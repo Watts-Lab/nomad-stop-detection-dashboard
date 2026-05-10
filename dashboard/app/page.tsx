@@ -890,15 +890,26 @@ function NomadDashboard() {
         <div className="flex-1 overflow-y-auto">
           <header className="sticky top-0 z-20 border-b border-[#263449] bg-[#111625]/92 backdrop-blur">
             <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between px-5">
-              <CSSLabLogo />
-              <nav className="hidden items-center gap-8 text-sm font-medium text-[#94a1b7] md:flex">
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>About</button>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("demo")}>Solution</button>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>Tools</button>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("metrics")}>Dashboard</button>
+              <button
+                aria-label="Go to home"
+                className="transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
+                onClick={goHome}
+              >
+                <CSSLabLogo />
+              </button>
+              <nav className="hidden items-center gap-4 text-[15px] font-medium text-[#94a1b7] lg:flex">
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={goHome}>Home</button>
+                <span aria-hidden="true" className="text-[#3a465d]">|</span>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>Learn</button>
+                <span aria-hidden="true" className="text-[#3a465d]">|</span>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("demo")}>Compare Algorithms</button>
+                <span aria-hidden="true" className="text-[#3a465d]">|</span>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("metrics")}>Aggregated Metrics</button>
+                <span aria-hidden="true" className="text-[#3a465d]">|</span>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => router.push("/about")}>About</button>
               </nav>
               <Button size="lg" onClick={() => navigateTo("demo")} className="h-11 bg-[#459ba4] px-6 text-[#08101c] hover:bg-[#62b8bf]">
-                Open Dashboard
+                Run Demo
               </Button>
             </div>
           </header>

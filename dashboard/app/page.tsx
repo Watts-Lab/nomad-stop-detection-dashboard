@@ -916,9 +916,14 @@ function NomadDashboard() {
 
           <section className="nomad-hero min-h-[400px] border-b border-[#263449] px-5">
             <div className="mx-auto flex max-w-6xl flex-col items-center py-12 text-center md:py-16">
-              <h1 className="text-7xl font-black leading-none tracking-normal text-[#f2f4eb] sm:text-8xl md:text-[7.5rem]">
-                N<span className="text-[#8acac8]">O</span>MAD
-              </h1>
+              <Image
+                src="/assets/logos/nomad_logo_hero_white_teal.svg"
+                alt="NOMAD"
+                width={480}
+                height={85}
+                priority
+                className="h-24 w-auto sm:h-28 md:h-32"
+              />
               <p className="mt-8 max-w-4xl text-2xl font-semibold tracking-normal text-[#f2f4eb] md:text-3xl">
                 Stop detection tools for noisy human mobility data.
               </p>

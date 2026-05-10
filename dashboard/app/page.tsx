@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Home, Columns2, Square } from "lucide-react"
+import { ArrowLeft, Home, Columns2, Play, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
 
@@ -914,41 +914,25 @@ function NomadDashboard() {
             </div>
           </header>
 
-          <section className="nomad-hero min-h-[610px] border-b border-[#263449] px-5">
+          <section className="nomad-hero min-h-[400px] border-b border-[#263449] px-5">
             <div className="mx-auto flex max-w-6xl flex-col items-center py-12 text-center md:py-16">
-              <div className="mb-10 rounded-full border border-[#459ba4]/35 bg-[#111625]/65 px-5 py-2 text-sm font-medium tracking-[0.12em] text-[#8acac8]">
-                UNIVERSITY OF PENNSYLVANIA - SEAS
-              </div>
               <h1 className="text-7xl font-black leading-none tracking-normal text-[#f2f4eb] sm:text-8xl md:text-[7.5rem]">
                 N<span className="text-[#8acac8]">O</span>MAD
               </h1>
               <p className="mt-8 max-w-4xl text-2xl font-semibold tracking-normal text-[#f2f4eb] md:text-3xl">
                 Stop detection tools for noisy human mobility data.
               </p>
-              <p className="mt-5 max-w-4xl text-xl leading-relaxed text-[#94a1b7]">
-                Visualize how algorithms turn sparse GPS pings into visits, trips, and time-separated stops that are easier to inspect and compare.
+              <p className="mt-5 max-w-5xl text-xl leading-relaxed text-[#94a1b7]">
+                An interactive dashboard for learning stop detection algorithms, tuning parameters, comparing behavior side by side, and inspecting trajectory outputs and aggregate metrics.
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row">
                 <Button size="lg" onClick={() => navigateTo("demo")} className="h-14 min-w-60 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]">
-                  Demo
+                  <Play className="h-5 w-5 fill-current" />
+                  Run Demo
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => navigateTo("learn")} className="h-14 min-w-44 border-[#3a465d] bg-[#111625]/45 text-base font-semibold text-[#f2f4eb] hover:bg-[#242b3d]">
                   Learn More
                 </Button>
-              </div>
-
-              <div className="mt-16 grid w-full overflow-hidden rounded-lg border border-[#263449] bg-[#171d2e]/78 text-left backdrop-blur md:grid-cols-4">
-                {[
-                  ["7", "Algorithms"],
-                  ["20", "Sample pings"],
-                  ["3", "Timeline blocks"],
-                  ["100%", "Cached workflow"],
-                ].map(([value, label]) => (
-                  <div key={label} className="border-[#263449] p-7 text-center md:border-r last:border-r-0">
-                    <p className="text-4xl font-bold text-[#459ba4]">{value}</p>
-                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[#94a1b7]">{label}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </section>
@@ -963,22 +947,6 @@ function NomadDashboard() {
                 <p className="mt-4 text-lg leading-relaxed text-[#94a1b7]">
                   The DBSTOP work highlights the core challenge: real GPS data is noisy, sparse, and bursty. Sequential methods can merge nearby visits or split a large stop, while density-based methods need temporal separation so stops do not overlap in time.
                 </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {[
-                  ["#8acac8", "Noise robust", "Inspect behavior when GPS uncertainty scatters pings around places."],
-                  ["#8199d8", "Time consistent", "Compare methods that must separate visits across a trajectory."],
-                  ["#dec345", "Parameter aware", "See how thresholds change merging, splitting, and missing stops."],
-                ].map(([color, title, body]) => (
-                  <Card key={title} className="nomad-soft-card rounded-lg py-0">
-                    <CardContent className="p-5">
-                      <div className="mb-4 h-3 w-10 rounded-full" style={{ backgroundColor: color }} />
-                      <h3 className="text-lg font-semibold text-[#f2f4eb]">{title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-[#94a1b7]">{body}</p>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
             </div>
 
@@ -997,20 +965,6 @@ function NomadDashboard() {
                   </div>
                   <div className="mt-5">
                     <Timeline segments={timelineSegments} selectedSegment={selectedTimeRange} onSegmentClick={setSelectedTimeRange} />
-                  </div>
-                  <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
-                      <p className="text-[#94a1b7]">Morning</p>
-                      <p className="font-semibold text-[#dec345]">Home stop</p>
-                    </div>
-                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
-                      <p className="text-[#94a1b7]">Midday</p>
-                      <p className="font-semibold text-[#8199d8]">Pause</p>
-                    </div>
-                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
-                      <p className="text-[#94a1b7]">Late</p>
-                      <p className="font-semibold text-[#8acac8]">Visit zone</p>
-                    </div>
                   </div>
                 </div>
               </CardContent>

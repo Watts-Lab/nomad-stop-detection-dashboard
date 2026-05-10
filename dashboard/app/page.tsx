@@ -16,54 +16,21 @@ import { ArrowLeft, Home, Columns2, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
 
-// ============ CSSLab Logo ============
+// ============ NOMAD Logo ============
 function CSSLabLogo({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <svg className="h-10 w-10" viewBox="-10 -10 120 120" aria-hidden="true">
-        <g className="outer-edges">
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 50 0 A 50 50 0 0 1 79.39 7.73"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 79.39 7.73 A 50 50 0 0 1 97.55 29.39"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 97.55 29.39 A 50 50 0 0 1 97.55 70.61"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 79.39 92.27 A 50 50 0 0 1 50 100"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 50 100 A 50 50 0 0 1 20.61 92.27"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 20.61 92.27 A 50 50 0 0 1 2.45 70.61"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 2.45 70.61 A 50 50 0 0 1 2.45 29.39"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 2.45 29.39 A 50 50 0 0 1 20.61 7.73"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="4" strokeLinecap="round" d="M 20.61 7.73 A 50 50 0 0 1 50 0"/>
-        </g>
-        <g className="inner-edges">
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 50 0 Q 59.5 39 97.55 29.39"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 50 0 Q 40.5 39 2.45 29.39"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 79.39 7.73 Q 70 50 97.55 70.61"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 79.39 7.73 Q 50 15 20.61 7.73"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 97.55 29.39 Q 79 65 79.39 92.27"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 97.55 70.61 Q 70 85 50 100"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 79.39 92.27 Q 50 100 20.61 92.27"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 50 100 Q 30 85 2.45 70.61"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 20.61 92.27 Q 21 65 2.45 29.39"/>
-          <path fill="none" stroke="#4a90d9" strokeWidth="3" strokeLinecap="round" d="M 2.45 70.61 Q 30 50 20.61 7.73"/>
-        </g>
-        <g className="shortcuts">
-          <path fill="none" stroke="#6bb3f0" strokeWidth="4" strokeLinecap="round" d="M 97.55 70.61 Q 50 50 2.45 29.39"/>
-          <path fill="none" stroke="#6bb3f0" strokeWidth="4" strokeLinecap="round" d="M 79.39 92.27 Q 50 50 20.61 7.73"/>
-        </g>
-        <g className="nodes">
-          <circle fill="#7ec8f3" cx="50" cy="0" r="5.5"/>
-          <circle fill="#7ec8f3" cx="79.39" cy="7.73" r="5.5"/>
-          <circle fill="#7ec8f3" cx="97.55" cy="29.39" r="5.5"/>
-          <circle fill="#7ec8f3" cx="97.55" cy="70.61" r="5.5"/>
-          <circle fill="#7ec8f3" cx="79.39" cy="92.27" r="5.5"/>
-          <circle fill="#7ec8f3" cx="50" cy="100" r="5.5"/>
-          <circle fill="#7ec8f3" cx="20.61" cy="92.27" r="5.5"/>
-          <circle fill="#7ec8f3" cx="2.45" cy="70.61" r="5.5"/>
-          <circle fill="#7ec8f3" cx="2.45" cy="29.39" r="5.5"/>
-          <circle fill="#7ec8f3" cx="20.61" cy="7.73" r="5.5"/>
-        </g>
+    <div className={`flex items-center gap-2 ${className}`}>
+      <span className="text-2xl font-bold tracking-[0.12em] text-[#8acac8]">N</span>
+      <svg className="h-7 w-7" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="17" fill="none" stroke="#8acac8" strokeWidth="2" />
+        <path d="M10 24c8-8 20-8 28 0M12 32c7-5 17-5 24 0M12 16c7 5 17 5 24 0" fill="none" stroke="#b6c9dc" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M24 7c-5 8-5 26 0 34M24 7c5 8 5 26 0 34" fill="none" stroke="#8acac8" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="14" cy="18" r="2.2" fill="#f2f4eb" />
+        <circle cx="31" cy="13" r="2.2" fill="#f2f4eb" />
+        <circle cx="35" cy="29" r="2.2" fill="#f2f4eb" />
       </svg>
-      <div className="text-2xl tracking-wide">
-        <span className="font-bold">CSS</span><span className="font-normal">Lab</span>
-      </div>
+      <span className="text-2xl font-bold tracking-[0.12em] text-[#f2f4eb]">MAD</span>
+      <span className="sr-only">NOMAD</span>
     </div>
   )
 }
@@ -367,10 +334,6 @@ const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>>
     radius: { min: 1, max: 500, step: 1 },
     min_duration: { min: 1, max: 3600, step: 1 },
   },
-  incremental: {
-    threshold: { min: 1, max: 500, step: 1 },
-    min_pts: { min: 2, max: 4, step: 1, allowedValues: [2, 3, 4] },
-  },
 }
 
 const ALGORITHM_REFERENCES: Record<string, { paper_label: string; paper_url?: string; docs_url?: string }> = {
@@ -398,9 +361,6 @@ const ALGORITHM_REFERENCES: Record<string, { paper_label: string; paper_url?: st
   },
   medoid: {
     paper_label: "Medoid-based clustering family",
-  },
-  incremental: {
-    paper_label: "Incremental clustering methods",
   },
 }
 
@@ -557,17 +517,6 @@ const algorithms = [
     parameters: [
       { name: "radius", defaultValue: "50", description: "Search radius (meters)" }, 
       { name: "min_duration", defaultValue: "60", description: "Minimum stop duration" }
-    ] 
-  },
-  { 
-    id: "incremental", 
-    name: "Incremental", 
-    shortDesc: "Online clustering approach",
-    description: "Online algorithm that processes GPS points as they arrive, building clusters incrementally without needing the full dataset upfront. Ideal for streaming data.", 
-    source: "Incremental Clustering for Mobile Sensor Data",
-    parameters: [
-      { name: "threshold", defaultValue: "50", description: "Distance threshold (meters)" }, 
-      { name: "min_pts", defaultValue: "3", description: "Minimum points per cluster" }
     ] 
   },
 ]
@@ -939,97 +888,127 @@ function NomadDashboard() {
   }, [activeView, metricsApiData, metricsLoading, metricsOptions, runMetricsVisualization])
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col">
+    <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
       {/* HOME VIEW */}
       {activeView === "home" && (
-        <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-          <div className="flex items-center justify-between">
-            <CSSLabLogo />
-          </div>
-          <div className="grid lg:grid-cols-2 gap-4 items-start overflow-hidden">
-            <div className="flex flex-col gap-3 overflow-hidden">
-              <h2 className="text-3xl font-bold text-foreground">Stop Detection Algorithm Visualizer</h2>
-              <p className="text-muted-foreground text-base">
-                Visualize and compare different stop detection algorithms to understand how they identify stops in GPS trajectory data.
+        <div className="flex-1 overflow-y-auto">
+          <header className="sticky top-0 z-20 border-b border-[#263449] bg-[#111625]/92 backdrop-blur">
+            <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between px-5">
+              <CSSLabLogo />
+              <nav className="hidden items-center gap-8 text-sm font-medium text-[#94a1b7] md:flex">
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>About</button>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("demo")}>Solution</button>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>Tools</button>
+                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("metrics")}>Dashboard</button>
+              </nav>
+              <Button size="lg" onClick={() => navigateTo("demo")} className="h-11 bg-[#459ba4] px-6 text-[#08101c] hover:bg-[#62b8bf]">
+                Open Dashboard
+              </Button>
+            </div>
+          </header>
+
+          <section className="nomad-hero min-h-[610px] border-b border-[#263449] px-5">
+            <div className="mx-auto flex max-w-6xl flex-col items-center py-12 text-center md:py-16">
+              <div className="mb-10 rounded-full border border-[#459ba4]/35 bg-[#111625]/65 px-5 py-2 text-sm font-medium tracking-[0.12em] text-[#8acac8]">
+                UNIVERSITY OF PENNSYLVANIA - SEAS
+              </div>
+              <h1 className="text-7xl font-black leading-none tracking-normal text-[#f2f4eb] sm:text-8xl md:text-[7.5rem]">
+                N<span className="text-[#8acac8]">O</span>MAD
+              </h1>
+              <p className="mt-8 max-w-4xl text-2xl font-semibold tracking-normal text-[#f2f4eb] md:text-3xl">
+                Stop detection tools for noisy human mobility data.
               </p>
-              <Card className="bg-card">
-                <CardContent className="pt-5 space-y-2">
-                  <h3 className="font-semibold text-foreground text-xl">What is stop detection?</h3>
-                  <p className="text-base text-muted-foreground">
-                    Stop detection turns noisy GPS trajectories into interpretable visits and trips by finding intervals where a person remains stationary for a meaningful amount of time. A detected stop is usually summarized by the user, the stop centroid, and its start and end timestamps, which makes large ping streams easier to analyze.
-                  </p>
-                  <p className="text-base text-muted-foreground">
-                    The DBSTOP paper frames the main difficulty as balancing spatial noise, sparse or bursty sampling, and time consistency. Sequential methods can miss, split, or merge nearby stops when GPS pings are noisy, while density-based methods are more robust but need explicit temporal separation so a person is never assigned to overlapping stops.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="bg-card">
-                <CardContent className="pt-5 space-y-3">
-                  <h3 className="font-semibold text-foreground text-xl">What this tool does</h3>
-                  <ul className="text-base text-muted-foreground space-y-1">
-                    <li>Visualize different stop detection algorithms in the same floor plan context.</li>
-                    <li>Compare algorithm performance side-by-side with synchronized time windows.</li>
-                    <li>Inspect algorithm parameters and see how they change stop clusters.</li>
-                  </ul>
-                </CardContent>
-              </Card>
-              <div className="grid sm:grid-cols-3 gap-2 text-sm">
-                <Card className="bg-muted/40">
-                  <CardContent className="p-4">
-                    <p className="text-muted-foreground">Algorithms</p>
-                    <p className="text-3xl font-bold">{algorithms.length}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-muted/40">
-                  <CardContent className="p-4">
-                    <p className="text-muted-foreground">Sample pings</p>
-                    <p className="text-3xl font-bold">{sampleDataPoints.length}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-muted/40">
-                  <CardContent className="p-4">
-                    <p className="text-muted-foreground">Timeline blocks</p>
-                    <p className="text-3xl font-bold">{timelineSegments.length}</p>
-                  </CardContent>
-                </Card>
+              <p className="mt-5 max-w-4xl text-xl leading-relaxed text-[#94a1b7]">
+                Visualize how algorithms turn sparse GPS pings into visits, trips, and time-separated stops that are easier to inspect and compare.
+              </p>
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                <Button size="lg" onClick={() => navigateTo("demo")} className="h-14 min-w-60 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]">
+                  Demo
+                </Button>
+                <Button variant="outline" size="lg" onClick={() => navigateTo("learn")} className="h-14 min-w-44 border-[#3a465d] bg-[#111625]/45 text-base font-semibold text-[#f2f4eb] hover:bg-[#242b3d]">
+                  Learn More
+                </Button>
               </div>
-              <div className="flex gap-3">
-                <Button variant="outline" size="lg" onClick={() => navigateTo("learn")}>Learn Algorithms</Button>
-                <Button size="lg" onClick={() => navigateTo("demo")}>Demo</Button>
+
+              <div className="mt-16 grid w-full overflow-hidden rounded-lg border border-[#263449] bg-[#171d2e]/78 text-left backdrop-blur md:grid-cols-4">
+                {[
+                  ["7", "Algorithms"],
+                  ["20", "Sample pings"],
+                  ["3", "Timeline blocks"],
+                  ["100%", "Cached workflow"],
+                ].map(([value, label]) => (
+                  <div key={label} className="border-[#263449] p-7 text-center md:border-r last:border-r-0">
+                    <p className="text-4xl font-bold text-[#459ba4]">{value}</p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[#94a1b7]">{label}</p>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="flex flex-col gap-2 overflow-hidden">
-              <Card className="bg-card overflow-hidden">
-                <CardContent className="p-0">
-                  <FloorPlan
-                    dataPoints={sampleDataPoints}
-                    selectedTimeRange={selectedTimeRange}
-                    placeholderSrc={GROUND_TRUTH_PLACEHOLDER_IMAGE}
-                  />
-                </CardContent>
-              </Card>
-              <Timeline segments={timelineSegments} selectedSegment={selectedTimeRange} onSegmentClick={setSelectedTimeRange} />
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Cluster Legend</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-md bg-muted/40 p-3">
-                    <p className="text-muted-foreground">Morning home stop</p>
-                    <p className="font-semibold text-[#F5A623]">Orange cluster</p>
-                  </div>
-                  <div className="rounded-md bg-muted/40 p-3">
-                    <p className="text-muted-foreground">Mid-session pause</p>
-                    <p className="font-semibold text-[#E57373]">Pink cluster</p>
-                  </div>
-                  <div className="rounded-md bg-muted/40 p-3">
-                    <p className="text-muted-foreground">Late visit zone</p>
-                    <p className="font-semibold text-[#7B68EE]">Purple cluster</p>
-                  </div>
-                </CardContent>
-              </Card>
+          </section>
+
+          <section className="mx-auto grid max-w-7xl gap-8 px-5 py-10 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold text-[#f2f4eb]">Stop Detection Overview</h2>
+                <p className="mt-4 text-lg leading-relaxed text-[#b6c9dc]">
+                  Stop detection identifies intervals where a person remains stationary long enough to count as a meaningful visit. Each detected stop summarizes a user, a centroid, and start and end times, reducing raw GPS streams into mobility events that can support downstream analysis.
+                </p>
+                <p className="mt-4 text-lg leading-relaxed text-[#94a1b7]">
+                  The DBSTOP work highlights the core challenge: real GPS data is noisy, sparse, and bursty. Sequential methods can merge nearby visits or split a large stop, while density-based methods need temporal separation so stops do not overlap in time.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {[
+                  ["#8acac8", "Noise robust", "Inspect behavior when GPS uncertainty scatters pings around places."],
+                  ["#8199d8", "Time consistent", "Compare methods that must separate visits across a trajectory."],
+                  ["#dec345", "Parameter aware", "See how thresholds change merging, splitting, and missing stops."],
+                ].map(([color, title, body]) => (
+                  <Card key={title} className="nomad-soft-card rounded-lg py-0">
+                    <CardContent className="p-5">
+                      <div className="mb-4 h-3 w-10 rounded-full" style={{ backgroundColor: color }} />
+                      <h3 className="text-lg font-semibold text-[#f2f4eb]">{title}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-[#94a1b7]">{body}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
+
+            <Card className="nomad-card overflow-hidden rounded-lg py-0">
+              <CardContent className="p-0">
+                <div className="border-b border-[#263449] bg-[#202738]/80 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-[#f2f4eb]">Trajectory Preview</h3>
+                </div>
+                <div className="p-5">
+                  <div className="overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
+                    <FloorPlan
+                      dataPoints={sampleDataPoints}
+                      selectedTimeRange={selectedTimeRange}
+                      placeholderSrc={GROUND_TRUTH_PLACEHOLDER_IMAGE}
+                    />
+                  </div>
+                  <div className="mt-5">
+                    <Timeline segments={timelineSegments} selectedSegment={selectedTimeRange} onSegmentClick={setSelectedTimeRange} />
+                  </div>
+                  <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
+                      <p className="text-[#94a1b7]">Morning</p>
+                      <p className="font-semibold text-[#dec345]">Home stop</p>
+                    </div>
+                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
+                      <p className="text-[#94a1b7]">Midday</p>
+                      <p className="font-semibold text-[#8199d8]">Pause</p>
+                    </div>
+                    <div className="rounded-md border border-[#263449] bg-[#202738]/60 p-3">
+                      <p className="text-[#94a1b7]">Late</p>
+                      <p className="font-semibold text-[#8acac8]">Visit zone</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
         </div>
       )}
 

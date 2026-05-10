@@ -4,39 +4,39 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.98 0 0);
-  --foreground: oklch(0.2 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0 0);
-  --primary: oklch(0.45 0.15 250);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0 0);
-  --secondary-foreground: oklch(0.2 0 0);
-  --muted: oklch(0.92 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.95 0 0);
-  --accent-foreground: oklch(0.2 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.92 0 0);
-  --ring: oklch(0.45 0.15 250);
-  --chart-1: oklch(0.75 0.15 65);
-  --chart-2: oklch(0.7 0.15 350);
-  --chart-3: oklch(0.55 0.2 290);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --background: #111625;
+  --foreground: #f2f4eb;
+  --card: #171d2e;
+  --card-foreground: #f2f4eb;
+  --popover: #171d2e;
+  --popover-foreground: #f2f4eb;
+  --primary: #459ba4;
+  --primary-foreground: #08101c;
+  --secondary: #242b3d;
+  --secondary-foreground: #dbe9f3;
+  --muted: #202738;
+  --muted-foreground: #94a1b7;
+  --accent: #8acac8;
+  --accent-foreground: #08101c;
+  --destructive: #c66d66;
+  --destructive-foreground: #fff7f2;
+  --border: #263449;
+  --input: #242b3d;
+  --ring: #8acac8;
+  --chart-1: #83c9cc;
+  --chart-2: #b6c9dc;
+  --chart-3: #8199d8;
+  --chart-4: #dec345;
+  --chart-5: #c17870;
   --radius: 0.5rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #151b2c;
+  --sidebar-foreground: #f2f4eb;
+  --sidebar-primary: #459ba4;
+  --sidebar-primary-foreground: #08101c;
+  --sidebar-accent: #242b3d;
+  --sidebar-accent-foreground: #dbe9f3;
+  --sidebar-border: #263449;
+  --sidebar-ring: #8acac8;
 }
 
 .dark {
@@ -121,5 +121,70 @@
   }
   body {
     @apply bg-background text-foreground text-[16px] leading-relaxed h-screen overflow-hidden;
+  }
+}
+
+@layer components {
+  .nomad-shell {
+    background:
+      radial-gradient(circle at 22% 18%, rgb(138 202 200 / 0.18), transparent 28%),
+      radial-gradient(circle at 76% 22%, rgb(129 153 216 / 0.14), transparent 30%),
+      linear-gradient(180deg, #111625 0%, #111625 58%, #151b2c 100%);
+  }
+
+  .nomad-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      linear-gradient(rgb(17 22 37 / 0.76), rgb(17 22 37 / 0.92)),
+      radial-gradient(circle at 28% 45%, rgb(69 155 164 / 0.34), transparent 26%),
+      radial-gradient(circle at 64% 38%, rgb(177 192 216 / 0.2), transparent 28%),
+      linear-gradient(90deg, transparent 24px, rgb(138 202 200 / 0.08) 25px, transparent 26px),
+      linear-gradient(transparent 24px, rgb(138 202 200 / 0.07) 25px, transparent 26px);
+    background-size: auto, auto, auto, 96px 96px, 96px 96px;
+  }
+
+  .nomad-hero::before,
+  .nomad-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .nomad-hero::before {
+    opacity: 0.56;
+    background-image:
+      radial-gradient(circle at 11% 38%, #8acac8 0 2px, transparent 3px),
+      radial-gradient(circle at 19% 47%, #8acac8 0 1px, transparent 2px),
+      radial-gradient(circle at 32% 30%, #b6c9dc 0 2px, transparent 3px),
+      radial-gradient(circle at 47% 55%, #8acac8 0 2px, transparent 3px),
+      radial-gradient(circle at 61% 35%, #b6c9dc 0 2px, transparent 3px),
+      radial-gradient(circle at 76% 44%, #8acac8 0 2px, transparent 3px),
+      radial-gradient(circle at 87% 30%, #b6c9dc 0 2px, transparent 3px),
+      linear-gradient(24deg, transparent 12%, rgb(138 202 200 / 0.18) 12.2%, transparent 31%),
+      linear-gradient(153deg, transparent 20%, rgb(182 201 220 / 0.13) 20.2%, transparent 48%),
+      linear-gradient(8deg, transparent 44%, rgb(138 202 200 / 0.16) 44.2%, transparent 72%);
+  }
+
+  .nomad-hero::after {
+    background:
+      radial-gradient(ellipse at 28% 54%, rgb(69 155 164 / 0.2), transparent 36%),
+      radial-gradient(ellipse at 62% 42%, rgb(177 192 216 / 0.16), transparent 40%);
+    filter: blur(18px);
+  }
+
+  .nomad-card {
+    border-color: rgb(138 202 200 / 0.16);
+    background: rgb(23 29 46 / 0.76);
+    box-shadow: 0 22px 60px rgb(0 0 0 / 0.18);
+    backdrop-filter: blur(12px);
+  }
+
+  .nomad-soft-card {
+    border-color: rgb(177 192 216 / 0.14);
+    background: rgb(242 244 235 / 0.045);
   }
 }

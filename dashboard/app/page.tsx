@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useState, useCallback, useEffect, useRef } from "react"
+import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,19 +20,14 @@ const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.s
 // ============ NOMAD Logo ============
 function CSSLabLogo({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <span className="text-2xl font-bold tracking-[0.12em] text-[#8acac8]">N</span>
-      <svg className="h-7 w-7" viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="24" cy="24" r="17" fill="none" stroke="#8acac8" strokeWidth="2" />
-        <path d="M10 24c8-8 20-8 28 0M12 32c7-5 17-5 24 0M12 16c7 5 17 5 24 0" fill="none" stroke="#b6c9dc" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M24 7c-5 8-5 26 0 34M24 7c5 8 5 26 0 34" fill="none" stroke="#8acac8" strokeWidth="1.8" strokeLinecap="round" />
-        <circle cx="14" cy="18" r="2.2" fill="#f2f4eb" />
-        <circle cx="31" cy="13" r="2.2" fill="#f2f4eb" />
-        <circle cx="35" cy="29" r="2.2" fill="#f2f4eb" />
-      </svg>
-      <span className="text-2xl font-bold tracking-[0.12em] text-[#f2f4eb]">MAD</span>
-      <span className="sr-only">NOMAD</span>
-    </div>
+    <Image
+      src="/assets/logos/nomad-logo.svg"
+      alt="NOMAD"
+      width={212}
+      height={37}
+      priority
+      className={`h-8 w-auto ${className}`}
+    />
   )
 }
 
@@ -580,7 +576,7 @@ function NomadDashboard() {
   const [compareSeed, setCompareSeed] = useState(1)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
-  const metricsMode: "compare" = "compare"
+  const metricsMode = "compare" as const
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential")
   const [metricsTrajectoryUser, setMetricsTrajectoryUser] = useState("")

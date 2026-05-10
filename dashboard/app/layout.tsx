@@ -6,8 +6,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'NOMAD Dashboard - Stop Detection Algorithm Visualizer',
-  description: 'Visualize and compare stop detection algorithms for GPS mobility data',
+  title: 'NOMAD Stop Detection Dashboard',
+  description: 'Learn, visualize, and compare stop detection algorithms used in human mobility science.',
 }
 
 export default function RootLayout({

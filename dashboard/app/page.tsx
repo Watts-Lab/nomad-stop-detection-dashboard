@@ -21,12 +21,12 @@ const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.s
 function CSSLabLogo({ className = "" }: { className?: string }) {
   return (
     <Image
-      src="/assets/logos/nomad-logo.svg"
+      src="/assets/logos/nomad-logo-white.svg"
       alt="NOMAD"
       width={212}
       height={37}
       priority
-      className={`h-8 w-auto ${className}`}
+      className={`h-8 w-auto brightness-0 invert ${className}`}
     />
   )
 }
@@ -1011,12 +1011,12 @@ function NomadDashboard() {
       {/* LEARN VIEW */}
       {activeView === "learn" && !expandedAlgorithm && (
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-          <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-start justify-between shrink-0">
             <div className="flex items-center gap-4">
               <NavButtons onHome={goHome} onBack={goBack} />
               <h2 className="text-3xl font-bold">Learn Algorithms</h2>
             </div>
-            <CSSLabLogo />
+            <CSSLabLogo className="mt-1 h-10 shrink-0" />
           </div>
           <p className="text-sm text-muted-foreground">
             Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch before running the demo.

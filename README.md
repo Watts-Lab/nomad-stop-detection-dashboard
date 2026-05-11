@@ -32,8 +32,8 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 │   ├── components/         # UI components
 │   ├── public/             # Static images and notebook figures
 │   └── scripts/            # Python visualization and metrics helpers
-├── build_cache/            # Local generated build/cache artifacts
-├── cached_results/         # Local cached API/experiment outputs
+├── build_cache/            # Source notebooks and generator scripts
+├── cached_results/         # Local cached API/experiment outputs and screenshots
 └── README.md
 ```
 

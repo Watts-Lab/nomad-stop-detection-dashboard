@@ -8,8 +8,6 @@ dist/
 build/
 
 # Local caches and generated dashboard results
-build_cache/*
-!build_cache/.gitkeep
 cached_results/*
 !cached_results/.gitkeep
 .turbo/
@@ -31,6 +29,13 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ipynb_checkpoints/
+
+# Build cache contains a mix of generated outputs and source notebooks/scripts.
+build_cache/**
+!build_cache/.gitkeep
+!build_cache/**/
+!build_cache/**/*.py
+!build_cache/**/*.ipynb
 
 # OS/editor noise
 .DS_Store

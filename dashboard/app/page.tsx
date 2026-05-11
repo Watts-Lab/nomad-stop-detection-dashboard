@@ -914,61 +914,65 @@ function NomadDashboard() {
             </div>
           </header>
 
-          <section className="nomad-hero min-h-[400px] border-b border-[#263449] px-5">
-            <div className="mx-auto flex max-w-6xl flex-col items-center py-12 text-center md:py-16">
-              <h1 className="text-7xl font-black leading-none tracking-normal text-[#f2f4eb] sm:text-8xl md:text-[7.5rem]">
-                N<span className="text-[#8acac8]">O</span>MAD
-              </h1>
-              <p className="mt-8 max-w-4xl text-2xl font-semibold tracking-normal text-[#f2f4eb] md:text-3xl">
-                Stop detection tools for noisy human mobility data.
-              </p>
-              <p className="mt-5 max-w-5xl text-xl leading-relaxed text-[#94a1b7]">
-                An interactive dashboard for learning stop detection algorithms, tuning parameters, comparing behavior side by side, and inspecting trajectory outputs and aggregate metrics.
-              </p>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-                <Button size="lg" onClick={() => navigateTo("demo")} className="h-14 min-w-60 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]">
-                  <Play className="h-5 w-5 fill-current" />
-                  Run Demo
-                </Button>
-                <Button variant="outline" size="lg" onClick={() => navigateTo("learn")} className="h-14 min-w-44 border-[#3a465d] bg-[#111625]/45 text-base font-semibold text-[#f2f4eb] hover:bg-[#242b3d]">
-                  Learn More
-                </Button>
-              </div>
-            </div>
-          </section>
-
-          <section className="mx-auto grid max-w-7xl gap-8 px-5 py-10 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-3xl font-bold text-[#f2f4eb]">Stop Detection Overview</h2>
-                <p className="mt-4 text-lg leading-relaxed text-[#b6c9dc]">
-                  Stop detection identifies intervals where a person remains stationary long enough to count as a meaningful visit. Each detected stop summarizes a user, a centroid, and start and end times, reducing raw GPS streams into mobility events that can support downstream analysis.
+          <section className="nomad-hero min-h-[calc(100vh-74px)] border-b border-[#263449] px-5 py-6">
+            <div className="mx-auto grid min-h-[calc(100vh-122px)] max-w-7xl items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="max-w-2xl">
+                <Image
+                  src="/assets/logos/nomad_logo_hero_white_teal.svg"
+                  alt="NOMAD"
+                  width={480}
+                  height={85}
+                  priority
+                  className="h-[72px] w-auto sm:h-[84px] md:h-24"
+                />
+                <p className="mt-7 text-2xl font-semibold tracking-normal text-[#f2f4eb] md:text-3xl">
+                  Stop detection tools for noisy human mobility data.
                 </p>
-                <p className="mt-4 text-lg leading-relaxed text-[#94a1b7]">
-                  The DBSTOP work highlights the core challenge: real GPS data is noisy, sparse, and bursty. Sequential methods can merge nearby visits or split a large stop, while density-based methods need temporal separation so stops do not overlap in time.
-                </p>
-              </div>
-            </div>
-
-            <Card className="nomad-card overflow-hidden rounded-lg py-0">
-              <CardContent className="p-0">
-                <div className="border-b border-[#263449] bg-[#202738]/80 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-[#f2f4eb]">Trajectory Preview</h3>
-                </div>
-                <div className="p-5">
-                  <div className="overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
-                    <FloorPlan
-                      dataPoints={sampleDataPoints}
-                      selectedTimeRange={selectedTimeRange}
-                      placeholderSrc={GROUND_TRUTH_PLACEHOLDER_IMAGE}
-                    />
+                <div className="mt-7 grid gap-5 text-left">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#f2f4eb]">What Stop Detection Is</h2>
+                    <p className="mt-2 text-base leading-relaxed text-[#b6c9dc]">
+                      Stop detection identifies intervals where a person remains stationary long enough to count as a meaningful visit, reducing raw GPS streams into mobility events.
+                    </p>
                   </div>
-                  <div className="mt-5">
-                    <Timeline segments={timelineSegments} selectedSegment={selectedTimeRange} onSegmentClick={setSelectedTimeRange} />
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#f2f4eb]">What This Dashboard Does</h2>
+                    <p className="mt-2 text-base leading-relaxed text-[#94a1b7]">
+                      Learn algorithm assumptions, tune parameters, compare behavior side by side, and inspect trajectory outputs and aggregate metrics without rerunning notebook experiments.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <Button size="lg" onClick={() => navigateTo("demo")} className="h-14 min-w-60 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]">
+                    <Play className="h-5 w-5 fill-current" />
+                    Run Demo
+                  </Button>
+                  <Button variant="outline" size="lg" onClick={() => navigateTo("learn")} className="h-14 min-w-44 border-[#3a465d] bg-[#111625]/45 text-base font-semibold text-[#f2f4eb] hover:bg-[#242b3d]">
+                    Learn More
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="nomad-card overflow-hidden rounded-lg py-0">
+                <CardContent className="p-0">
+                  <div className="border-b border-[#263449] bg-[#202738]/80 px-5 py-4">
+                    <h3 className="text-lg font-semibold text-[#f2f4eb]">Trajectory Preview</h3>
+                  </div>
+                  <div className="p-5">
+                    <div className="overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
+                      <FloorPlan
+                        dataPoints={sampleDataPoints}
+                        selectedTimeRange={selectedTimeRange}
+                        placeholderSrc={GROUND_TRUTH_PLACEHOLDER_IMAGE}
+                      />
+                    </div>
+                    <div className="mt-5">
+                      <Timeline segments={timelineSegments} selectedSegment={selectedTimeRange} onSegmentClick={setSelectedTimeRange} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </section>
         </div>
       )}

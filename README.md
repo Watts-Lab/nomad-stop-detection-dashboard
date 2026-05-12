@@ -45,12 +45,18 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
+## Cache-Backed API Contract
 
-## Build
+The app routes in `dashboard/app/api/*` do not call Python or import `nomad`.
+They serve placeholder/cached responses from:
 
-```bash
-cd dashboard
-npm run build
-npm run start
-```
+- `cached_results/algorithm-compare/default.json`
+- `cached_results/algorithm-metrics/options.json`
+- `cached_results/algorithm-metrics/default.json`
+
+You can replace these JSON files with real cached outputs later, keeping the same response shapes.
+
+## Notes
+
+- Static placeholder figures are in `dashboard/public`.
+- Python scripts in `dashboard/scripts` were copied for reference only and are not used by the API routes.

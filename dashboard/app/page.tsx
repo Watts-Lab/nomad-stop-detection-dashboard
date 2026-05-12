@@ -5,7 +5,6 @@ import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -13,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
 import { NomadNav } from "@/components/nomad-nav"
 import { ArrowLeft, Columns2, Play, Square } from "lucide-react"
 
@@ -182,6 +182,7 @@ type CompareApiResponse = {
 
 type MetricsPanelResponse = {
   algorithm: string
+  sweep_parameter?: string
   title: string
   image_data_url: string | null
   max_mean: number
@@ -234,7 +235,9 @@ type MetricsOptionsResponse = {
   max_iterations: number
 }
 
-const FALLBACK_PARAMETER_NOTES: NonNullable<MetricsOptionsResponse["parameter_notes"]> = {
+type MetricsParameterNote = NonNullable<MetricsOptionsResponse["parameter_notes"]>[string]
+
+const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   Lachesis: {
     source: "delta_roam_vs_acc_exp.ipynb",
     sweep_parameter: "delta_roam",
@@ -270,28 +273,32 @@ type ParameterConstraint = {
   allowedValues?: number[]
 }
 
+type DemoEditableParam = ParameterConstraint & {
+  label?: string
+}
+
 const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>> = {
   dbstop: {
     time_thresh: { min: 1, max: 180, step: 1 },
-    dist_thresh: { min: 1, max: 50, step: 1 },
-    min_pts: { min: 2, max: 4, step: 1, allowedValues: [2, 3, 4] },
-    dur_min: { min: 1, max: 180, step: 1 },
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
+    dur_min: { min: 0, max: 180, step: 5 },
   },
   seqscan: {
     time_thresh: { min: 1, max: 180, step: 1 },
-    dist_thresh: { min: 1, max: 50, step: 1 },
-    min_pts: { min: 2, max: 4, step: 1, allowedValues: [2, 3, 4] },
-    dur_min: { min: 1, max: 180, step: 1 },
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
+    dur_min: { min: 0, max: 180, step: 5 },
   },
   dbscan: {
-    eps_spatial: { min: 1, max: 50, step: 1 },
+    eps_spatial: { min: 0, max: 50, step: 5 },
     T_max: { min: 1, max: 180, step: 1 },
-    minPts: { min: 2, max: 4, step: 1, allowedValues: [2, 3, 4] },
+    minPts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
   },
   lachesis: {
-    dur_min: { min: 1, max: 180, step: 1 },
+    dur_min: { min: 0, max: 180, step: 5 },
     dt_max: { min: 1, max: 180, step: 1 },
-    delta_roam: { min: 5, max: 60, step: 1 },
+    delta_roam: { min: 0, max: 120, step: 5 },
   },
   gridbased: {
     cell_size: { min: 25, max: 500, step: 1 },
@@ -301,6 +308,61 @@ const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>>
     radius: { min: 1, max: 500, step: 1 },
     min_duration: { min: 1, max: 3600, step: 1 },
   },
+}
+
+const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
+  dbstop: {
+    dur_min: { min: 0, max: 180, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    min_pts: { min: 2, max: 3, step: 1 },
+  },
+  seqscan: {
+    dur_min: { min: 0, max: 180, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    min_pts: { min: 2, max: 3, step: 1 },
+  },
+  dbscan: {
+    eps_spatial: { min: 0, max: 50, step: 5, label: "dist_thresh" },
+    minPts: { min: 2, max: 3, step: 1, label: "min_pts" },
+  },
+  lachesis: {
+    dur_min: { min: 0, max: 180, step: 5 },
+    delta_roam: { min: 0, max: 120, step: 5 },
+  },
+}
+
+const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
+  dbstop: "DBSTOP",
+  lachesis: "Lachesis",
+  seqscan: "SeqScan",
+  dbscan: "ST-DBSCAN",
+}
+
+const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
+  DBSTOP: [
+    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  Lachesis: [
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  Sequential: [
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  SeqScan: [
+    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  "ST-DBSCAN": [
+    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+  ],
+}
+
+function getMetricsSweepLimit(algorithm: string, parameter: string): { min: number; max: number } {
+  const options = METRICS_SWEEP_PARAMETERS[algorithm] ?? []
+  return options.find((option) => option.value === parameter) ?? options[0] ?? { min: 0, max: 50 }
 }
 
 const ALGORITHM_REFERENCES: Record<string, { paper_label: string; paper_url?: string; docs_url?: string }> = {
@@ -361,11 +423,6 @@ function validateAlgorithmParams(
         errors[p.name] = `Must be between ${constraint.min} and ${constraint.max}.`
         continue
       }
-      const offset = Math.abs((num - constraint.min) % constraint.step)
-      if (offset > 1e-9 && Math.abs(offset - constraint.step) > 1e-9) {
-        errors[p.name] = `Must be a multiple of ${constraint.step}.`
-        continue
-      }
     }
     normalized[p.name] = num
   }
@@ -378,6 +435,114 @@ function paramInputValue(
   defaultValue: string,
 ): string {
   return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : defaultValue
+}
+
+type AlgorithmDefinition = (typeof algorithms)[number]
+type ParamStateSetter = (value: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void
+
+function DemoParameterControls({
+  algo,
+  algoId,
+  values,
+  errors,
+  setValues,
+  setErrors,
+}: {
+  algo: AlgorithmDefinition | undefined
+  algoId: string
+  values: Record<string, string>
+  errors: Record<string, string>
+  setValues: ParamStateSetter
+  setErrors: ParamStateSetter
+}) {
+  if (!algo) return null
+
+  const editableRules = DEMO_EDITABLE_PARAMS[algoId] ?? {}
+
+  return (
+    <div className="space-y-3">
+      {algo.parameters.map((param) => {
+        const rule = editableRules[param.name]
+        const value = Number(paramInputValue(values, param.name, param.defaultValue))
+        const label = rule?.label ?? param.name
+        const optionCount = rule ? Math.floor((rule.max - rule.min) / rule.step) + 1 : 0
+        const discreteOptions = rule?.allowedValues ?? (
+          rule && optionCount > 0 && optionCount <= 5
+            ? Array.from({ length: optionCount }, (_, index) => rule.min + index * rule.step)
+            : null
+        )
+
+        if (!rule) {
+          return (
+            <div key={param.name} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-mono text-muted-foreground">{param.name}</span>
+                <span className="text-xs font-mono text-foreground">{param.defaultValue}</span>
+              </div>
+            </div>
+          )
+        }
+
+        if (discreteOptions) {
+          return (
+            <div key={param.name} className="space-y-2 rounded-md border border-border/70 bg-background/40 px-3 py-3">
+              <label className="text-sm font-mono">{label}</label>
+              <Select
+                value={String(Number.isFinite(value) ? value : param.defaultValue)}
+                onValueChange={(next) => {
+                  setValues((prev) => ({ ...prev, [param.name]: next }))
+                  setErrors((prev) => {
+                    const updated = { ...prev }
+                    delete updated[param.name]
+                    return updated
+                  })
+                }}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {discreteOptions.map((option) => (
+                    <SelectItem key={`${param.name}-${option}`} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )
+        }
+
+        return (
+          <div key={param.name} className="space-y-2 rounded-md border border-border/70 bg-background/40 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-mono">{label}</label>
+              <span className="rounded-sm bg-muted px-2 py-0.5 font-mono text-xs">{Number.isFinite(value) ? value : param.defaultValue}</span>
+            </div>
+            <Slider
+              min={rule.min}
+              max={rule.max}
+              step={rule.step}
+              value={[Number.isFinite(value) ? value : Number(param.defaultValue)]}
+              onValueChange={([next]) => {
+                setValues((prev) => ({ ...prev, [param.name]: String(next) }))
+                setErrors((prev) => {
+                  const updated = { ...prev }
+                  delete updated[param.name]
+                  return updated
+                })
+              }}
+            />
+          </div>
+        )
+      })}
+      {Object.keys(errors).length > 0 && (
+        <p className="text-xs text-red-500">
+          {Object.entries(errors).map(([key, value]) => `${key}: ${value}`).join(" · ")}
+        </p>
+      )}
+    </div>
+  )
 }
 
 function CompareAnimationPanel({
@@ -524,7 +689,6 @@ const DEMO_ALGORITHM_IDS = new Set(["dbstop", "lachesis", "seqscan", "dbscan", "
 const DASHBOARD_VIEWS = new Set(["home", "learn", "demo", "metrics"] as const)
 type DashboardView = "home" | "learn" | "demo" | "metrics"
 type DemoMode = "single" | "compare"
-type MetricsOutputView = "metrics" | "map" | "timeline"
 
 // ============ MAIN COMPONENT ============
 
@@ -549,17 +713,15 @@ function NomadDashboard() {
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
-  const [metricsOutputView, setMetricsOutputView] = useState<MetricsOutputView>("metrics")
   const metricsMode = metricsCompareMode ? "compare" : "single"
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential")
+  const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
+  const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
   const [metricsTrajectoryUser, setMetricsTrajectoryUser] = useState("")
   const [metricsIterations, setMetricsIterations] = useState(100)
-  const [metricsSweepMin, setMetricsSweepMin] = useState(5)
-  const [metricsSweepMax, setMetricsSweepMax] = useState(50)
   const [metricsSweepPoints, setMetricsSweepPoints] = useState(50)
   const [metricsSeed, setMetricsSeed] = useState(2026)
-  const [metricsSweepLimits, setMetricsSweepLimits] = useState<Record<string, SweepLimit>>({})
   const [metricsApiData, setMetricsApiData] = useState<MetricsApiResponse | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsError, setMetricsError] = useState<string | null>(null)
@@ -680,11 +842,8 @@ function NomadDashboard() {
       setMetricsLeftAlgorithm(data.defaults.left_algorithm ?? "Lachesis")
       setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential")
       setMetricsIterations(data.defaults.iterations ?? 100)
-      setMetricsSweepMin(data.defaults.sweep_min ?? 5)
-      setMetricsSweepMax(data.defaults.sweep_max ?? 50)
       setMetricsSweepPoints(data.defaults.sweep_points ?? 50)
       setMetricsSeed(data.defaults.seed ?? 2026)
-      setMetricsSweepLimits(data.sweep_limits ?? {})
       const firstUser = data.trajectories?.[0]?.user_id ?? ""
       setMetricsTrajectoryUser(firstUser)
     } catch (err) {
@@ -694,21 +853,13 @@ function NomadDashboard() {
 
   const runMetricsVisualization = useCallback(async () => {
     if (!metricsOptions) return
-    const algorithmsForRange = metricsCompareMode
-      ? [metricsLeftAlgorithm, metricsRightAlgorithm]
-      : [metricsLeftAlgorithm]
-    const limits = algorithmsForRange
-      .map((a) => metricsSweepLimits[a])
-      .filter((v): v is SweepLimit => Boolean(v))
-    if (limits.length > 0) {
-      const allowedMin = Math.max(...limits.map((l) => l.min))
-      const allowedMax = Math.min(...limits.map((l) => l.max))
-      if (!Number.isInteger(metricsSweepMin) || !Number.isInteger(metricsSweepMax) || !Number.isInteger(metricsSweepPoints)) {
-        setMetricsError("Sweep values must be integers (step = 1).")
-        return
-      }
-      if (metricsSweepMin < allowedMin || metricsSweepMax > allowedMax || metricsSweepMin > metricsSweepMax) {
-        setMetricsError(`Sweep range must be between ${allowedMin} and ${allowedMax} for the selected algorithms.`)
+    const leftLimit = getMetricsSweepLimit(metricsLeftAlgorithm, metricsLeftParameter)
+    const rightLimit = getMetricsSweepLimit(metricsRightAlgorithm, metricsRightParameter)
+    const allowedMin = metricsCompareMode ? Math.max(leftLimit.min, rightLimit.min) : leftLimit.min
+    const allowedMax = metricsCompareMode ? Math.min(leftLimit.max, rightLimit.max) : leftLimit.max
+    if (Number.isFinite(allowedMin) && Number.isFinite(allowedMax)) {
+      if (!Number.isInteger(metricsSweepPoints)) {
+        setMetricsError("Sweep values must be whole numbers.")
         return
       }
       if (metricsSweepPoints < 2 || metricsSweepPoints > 200) {
@@ -726,10 +877,12 @@ function NomadDashboard() {
           mode: metricsMode,
           left_algorithm: metricsLeftAlgorithm,
           right_algorithm: metricsRightAlgorithm,
+          left_parameter: metricsLeftParameter,
+          right_parameter: metricsRightParameter,
           trajectory_user_id: metricsTrajectoryUser,
           iterations: metricsIterations,
-          sweep_min: metricsSweepMin,
-          sweep_max: metricsSweepMax,
+          sweep_min: allowedMin,
+          sweep_max: allowedMax,
           sweep_points: metricsSweepPoints,
           seed: metricsSeed,
         }),
@@ -748,24 +901,26 @@ function NomadDashboard() {
     metricsIterations,
     metricsCompareMode,
     metricsLeftAlgorithm,
+    metricsLeftParameter,
     metricsMode,
     metricsOptions,
     metricsRightAlgorithm,
+    metricsRightParameter,
     metricsSeed,
-    metricsSweepMax,
-    metricsSweepMin,
     metricsSweepPoints,
-    metricsSweepLimits,
     metricsTrajectoryUser,
   ])
 
   const handleNewMetricsTrajectory = useCallback(() => {
-    if (!metricsOptions || metricsOptions.trajectories.length === 0) return
-    const ids = metricsOptions.trajectories.map((t) => t.user_id)
-    const curr = Math.max(0, ids.indexOf(metricsTrajectoryUser))
-    const next = ids[(curr + 1) % ids.length]
-    setMetricsTrajectoryUser(next)
-    setMetricsSeed((s) => s + 1)
+    const trajectories = metricsOptions?.trajectories ?? []
+    if (trajectories.length > 0) {
+      const ids = trajectories.map((trajectory) => trajectory.user_id)
+      const currentIndex = ids.indexOf(metricsTrajectoryUser)
+      const nextId = ids[(currentIndex + 1 + ids.length) % ids.length]
+      setMetricsTrajectoryUser(nextId)
+    }
+    setMetricsSeed((seed) => seed + 1)
+    setMetricsApiData(null)
   }, [metricsOptions, metricsTrajectoryUser])
 
   const handleAlgorithmSelect = (algorithmId: string) => {
@@ -786,6 +941,23 @@ function NomadDashboard() {
     setRightParams({})
     setRightParamErrors({})
   }, [])
+
+  const openMetricsFromDemo = useCallback(() => {
+    const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
+    const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
+
+    if (leftMetricsAlgorithm) {
+      setMetricsLeftAlgorithm(leftMetricsAlgorithm)
+      setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[leftMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
+    }
+    if (rightMetricsAlgorithm) {
+      setMetricsRightAlgorithm(rightMetricsAlgorithm)
+      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[rightMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
+    }
+    setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
+    setActiveView("metrics")
+    syncUrl("metrics")
+  }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
 
   const handleCompareModeToggle = useCallback(() => {
     const nextMode: DemoMode = compareMode ? "single" : "compare"
@@ -808,44 +980,38 @@ function NomadDashboard() {
   const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
   const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential"]
-  const metricsTrajectories = metricsOptions?.trajectories ?? []
-  const parameterNotes = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
+  const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
-  const previewMapUrl = metricsApiData?.trajectory_preview?.image_data_url ?? null
-  const previewTimelineUrl = metricsApiData?.trajectory_preview?.timeline_data_url ?? null
-  const hasGroundTruthPreview = Boolean(previewMapUrl || previewTimelineUrl)
-  const renderMetricsParameterNote = (
+  const leftSweepParameters = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? []
+  const rightSweepParameters = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? []
+  const renderMetricsParameterRows = (
     algorithm: string,
-    note: MetricsOptionsResponse["parameter_notes"][string] | undefined,
-  ) => (
-    <div className="rounded-md border border-border/70 bg-background/60 p-2">
-      <p className="text-xs font-medium">{algorithm}</p>
-      {note ? (
-        <>
-          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-            X-axis: <span className="font-mono">{note.sweep_parameter}</span>
-          </p>
-          <p className="mt-1 truncate text-[11px] leading-tight text-muted-foreground" title={note.source}>Source: {note.source}</p>
-          {note.sweep_note && (
-            <p className="mt-1 text-[11px] leading-tight text-muted-foreground">{note.sweep_note}</p>
-          )}
-          <div className="mt-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Fixed parameters</p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {note.fixed_parameters.map((param) => (
-                <span key={`${algorithm}-${param}`} className="rounded-sm bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                  {param}
-                </span>
-              ))}
+    note: MetricsParameterNote | undefined,
+    selectedParameter: string,
+  ) => {
+    const rows = [
+      ["x_axis", selectedParameter],
+      ...(note?.fixed_parameters ?? []).map((param) => {
+        const [name, ...valueParts] = param.split("=")
+        return [name, valueParts.join("=") || "fixed"]
+      }),
+    ]
+
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
+        {rows.map(([name, value]) => (
+          <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-mono text-muted-foreground">{name}</span>
+              <span className="text-xs font-mono text-foreground">{value}</span>
             </div>
           </div>
-        </>
-      ) : (
-        <p className="mt-1 text-[11px] text-muted-foreground">No fixed-parameter note available.</p>
-      )}
-    </div>
-  )
+        ))}
+      </div>
+    )
+  }
 
   useEffect(() => {
     const rawView = searchParams.get("view")
@@ -880,6 +1046,18 @@ function NomadDashboard() {
   useEffect(() => {
     void loadMetricsOptions()
   }, [loadMetricsOptions])
+
+  useEffect(() => {
+    if (!leftSweepParameters.some((param) => param.value === metricsLeftParameter)) {
+      setMetricsLeftParameter(leftSweepParameters[0]?.value ?? "dist_thresh")
+    }
+  }, [leftSweepParameters, metricsLeftParameter])
+
+  useEffect(() => {
+    if (!rightSweepParameters.some((param) => param.value === metricsRightParameter)) {
+      setMetricsRightParameter(rightSweepParameters[0]?.value ?? "dist_thresh")
+    }
+  }, [rightSweepParameters, metricsRightParameter])
 
   useEffect(() => {
     if (activeView === "metrics" && metricsOptions && !metricsApiData && !metricsLoading) {
@@ -1131,61 +1309,19 @@ function NomadDashboard() {
                   </Select>
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
-                    {leftAlgo?.parameters.map((p) => (
-                      <div key={p.name} className="flex items-center gap-2">
-                        <label className="text-sm font-mono w-24 shrink-0">{p.name}:</label>
-                        {PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.allowedValues ? (
-                          <Select
-                            value={paramInputValue(leftParams, p.name, p.defaultValue)}
-                            onValueChange={(value) => {
-                              setLeftParams((prev) => ({ ...prev, [p.name]: value }))
-                              setLeftParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                          >
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.allowedValues ?? []).map((option) => (
-                                <SelectItem key={`${p.name}-${option}`} value={String(option)}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            type="number"
-                            min={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.min}
-                            max={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.max}
-                            step={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.step ?? 1}
-                            value={paramInputValue(leftParams, p.name, p.defaultValue)}
-                            onChange={(e) => {
-                              setLeftParams((prev) => ({ ...prev, [p.name]: e.target.value }))
-                              setLeftParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                            className="h-9 text-sm"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {Object.keys(leftParamErrors).length > 0 && (
-                      <p className="text-xs text-red-500">
-                        {Object.entries(leftParamErrors).map(([k, v]) => `${k}: ${v}`).join(" · ")}
-                      </p>
-                    )}
+                    <DemoParameterControls
+                      algo={leftAlgo}
+                      algoId={leftAlgorithm}
+                      values={leftParams}
+                      errors={leftParamErrors}
+                      setValues={setLeftParams}
+                      setErrors={setLeftParamErrors}
+                    />
                   </div>
                   <div className="space-y-2 pt-2">
                     <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">New Trajectory</Button>
                     <Button onClick={() => handleVisualize("left")} size="lg" className="w-full">Visualize</Button>
+                    <Button onClick={openMetricsFromDemo} size="lg" className="w-full">Aggregated Metrics</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1211,57 +1347,14 @@ function NomadDashboard() {
                       <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                       <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    {leftAlgo?.parameters.map((p) => (
-                      <div key={p.name} className="flex items-center gap-2">
-                        <label className="text-sm font-mono w-24 shrink-0">{p.name}:</label>
-                        {PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.allowedValues ? (
-                          <Select
-                            value={paramInputValue(leftParams, p.name, p.defaultValue)}
-                            onValueChange={(value) => {
-                              setLeftParams((prev) => ({ ...prev, [p.name]: value }))
-                              setLeftParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                          >
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.allowedValues ?? []).map((option) => (
-                                <SelectItem key={`${p.name}-${option}`} value={String(option)}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            type="number"
-                            min={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.min}
-                            max={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.max}
-                            step={PARAMETER_CONSTRAINTS[leftAlgorithm]?.[p.name]?.step ?? 1}
-                            value={paramInputValue(leftParams, p.name, p.defaultValue)}
-                            onChange={(e) => {
-                              setLeftParams((prev) => ({ ...prev, [p.name]: e.target.value }))
-                              setLeftParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                            className="h-9 text-sm"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {Object.keys(leftParamErrors).length > 0 && (
-                      <p className="text-xs text-red-500">
-                        {Object.entries(leftParamErrors).map(([k, v]) => `${k}: ${v}`).join(" · ")}
-                      </p>
-                    )}
+                    <DemoParameterControls
+                      algo={leftAlgo}
+                      algoId={leftAlgorithm}
+                      values={leftParams}
+                      errors={leftParamErrors}
+                      setValues={setLeftParams}
+                      setErrors={setLeftParamErrors}
+                    />
                   </div>
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">{rightAlgo?.name ?? "Right algorithm"}</h4>
@@ -1269,62 +1362,19 @@ function NomadDashboard() {
                       <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                       <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    {rightAlgo?.parameters.map((p) => (
-                      <div key={p.name} className="flex items-center gap-2">
-                        <label className="text-sm font-mono w-24 shrink-0">{p.name}:</label>
-                        {PARAMETER_CONSTRAINTS[rightAlgorithm]?.[p.name]?.allowedValues ? (
-                          <Select
-                            value={paramInputValue(rightParams, p.name, p.defaultValue)}
-                            onValueChange={(value) => {
-                              setRightParams((prev) => ({ ...prev, [p.name]: value }))
-                              setRightParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                          >
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(PARAMETER_CONSTRAINTS[rightAlgorithm]?.[p.name]?.allowedValues ?? []).map((option) => (
-                                <SelectItem key={`${p.name}-${option}`} value={String(option)}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            type="number"
-                            min={PARAMETER_CONSTRAINTS[rightAlgorithm]?.[p.name]?.min}
-                            max={PARAMETER_CONSTRAINTS[rightAlgorithm]?.[p.name]?.max}
-                            step={PARAMETER_CONSTRAINTS[rightAlgorithm]?.[p.name]?.step ?? 1}
-                            value={paramInputValue(rightParams, p.name, p.defaultValue)}
-                            onChange={(e) => {
-                              setRightParams((prev) => ({ ...prev, [p.name]: e.target.value }))
-                              setRightParamErrors((prev) => {
-                                const next = { ...prev }
-                                delete next[p.name]
-                                return next
-                              })
-                            }}
-                            className="h-9 text-sm"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {Object.keys(rightParamErrors).length > 0 && (
-                      <p className="text-xs text-red-500">
-                        {Object.entries(rightParamErrors).map(([k, v]) => `${k}: ${v}`).join(" · ")}
-                      </p>
-                    )}
+                    <DemoParameterControls
+                      algo={rightAlgo}
+                      algoId={rightAlgorithm}
+                      values={rightParams}
+                      errors={rightParamErrors}
+                      setValues={setRightParams}
+                      setErrors={setRightParamErrors}
+                    />
                   </div>
                   <div className="space-y-2 pt-2">
                     <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">New Trajectory</Button>
                     <Button onClick={() => handleVisualize("left")} size="lg" className="w-full">Visualize</Button>
-                    <Button onClick={() => navigateTo("metrics")} size="lg" className="w-full">Aggregated Metrics</Button>
+                    <Button onClick={openMetricsFromDemo} size="lg" className="w-full">Aggregated Metrics</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1346,100 +1396,105 @@ function NomadDashboard() {
             <Button
               variant={metricsCompareMode ? "default" : "outline"}
               size="lg"
-              onClick={() => setMetricsCompareMode((value) => !value)}
+              onClick={() => {
+                setMetricsCompareMode((value) => !value)
+                setMetricsApiData(null)
+              }}
               className="gap-2"
             >
               {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
             </Button>
           </div>
 
-          <div className="grid flex-1 min-h-0 lg:grid-cols-[340px_minmax(0,1fr)] gap-3 items-stretch">
+          <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch">
+            <Card className="h-full min-h-0 overflow-hidden py-0">
+              <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
+                <CardTitle className="text-sm font-semibold">
+                  {metricsCompareMode ? "Metric Comparison" : (metricsApiData?.left?.title ?? metricsLeftAlgorithm)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="min-h-0 flex-1 p-2">
+                <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
+                  <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
+                    {metricsApiData?.left?.image_data_url ? (
+                      <img
+                        src={metricsApiData.left.image_data_url}
+                        alt={metricsApiData.left.title}
+                        className="h-full max-h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
+                    )}
+                  </div>
+
+                  {metricsCompareMode && (
+                    <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
+                      {metricsApiData?.right?.image_data_url ? (
+                        <img
+                          src={metricsApiData.right.image_data_url}
+                          alt={metricsApiData.right.title}
+                          className="h-full max-h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="min-h-0 overflow-hidden py-0">
               <CardHeader className="shrink-0 px-5 py-3">
-                <CardTitle className="text-lg font-semibold">Experiment Controls</CardTitle>
+                <CardTitle className="text-lg font-semibold">
+                  {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
+                </CardTitle>
               </CardHeader>
               <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Algorithm A</label>
-                  <Select value={metricsLeftAlgorithm} onValueChange={setMetricsLeftAlgorithm}>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    {metricsCompareMode ? "Algorithm A" : "Algorithm"}
+                  </label>
+                  <Select
+                    value={metricsLeftAlgorithm}
+                    onValueChange={(algorithm) => {
+                      setMetricsLeftAlgorithm(algorithm)
+                      setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                      setMetricsApiData(null)
+                    }}
+                  >
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                {renderMetricsParameterNote(metricsLeftAlgorithm, leftParameterNote)}
+                {renderMetricsParameterRows(metricsLeftAlgorithm, leftParameterNote, metricsLeftParameter)}
 
                 {metricsCompareMode && (
                   <>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-muted-foreground">Algorithm B</label>
-                      <Select value={metricsRightAlgorithm} onValueChange={setMetricsRightAlgorithm}>
+                      <Select
+                        value={metricsRightAlgorithm}
+                        onValueChange={(algorithm) => {
+                          setMetricsRightAlgorithm(algorithm)
+                          setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                          setMetricsApiData(null)
+                        }}
+                      >
                         <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
-                    {renderMetricsParameterNote(metricsRightAlgorithm, rightParameterNote)}
+                    {renderMetricsParameterRows(metricsRightAlgorithm, rightParameterNote, metricsRightParameter)}
                   </>
                 )}
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Ground Truth Trajectory</label>
-                  <Select value={metricsTrajectoryUser} onValueChange={setMetricsTrajectoryUser}>
-                    <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {metricsTrajectories.map((t) => (
-                        <SelectItem key={t.user_id} value={t.user_id}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <Button variant="outline" size="lg" className="w-full" onClick={handleNewMetricsTrajectory}>
                   New Trajectory
-                </Button>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Iterations</label>
-                    <Input type="number" min={1} step={1} value={String(metricsIterations)} onChange={(e) => setMetricsIterations(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Sweep points</label>
-                    <Input type="number" min={2} max={200} step={1} value={String(metricsSweepPoints)} onChange={(e) => setMetricsSweepPoints(Number(e.target.value))} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Min</label>
-                    <Input type="number" step={1} value={String(metricsSweepMin)} onChange={(e) => setMetricsSweepMin(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Max</label>
-                    <Input type="number" step={1} value={String(metricsSweepMax)} onChange={(e) => setMetricsSweepMax(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Seed</label>
-                    <Input type="number" step={1} value={String(metricsSeed)} onChange={(e) => setMetricsSeed(Number(e.target.value))} />
-                  </div>
-                </div>
-                {metricsSweepLimits[metricsLeftAlgorithm] && (!metricsCompareMode || metricsSweepLimits[metricsRightAlgorithm]) && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Allowed sweep range:{" "}
-                    {metricsCompareMode
-                      ? Math.max(metricsSweepLimits[metricsLeftAlgorithm].min, metricsSweepLimits[metricsRightAlgorithm].min)
-                      : metricsSweepLimits[metricsLeftAlgorithm].min} to{" "}
-                    {metricsCompareMode
-                      ? Math.min(metricsSweepLimits[metricsLeftAlgorithm].max, metricsSweepLimits[metricsRightAlgorithm].max)
-                      : metricsSweepLimits[metricsLeftAlgorithm].max} (step = 1)
-                  </p>
-                )}
-
-                <Button size="lg" className="w-full" onClick={() => void runMetricsVisualization()}>
-                  {metricsCompareMode ? "Run Comparison" : "Run Metrics"}
                 </Button>
                 {metricsLoading && <p className="text-xs text-muted-foreground">Running notebook metric experiment...</p>}
                 {metricsError && <p className="text-xs text-red-500">{metricsError}</p>}
@@ -1450,91 +1505,6 @@ function NomadDashboard() {
                       ? ` · ${metricsApiData.meta.cache_files} files · ${(metricsApiData.meta.cache_total_bytes / 1024).toFixed(1)} KB`
                       : ""}
                   </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="h-full min-h-0 overflow-hidden py-0">
-              <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-sm font-semibold">
-                    {metricsOutputView === "metrics"
-                      ? metricsCompareMode
-                        ? "Metric Comparison"
-                        : (metricsApiData?.left?.title ?? metricsLeftAlgorithm)
-                      : metricsOutputView === "map"
-                        ? "Ground Truth Map"
-                        : "Ground Truth Timeline"}
-                  </CardTitle>
-                  <div className="flex w-fit rounded-md border border-border bg-background/60 p-0.5">
-                    {(["metrics", "map", "timeline"] as const).map((view) => (
-                      <button
-                        key={view}
-                        type="button"
-                        onClick={() => setMetricsOutputView(view)}
-                        className={`rounded-sm px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                          metricsOutputView === view
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {view}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="min-h-0 flex-1 p-2">
-                {metricsOutputView === "metrics" ? (
-                  <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
-                    <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                      {metricsApiData?.left?.image_data_url ? (
-                        <img
-                          src={metricsApiData.left.image_data_url}
-                          alt={metricsApiData.left.title}
-                          className="h-full max-h-full w-full object-contain"
-                        />
-                      ) : (
-                        <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
-                      )}
-                    </div>
-
-                    {metricsCompareMode && (
-                      <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                        {metricsApiData?.right?.image_data_url ? (
-                          <img
-                            src={metricsApiData.right.image_data_url}
-                            alt={metricsApiData.right.title}
-                            className="h-full max-h-full w-full object-contain"
-                          />
-                        ) : (
-                          <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-auto p-3">
-                    {hasGroundTruthPreview && metricsOutputView === "map" && previewMapUrl ? (
-                      <img
-                        src={previewMapUrl}
-                        alt="Ground truth trajectory map"
-                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
-                      />
-                    ) : hasGroundTruthPreview && metricsOutputView === "timeline" && previewTimelineUrl ? (
-                      <img
-                        src={previewTimelineUrl}
-                        alt="Ground truth timeline preview"
-                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
-                      />
-                    ) : (
-                      <img
-                        src={GROUND_TRUTH_PLACEHOLDER_IMAGE}
-                        alt="Ground truth trajectory placeholder"
-                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
-                      />
-                    )}
-                  </div>
                 )}
               </CardContent>
             </Card>

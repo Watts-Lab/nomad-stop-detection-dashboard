@@ -17,6 +17,7 @@ import pandas as pd
 import geopandas as gpd
 import json
 from functools import partial
+from pathlib import Path
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
@@ -41,6 +42,9 @@ warnings.filterwarnings('ignore', message='Input is timezone-naive; assuming UTC
 
 # %%
 key = '2_stops'
+results_output_dir = Path('../../cached_results')
+results_output_file = results_output_dir / 'lachesis_delta_roam_results.json'
+
 with open(f'config_{key}.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
 
@@ -138,6 +142,15 @@ for algo in tqdm(R, desc='Processing algorithms'):
 
 results_df = pd.DataFrame(results_list)
 timing_summary = R.family_timing_summary()
+
+results_output_dir.mkdir(parents=True, exist_ok=True)
+lachesis_results_df = results_df.query("family == 'lachesis'").sort_values(
+    ['delta_roam', 'user_id'])
+lachesis_results_df.to_json(
+    results_output_file,
+    orient='records',
+    indent=2,
+)
 
 timing_summary
 

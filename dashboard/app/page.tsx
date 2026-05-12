@@ -523,6 +523,8 @@ const generateDataPoints = (): DataPoint[] => {
 const DEMO_ALGORITHM_IDS = new Set(["dbstop", "lachesis", "seqscan", "dbscan", "gridbased"])
 const DASHBOARD_VIEWS = new Set(["home", "learn", "demo", "metrics"] as const)
 type DashboardView = "home" | "learn" | "demo" | "metrics"
+type DemoMode = "single" | "compare"
+type MetricsOutputView = "metrics" | "map" | "timeline"
 
 // ============ MAIN COMPONENT ============
 
@@ -546,7 +548,9 @@ function NomadDashboard() {
   const [compareSeed, setCompareSeed] = useState(1)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
-  const metricsMode = "compare" as const
+  const [metricsCompareMode, setMetricsCompareMode] = useState(false)
+  const [metricsOutputView, setMetricsOutputView] = useState<MetricsOutputView>("metrics")
+  const metricsMode = metricsCompareMode ? "compare" : "single"
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential")
   const [metricsTrajectoryUser, setMetricsTrajectoryUser] = useState("")
@@ -560,11 +564,12 @@ function NomadDashboard() {
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
-  const syncUrl = useCallback((view: DashboardView, algoId: string | null = null) => {
+  const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
     const params = new URLSearchParams(searchParams.toString())
     if (view === "home") {
       params.delete("view")
       params.delete("algo")
+      params.delete("mode")
     } else {
       params.set("view", view)
       if (view === "learn" && algoId) {
@@ -572,10 +577,15 @@ function NomadDashboard() {
       } else {
         params.delete("algo")
       }
+      if (view === "demo") {
+        params.set("mode", demoMode ?? (compareMode ? "compare" : "single"))
+      } else {
+        params.delete("mode")
+      }
     }
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-  }, [pathname, router, searchParams])
+  }, [compareMode, pathname, router, searchParams])
 
   const runCompareVisualization = useCallback(async (seed: number) => {
     const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
@@ -684,7 +694,9 @@ function NomadDashboard() {
 
   const runMetricsVisualization = useCallback(async () => {
     if (!metricsOptions) return
-    const algorithmsForRange = [metricsLeftAlgorithm, metricsRightAlgorithm]
+    const algorithmsForRange = metricsCompareMode
+      ? [metricsLeftAlgorithm, metricsRightAlgorithm]
+      : [metricsLeftAlgorithm]
     const limits = algorithmsForRange
       .map((a) => metricsSweepLimits[a])
       .filter((v): v is SweepLimit => Boolean(v))
@@ -734,6 +746,7 @@ function NomadDashboard() {
     }
   }, [
     metricsIterations,
+    metricsCompareMode,
     metricsLeftAlgorithm,
     metricsMode,
     metricsOptions,
@@ -774,6 +787,12 @@ function NomadDashboard() {
     setRightParamErrors({})
   }, [])
 
+  const handleCompareModeToggle = useCallback(() => {
+    const nextMode: DemoMode = compareMode ? "single" : "compare"
+    setCompareMode(nextMode === "compare")
+    syncUrl("demo", null, nextMode)
+  }, [compareMode, syncUrl])
+
   const navigateTo = (view: DashboardView) => {
     setActiveView(view)
     syncUrl(view)
@@ -796,6 +815,37 @@ function NomadDashboard() {
   const previewMapUrl = metricsApiData?.trajectory_preview?.image_data_url ?? null
   const previewTimelineUrl = metricsApiData?.trajectory_preview?.timeline_data_url ?? null
   const hasGroundTruthPreview = Boolean(previewMapUrl || previewTimelineUrl)
+  const renderMetricsParameterNote = (
+    algorithm: string,
+    note: MetricsOptionsResponse["parameter_notes"][string] | undefined,
+  ) => (
+    <div className="rounded-md border border-border/70 bg-background/60 p-2">
+      <p className="text-xs font-medium">{algorithm}</p>
+      {note ? (
+        <>
+          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
+            X-axis: <span className="font-mono">{note.sweep_parameter}</span>
+          </p>
+          <p className="mt-1 truncate text-[11px] leading-tight text-muted-foreground" title={note.source}>Source: {note.source}</p>
+          {note.sweep_note && (
+            <p className="mt-1 text-[11px] leading-tight text-muted-foreground">{note.sweep_note}</p>
+          )}
+          <div className="mt-2">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Fixed parameters</p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {note.fixed_parameters.map((param) => (
+                <span key={`${algorithm}-${param}`} className="rounded-sm bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {param}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="mt-1 text-[11px] text-muted-foreground">No fixed-parameter note available.</p>
+      )}
+    </div>
+  )
 
   useEffect(() => {
     const rawView = searchParams.get("view")
@@ -805,9 +855,12 @@ function NomadDashboard() {
     const rawAlgo = searchParams.get("algo")
     const hasAlgo = Boolean(rawAlgo && algorithms.some((a) => a.id === rawAlgo))
     const nextExpanded = nextView === "learn" && hasAlgo ? rawAlgo : null
+    const rawMode = searchParams.get("mode")
+    const nextCompareMode = nextView === "demo" && rawMode === "compare"
 
     setActiveView(nextView)
     setExpandedAlgorithm(nextExpanded)
+    setCompareMode(nextCompareMode)
   }, [searchParams])
 
   useEffect(() => {
@@ -906,26 +959,26 @@ function NomadDashboard() {
 
       {/* LEARN VIEW */}
       {activeView === "learn" && !expandedAlgorithm && (
-        <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col p-4 pb-6 gap-3 overflow-y-auto overflow-x-hidden">
           <div className="shrink-0 space-y-1">
             <h2 className="text-3xl font-bold">Learn Algorithms</h2>
             <p className="text-sm text-muted-foreground">
               Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch before running the demo.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-2">
             {algorithms.map((algo) => (
               <Card
                 key={algo.id}
-                className="cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col"
+                className="cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
                 onClick={() => openLearnAlgorithm(algo.id)}
               >
-                <CardHeader className="pb-2 shrink-0">
+                <CardHeader className="px-5 pt-5 pb-1 shrink-0">
                   <CardTitle className="text-lg">{algo.name}</CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 flex flex-col gap-3">
+                <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
                   <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
-                  <div className="bg-muted/50 rounded-md min-h-[120px] p-2">
+                  <div className="bg-muted/50 rounded-md h-[clamp(140px,18vh,190px)] p-2 overflow-hidden">
                     <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} notebook visualization`} />
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -940,7 +993,7 @@ function NomadDashboard() {
 
       {/* EXPANDED ALGORITHM VIEW */}
       {activeView === "learn" && expandedAlgorithm && (
-        <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col p-4 pb-6 gap-3 overflow-y-auto overflow-x-hidden">
           {(() => {
             const algo = algorithms.find(a => a.id === expandedAlgorithm)
             if (!algo) return null
@@ -966,7 +1019,7 @@ function NomadDashboard() {
                     Demo
                   </Button>
                 </div>
-                <div className="flex-1 flex flex-col bg-muted/30 rounded-xl p-4 gap-3 overflow-hidden">
+                <div className="flex flex-col bg-muted/30 rounded-xl p-4 gap-3">
                   {/* Description */}
                   <Card className="shrink-0">
                     <CardContent className="py-4">
@@ -1006,8 +1059,8 @@ function NomadDashboard() {
                   </Card>
                   {/* Diagram and Parameters */}
                   <div className="grid md:grid-cols-2 gap-4">
-                    <Card>
-                      <CardContent className="p-4 h-full flex items-center justify-center">
+                    <Card className="py-0">
+                      <CardContent className="p-4 h-[min(320px,36vh)] flex items-center justify-center">
                         <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
                       </CardContent>
                     </Card>
@@ -1055,7 +1108,7 @@ function NomadDashboard() {
                 Dashboard-style preview: choose two algorithms and their own parameters, run, and inspect side-by-side map and barcode outputs.
               </p>
             </div>
-            <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={() => setCompareMode(!compareMode)} className="gap-2">
+            <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={handleCompareModeToggle} className="gap-2">
               {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
             </Button>
           </div>
@@ -1282,66 +1335,30 @@ function NomadDashboard() {
 
       {/* AGGREGATED METRICS VIEW */}
       {activeView === "metrics" && (
-        <div className="flex-1 flex flex-col p-4 pb-8 gap-3 min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="shrink-0 space-y-2">
-            <h2 className="text-2xl font-bold">Aggregated Metrics</h2>
-            <p className="text-sm text-muted-foreground">
-              Each run sweeps one scale parameter and recomputes recall over sampled users.
-            </p>
-            <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
-              <li>Faint points are all user-by-sweep recall values.</li>
-              <li>Red points are each user&apos;s best recall across the sweep.</li>
-              <li>The solid line is the mean recall, and the dashed line is the max of that mean curve.</li>
-            </ul>
-            <div className="rounded-md border border-border bg-muted/20 p-3">
-              <p className="text-xs font-medium">Fixed parameters from notebooks</p>
-              <div className="grid md:grid-cols-2 gap-3 mt-2">
-                <div className="rounded-md border border-border/70 bg-background/60 p-2">
-                  <p className="text-xs font-medium">{metricsLeftAlgorithm}</p>
-                  {leftParameterNote ? (
-                    <>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Sweep: <span className="font-mono">{leftParameterNote.sweep_parameter}</span> · Source: {leftParameterNote.source}
-                      </p>
-                      {leftParameterNote.sweep_note && (
-                        <p className="text-[11px] text-muted-foreground mt-1">{leftParameterNote.sweep_note}</p>
-                      )}
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {leftParameterNote.fixed_parameters.join(" · ")}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground mt-1">No fixed-parameter note available.</p>
-                  )}
-                </div>
-                <div className="rounded-md border border-border/70 bg-background/60 p-2">
-                  <p className="text-xs font-medium">{metricsRightAlgorithm}</p>
-                  {rightParameterNote ? (
-                    <>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Sweep: <span className="font-mono">{rightParameterNote.sweep_parameter}</span> · Source: {rightParameterNote.source}
-                      </p>
-                      {rightParameterNote.sweep_note && (
-                        <p className="text-[11px] text-muted-foreground mt-1">{rightParameterNote.sweep_note}</p>
-                      )}
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {rightParameterNote.fixed_parameters.join(" · ")}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground mt-1">No fixed-parameter note available.</p>
-                  )}
-                </div>
-              </div>
+        <div className="flex-1 flex flex-col p-3 gap-3 min-h-0 overflow-hidden">
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+              <p className="text-sm text-muted-foreground">
+                Sweep one scale parameter for the selected algorithm{metricsCompareMode ? "s" : ""}; fixed notebook parameters are shown in the control panel.
+              </p>
             </div>
+            <Button
+              variant={metricsCompareMode ? "default" : "outline"}
+              size="lg"
+              onClick={() => setMetricsCompareMode((value) => !value)}
+              className="gap-2"
+            >
+              {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
+            </Button>
           </div>
 
-          <div className="grid lg:grid-cols-[340px_1fr] gap-3 items-start">
-            <Card className="overflow-hidden">
-              <CardHeader className="pb-2">
+          <div className="grid flex-1 min-h-0 lg:grid-cols-[340px_minmax(0,1fr)] gap-3 items-stretch">
+            <Card className="min-h-0 overflow-hidden py-0">
+              <CardHeader className="shrink-0 px-5 py-3">
                 <CardTitle className="text-lg font-semibold">Experiment Controls</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-muted-foreground">Algorithm A</label>
                   <Select value={metricsLeftAlgorithm} onValueChange={setMetricsLeftAlgorithm}>
@@ -1351,16 +1368,22 @@ function NomadDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
+                {renderMetricsParameterNote(metricsLeftAlgorithm, leftParameterNote)}
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Algorithm B</label>
-                  <Select value={metricsRightAlgorithm} onValueChange={setMetricsRightAlgorithm}>
-                    <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {metricsCompareMode && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Algorithm B</label>
+                      <Select value={metricsRightAlgorithm} onValueChange={setMetricsRightAlgorithm}>
+                        <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {renderMetricsParameterNote(metricsRightAlgorithm, rightParameterNote)}
+                  </>
+                )}
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-muted-foreground">Ground Truth Trajectory</label>
@@ -1403,15 +1426,21 @@ function NomadDashboard() {
                     <Input type="number" step={1} value={String(metricsSeed)} onChange={(e) => setMetricsSeed(Number(e.target.value))} />
                   </div>
                 </div>
-                {metricsSweepLimits[metricsLeftAlgorithm] && metricsSweepLimits[metricsRightAlgorithm] && (
+                {metricsSweepLimits[metricsLeftAlgorithm] && (!metricsCompareMode || metricsSweepLimits[metricsRightAlgorithm]) && (
                   <p className="text-[11px] text-muted-foreground">
-                    Allowed sweep range for this pair:{" "}
-                    {Math.max(metricsSweepLimits[metricsLeftAlgorithm].min, metricsSweepLimits[metricsRightAlgorithm].min)} to{" "}
-                    {Math.min(metricsSweepLimits[metricsLeftAlgorithm].max, metricsSweepLimits[metricsRightAlgorithm].max)} (step = 1)
+                    Allowed sweep range:{" "}
+                    {metricsCompareMode
+                      ? Math.max(metricsSweepLimits[metricsLeftAlgorithm].min, metricsSweepLimits[metricsRightAlgorithm].min)
+                      : metricsSweepLimits[metricsLeftAlgorithm].min} to{" "}
+                    {metricsCompareMode
+                      ? Math.min(metricsSweepLimits[metricsLeftAlgorithm].max, metricsSweepLimits[metricsRightAlgorithm].max)
+                      : metricsSweepLimits[metricsLeftAlgorithm].max} (step = 1)
                   </p>
                 )}
 
-                <Button size="lg" className="w-full" onClick={() => void runMetricsVisualization()}>Run Aggregated</Button>
+                <Button size="lg" className="w-full" onClick={() => void runMetricsVisualization()}>
+                  {metricsCompareMode ? "Run Comparison" : "Run Metrics"}
+                </Button>
                 {metricsLoading && <p className="text-xs text-muted-foreground">Running notebook metric experiment...</p>}
                 {metricsError && <p className="text-xs text-red-500">{metricsError}</p>}
                 {metricsApiData?.meta && (
@@ -1425,85 +1454,90 @@ function NomadDashboard() {
               </CardContent>
             </Card>
 
-            <div className="flex flex-col gap-3">
-              <Card className="overflow-hidden">
-                <CardHeader className="py-2 px-3 bg-muted/30">
-                  <CardTitle className="text-sm font-semibold">Ground Truth Trajectory</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2">
-                  {hasGroundTruthPreview ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="rounded-md border border-border bg-muted/30 min-h-[190px] flex items-center justify-center">
-                        {previewMapUrl ? (
-                          <img
-                            src={previewMapUrl}
-                            alt="Ground truth trajectory map"
-                            className="w-full h-auto object-contain rounded-md"
-                          />
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No trajectory map preview</p>
-                        )}
-                      </div>
-                      <div className="rounded-md border border-border bg-muted/30 min-h-[120px] flex items-center justify-center">
-                        {previewTimelineUrl ? (
-                          <img
-                            src={previewTimelineUrl}
-                            alt="Ground truth timeline preview"
-                            className="w-full h-auto object-contain rounded-md"
-                          />
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No timeline preview</p>
-                        )}
-                      </div>
+            <Card className="h-full min-h-0 overflow-hidden py-0">
+              <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-sm font-semibold">
+                    {metricsOutputView === "metrics"
+                      ? metricsCompareMode
+                        ? "Metric Comparison"
+                        : (metricsApiData?.left?.title ?? metricsLeftAlgorithm)
+                      : metricsOutputView === "map"
+                        ? "Ground Truth Map"
+                        : "Ground Truth Timeline"}
+                  </CardTitle>
+                  <div className="flex w-fit rounded-md border border-border bg-background/60 p-0.5">
+                    {(["metrics", "map", "timeline"] as const).map((view) => (
+                      <button
+                        key={view}
+                        type="button"
+                        onClick={() => setMetricsOutputView(view)}
+                        className={`rounded-sm px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                          metricsOutputView === view
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {view}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="min-h-0 flex-1 p-2">
+                {metricsOutputView === "metrics" ? (
+                  <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
+                    <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
+                      {metricsApiData?.left?.image_data_url ? (
+                        <img
+                          src={metricsApiData.left.image_data_url}
+                          alt={metricsApiData.left.title}
+                          className="h-full max-h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
+                      )}
                     </div>
-                  ) : (
-                    <div className="rounded-md border border-border bg-muted/30 overflow-hidden">
+
+                    {metricsCompareMode && (
+                      <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
+                        {metricsApiData?.right?.image_data_url ? (
+                          <img
+                            src={metricsApiData.right.image_data_url}
+                            alt={metricsApiData.right.title}
+                            className="h-full max-h-full w-full object-contain"
+                          />
+                        ) : (
+                          <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-auto p-3">
+                    {hasGroundTruthPreview && metricsOutputView === "map" && previewMapUrl ? (
+                      <img
+                        src={previewMapUrl}
+                        alt="Ground truth trajectory map"
+                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
+                      />
+                    ) : hasGroundTruthPreview && metricsOutputView === "timeline" && previewTimelineUrl ? (
+                      <img
+                        src={previewTimelineUrl}
+                        alt="Ground truth timeline preview"
+                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
+                      />
+                    ) : (
                       <img
                         src={GROUND_TRUTH_PLACEHOLDER_IMAGE}
                         alt="Ground truth trajectory placeholder"
-                        className="w-full h-auto object-contain"
+                        className="mx-auto h-auto min-h-full w-full min-w-[960px] max-w-none object-contain"
                       />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="grid gap-3 lg:grid-cols-2">
-                <Card className="overflow-hidden">
-                  <CardHeader className="py-2 px-3 bg-muted/30">
-                    <CardTitle className="text-sm font-semibold">{metricsApiData?.left?.title ?? "Algorithm A"}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2">
-                    {metricsApiData?.left?.image_data_url ? (
-                      <img
-                        src={metricsApiData.left.image_data_url}
-                        alt={metricsApiData.left.title}
-                        className="w-full h-auto object-contain rounded-md border border-border"
-                      />
-                    ) : (
-                      <div className="h-[260px] rounded-md border border-dashed border-border bg-muted/40" />
                     )}
-                  </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden">
-                  <CardHeader className="py-2 px-3 bg-muted/30">
-                    <CardTitle className="text-sm font-semibold">{metricsApiData?.right?.title ?? "Algorithm B"}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2">
-                    {metricsApiData?.right?.image_data_url ? (
-                      <img
-                        src={metricsApiData.right.image_data_url}
-                        alt={metricsApiData.right.title}
-                        className="w-full h-auto object-contain rounded-md border border-border"
-                      />
-                    ) : (
-                      <div className="h-[260px] rounded-md border border-dashed border-border bg-muted/40" />
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
         </div>

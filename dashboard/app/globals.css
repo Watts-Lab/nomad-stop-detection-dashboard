@@ -127,60 +127,24 @@
 @layer components {
   .nomad-shell {
     background:
-      radial-gradient(circle at 22% 18%, rgb(138 202 200 / 0.18), transparent 28%),
-      radial-gradient(circle at 76% 22%, rgb(129 153 216 / 0.14), transparent 30%),
       linear-gradient(180deg, #111625 0%, #111625 58%, #151b2c 100%);
   }
 
   .nomad-hero {
     position: relative;
-    isolation: isolate;
     overflow: hidden;
     background:
-      linear-gradient(rgb(17 22 37 / 0.76), rgb(17 22 37 / 0.92)),
-      radial-gradient(circle at 28% 45%, rgb(69 155 164 / 0.34), transparent 26%),
-      radial-gradient(circle at 64% 38%, rgb(177 192 216 / 0.2), transparent 28%),
-      linear-gradient(90deg, transparent 24px, rgb(138 202 200 / 0.08) 25px, transparent 26px),
-      linear-gradient(transparent 24px, rgb(138 202 200 / 0.07) 25px, transparent 26px);
-    background-size: auto, auto, auto, 96px 96px, 96px 96px;
-  }
-
-  .nomad-hero::before,
-  .nomad-hero::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-  }
-
-  .nomad-hero::before {
-    opacity: 0.56;
-    background-image:
-      radial-gradient(circle at 11% 38%, #8acac8 0 2px, transparent 3px),
-      radial-gradient(circle at 19% 47%, #8acac8 0 1px, transparent 2px),
-      radial-gradient(circle at 32% 30%, #b6c9dc 0 2px, transparent 3px),
-      radial-gradient(circle at 47% 55%, #8acac8 0 2px, transparent 3px),
-      radial-gradient(circle at 61% 35%, #b6c9dc 0 2px, transparent 3px),
-      radial-gradient(circle at 76% 44%, #8acac8 0 2px, transparent 3px),
-      radial-gradient(circle at 87% 30%, #b6c9dc 0 2px, transparent 3px),
-      linear-gradient(24deg, transparent 12%, rgb(138 202 200 / 0.18) 12.2%, transparent 31%),
-      linear-gradient(153deg, transparent 20%, rgb(182 201 220 / 0.13) 20.2%, transparent 48%),
-      linear-gradient(8deg, transparent 44%, rgb(138 202 200 / 0.16) 44.2%, transparent 72%);
-  }
-
-  .nomad-hero::after {
-    background:
-      radial-gradient(ellipse at 28% 54%, rgb(69 155 164 / 0.2), transparent 36%),
-      radial-gradient(ellipse at 62% 42%, rgb(177 192 216 / 0.16), transparent 40%);
-    filter: blur(18px);
+      linear-gradient(rgb(17 22 37 / 0.88), rgb(17 22 37 / 0.94)),
+      linear-gradient(90deg, transparent 31px, rgb(138 202 200 / 0.045) 32px, transparent 33px),
+      linear-gradient(transparent 31px, rgb(138 202 200 / 0.04) 32px, transparent 33px);
+    background-color: #111625;
+    background-size: auto, 128px 128px, 128px 128px;
   }
 
   .nomad-card {
     border-color: rgb(138 202 200 / 0.16);
-    background: rgb(23 29 46 / 0.76);
-    box-shadow: 0 22px 60px rgb(0 0 0 / 0.18);
-    backdrop-filter: blur(12px);
+    background: rgb(23 29 46 / 0.92);
+    box-shadow: 0 12px 28px rgb(0 0 0 / 0.14);
   }
 
   .nomad-soft-card {

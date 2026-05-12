@@ -242,12 +242,12 @@ const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
     source: "delta_roam_vs_acc_exp.ipynb",
     sweep_parameter: "delta_roam",
     sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
-    fixed_parameters: ["dt_max=60", "dur_min=5 (function default)"],
+    fixed_parameters: ["dt_max=60", "dur_min=5"],
   },
   Sequential: {
     source: "delta_roam_vs_acc_exp.ipynb",
     sweep_parameter: "delta_roam",
-    fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5 (function default)"],
+    fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
   },
   SeqScan: {
     source: "dist_thresh_vs_acc_exp.ipynb",
@@ -592,64 +592,64 @@ const algorithms = [
       { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" },
     ],
   },
-  { 
-    id: "lachesis", 
-    name: "Lachesis", 
+  {
+    id: "lachesis",
+    name: "Lachesis",
     shortDesc: "Roaming-distance based stop detection",
-    description: "Lachesis is a greedy, sequential and threshold-based algorithm taking in three parameters: dur_min, dt_max, and delta_roam. The algorithm processes pings in time order, and builds a candidate stop by scanning trajectories and grouping consecutive pings into a cluster under the following conditions: (1) the cluster diameter is less than or equal to delta_roam, (2) has no temporal gaps larger than dt_max, and (3) the accumulated duration is equal to or greater than dur_min. Key limitations include (1) being highly sensitive to parameter choices, with a small delta_roam leading to splitting or missing stops, and a large delta_roam leading to merging stops, and (2) assuming continuous sampling, so GPS noise or sparse data can lead to fragmented stops.", 
+    description: "Lachesis is a greedy, sequential and threshold-based algorithm taking in three parameters: dur_min, dt_max, and delta_roam. The algorithm processes pings in time order, and builds a candidate stop by scanning trajectories and grouping consecutive pings into a cluster under the following conditions: (1) the cluster diameter is less than or equal to delta_roam, (2) has no temporal gaps larger than dt_max, and (3) the accumulated duration is equal to or greater than dur_min. Key limitations include (1) being highly sensitive to parameter choices, with a small delta_roam leading to splitting or missing stops, and a large delta_roam leading to merging stops, and (2) assuming continuous sampling, so GPS noise or sparse data can lead to fragmented stops.",
     source: "Lachesis: A GPS-Based Human Mobility Pattern Analyzer",
     parameters: [
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop (minutes)" }, 
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop (minutes)" },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed temporal gap between pings (minutes)" },
       { name: "delta_roam", defaultValue: "25", description: "Maximum roaming distance (meters)" }
-    ] 
+    ]
   },
-  { 
-    id: "seqscan", 
-    name: "SeqScan", 
+  {
+    id: "seqscan",
+    name: "SeqScan",
     shortDesc: "Sequential scanning with thresholds",
-    description: "SeqScan extends DBSCAN to spatio-temporal data while guaranteeing temporal separation between detected stops. Each stop is defined as a DBSCAN cluster computed over a local time context, using the reachability graph of core points (a ping with a minimum of min_pts neighbors at a distance below dist_thresh). The algorithm scans points in chronological order, maintaining both an active cluster and an active time context for neighbor queries. For each incoming ping, neighbors are queried within the active time context; if it is connected to the active cluster, the active cluster is expanded. Otherwise, DBSCAN is applied to the tail of the trajectory, starting from the last ping of the active cluster up to the incoming ping. If a cluster with duration at least dur_min is found in the tail, it becomes the new active cluster and the active time context is shifted, continuing until reaching the end of the trajectory.", 
+    description: "SeqScan extends DBSCAN to spatio-temporal data while guaranteeing temporal separation between detected stops. Each stop is defined as a DBSCAN cluster computed over a local time context, using the reachability graph of core points (a ping with a minimum of min_pts neighbors at a distance below dist_thresh). The algorithm scans points in chronological order, maintaining both an active cluster and an active time context for neighbor queries. For each incoming ping, neighbors are queried within the active time context; if it is connected to the active cluster, the active cluster is expanded. Otherwise, DBSCAN is applied to the tail of the trajectory, starting from the last ping of the active cluster up to the incoming ping. If a cluster with duration at least dur_min is found in the tail, it becomes the new active cluster and the active time context is shifted, continuing until reaching the end of the trajectory.",
     source: "Sequential Scan Algorithm for GPS Stop Detection",
     parameters: [
-      { name: "time_thresh", defaultValue: "60", description: "Time threshold for stop detection (minutes)" }, 
+      { name: "time_thresh", defaultValue: "60", description: "Time threshold for stop detection (minutes)" },
       { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
       { name: "min_pts", defaultValue: "3", description: "Minimum points for cluster core" },
       { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" }
-    ] 
+    ]
   },
-  { 
-    id: "dbscan", 
-    name: "ST-DBSCAN", 
+  {
+    id: "dbscan",
+    name: "ST-DBSCAN",
     shortDesc: "Density-based spatiotemporal clustering",
-    description: "ST-DBSCAN extends classical DBSCAN by incorporating a second scale parameter to avoid long temporal gaps within detected stops, namely T_max, in addition to the spatial scale parameter eps_spatial and minPts, the usual density threshold in DBSCAN. In this way, it incorporates both spatial and temporal proximity to define reachability. Since stops are defined as components of the reachability graph of core points, ST-DBSCAN is robust to noise points that could break up stops in sequential algorithms. Standard ST-DBSCAN does not guarantee temporal separation, so clusters can overlap in time even if they represent different stops. In this dashboard, we extend it with a simple heuristic to remove overlaps in which every core point acts as a cutoff and prevents the merging of core points that are not neighbors of said point.", 
+    description: "ST-DBSCAN extends classical DBSCAN by incorporating a second scale parameter to avoid long temporal gaps within detected stops, namely T_max, in addition to the spatial scale parameter eps_spatial and minPts, the usual density threshold in DBSCAN. In this way, it incorporates both spatial and temporal proximity to define reachability. Since stops are defined as components of the reachability graph of core points, ST-DBSCAN is robust to noise points that could break up stops in sequential algorithms. Standard ST-DBSCAN does not guarantee temporal separation, so clusters can overlap in time even if they represent different stops. In this dashboard, we extend it with a simple heuristic to remove overlaps in which every core point acts as a cutoff and prevents the merging of core points that are not neighbors of said point.",
     source: "ST-DBSCAN: An algorithm for clustering spatial-temporal data",
     parameters: [
-      { name: "eps_spatial", defaultValue: "50", description: "Spatial radius epsilon (meters)" }, 
-      { name: "T_max", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage (minutes)" }, 
+      { name: "eps_spatial", defaultValue: "50", description: "Spatial radius epsilon (meters)" },
+      { name: "T_max", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage (minutes)" },
       { name: "minPts", defaultValue: "3", description: "Minimum neighbors required for a core point" }
-    ] 
+    ]
   },
-  { 
-    id: "gridbased", 
-    name: "Grid-based", 
+  {
+    id: "gridbased",
+    name: "Grid-based",
     shortDesc: "Cell-based dwell time analysis",
-    description: "Divides the geographic area into grid cells and identifies stops based on dwell time within cells, useful for aggregated analysis at different spatial resolutions.", 
+    description: "Divides the geographic area into grid cells and identifies stops based on dwell time within cells, useful for aggregated analysis at different spatial resolutions.",
     source: "Grid-based Methods for Mobility Analysis",
     parameters: [
-      { name: "cell_size", defaultValue: "100", description: "Grid cell size (meters)" }, 
+      { name: "cell_size", defaultValue: "100", description: "Grid cell size (meters)" },
       { name: "min_time", defaultValue: "5", description: "Minimum time in cell (minutes)" }
-    ] 
+    ]
   },
-  { 
-    id: "medoid", 
-    name: "Medoid-based", 
+  {
+    id: "medoid",
+    name: "Medoid-based",
     shortDesc: "Representative point clustering",
-    description: "Uses medoid computation to find representative central points of potential stops, robust against outliers in noisy GPS data.", 
+    description: "Uses medoid computation to find representative central points of potential stops, robust against outliers in noisy GPS data.",
     source: "Medoid-based Clustering for GPS Trajectories",
     parameters: [
-      { name: "radius", defaultValue: "50", description: "Search radius (meters)" }, 
+      { name: "radius", defaultValue: "50", description: "Search radius (meters)" },
       { name: "min_duration", defaultValue: "60", description: "Minimum stop duration" }
-    ] 
+    ]
   },
 ]
 

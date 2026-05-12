@@ -107,12 +107,12 @@ const DEFAULT_OPTIONS: MetricsOptionsResponse = {
       source: "delta_roam_vs_acc_exp.ipynb",
       sweep_parameter: "delta_roam",
       sweep_note: "UI sweep is scaled as 1.7 x value for Lachesis.",
-      fixed_parameters: ["dt_max=60", "dur_min=5 (function default)"],
+      fixed_parameters: ["dt_max=60", "dur_min=5"],
     },
     Sequential: {
       source: "delta_roam_vs_acc_exp.ipynb",
       sweep_parameter: "delta_roam",
-      fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5 (function default)"],
+      fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
     },
     SeqScan: {
       source: "dist_thresh_vs_acc_exp.ipynb",
@@ -233,8 +233,8 @@ function buildPanel(
 function getCacheStats(): { cache_files: number; cache_total_bytes: number } {
   const files = fs.existsSync(CACHE_ROOT)
     ? fs.readdirSync(CACHE_ROOT, { recursive: true })
-        .filter((entry) => typeof entry === "string" && entry.endsWith(".json"))
-        .map((entry) => path.join(CACHE_ROOT, entry as string))
+      .filter((entry) => typeof entry === "string" && entry.endsWith(".json"))
+      .map((entry) => path.join(CACHE_ROOT, entry as string))
     : []
 
   let totalBytes = 0

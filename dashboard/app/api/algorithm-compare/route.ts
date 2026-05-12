@@ -9,9 +9,13 @@ type ComparePayload = {
   mode?: "single" | "compare"
   left?: {
     algo?: string
+    params?: Record<string, number>
+    cmap?: string
   }
   right?: {
     algo?: string
+    params?: Record<string, number>
+    cmap?: string
   }
 }
 
@@ -30,6 +34,44 @@ type ComparePanelResponse = {
   title: string
   available: boolean
   animation_data_url: string | null
+  scene?: CompareSceneResponse | null
+  params?: Record<string, number>
+}
+
+type SceneCache = {
+  crs: string
+  source: string
+  bounds: [number, number, number, number]
+  users: string[]
+  buildings: Array<{
+    id: string
+    type: string
+    rings: number[][][]
+  }>
+  pings: Array<{
+    user_id: string
+    x: number
+    y: number
+    timestamp: number
+  }>
+  truth: Array<{
+    user_id: string
+    location: string | null
+    timestamp: number
+    duration: number
+    x: number | null
+    y: number | null
+  }>
+}
+
+type CompareSceneResponse = {
+  crs: string
+  source: string
+  user_id: string
+  bounds: [number, number, number, number]
+  buildings: SceneCache["buildings"]
+  pings: Array<Omit<SceneCache["pings"][number], "user_id">>
+  truth: Array<Omit<SceneCache["truth"][number], "user_id">>
 }
 
 const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
@@ -62,7 +104,49 @@ function prettyAlgoName(algo: string): string {
   return names[algo] ?? algo.toUpperCase()
 }
 
-function buildPanel(algo: string, cache: CompareCache | null): ComparePanelResponse {
+function sceneForSeed(seed: number): CompareSceneResponse | null {
+  const scenePath = path.join(CACHE_ROOT, "algorithm-compare", "scene.json")
+  const scene = readJsonIfExists<SceneCache>(scenePath)
+  if (!scene || scene.users.length === 0) return null
+
+  const user = scene.users[Math.abs(seed) % scene.users.length]
+  const pings = scene.pings
+    .filter((ping) => ping.user_id === user)
+    .map(({ user_id: _user_id, ...ping }) => ping)
+    .sort((a, b) => a.timestamp - b.timestamp)
+  const truth = scene.truth
+    .filter((row) => row.user_id === user)
+    .map(({ user_id: _user_id, ...row }) => row)
+    .sort((a, b) => a.timestamp - b.timestamp)
+
+  if (pings.length === 0) return null
+  const xs = pings.map((ping) => ping.x)
+  const ys = pings.map((ping) => ping.y)
+  const pad = 90
+  const bounds: [number, number, number, number] = [
+    Math.min(...xs) - pad,
+    Math.min(...ys) - pad,
+    Math.max(...xs) + pad,
+    Math.max(...ys) + pad,
+  ]
+
+  return {
+    crs: scene.crs,
+    source: scene.source,
+    user_id: user,
+    bounds,
+    buildings: scene.buildings,
+    pings,
+    truth,
+  }
+}
+
+function buildPanel(
+  algo: string,
+  params: Record<string, number> | undefined,
+  cache: CompareCache | null,
+  scene: CompareSceneResponse | null,
+): ComparePanelResponse {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
   const fallbackAnimation = cache?.fallback_animation ?? DEFAULT_FALLBACK_ANIMATION
@@ -71,8 +155,10 @@ function buildPanel(algo: string, cache: CompareCache | null): ComparePanelRespo
   return {
     algo: normalized,
     title: fromCache?.title ?? prettyAlgoName(normalized),
-    available: Boolean(animation),
+    available: Boolean(scene || animation),
     animation_data_url: animation,
+    scene,
+    params: params ?? {},
   }
 }
 
@@ -86,6 +172,7 @@ export async function POST(req: NextRequest) {
     const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
     const leftAlgo = normalizeAlgo(payload.left?.algo)
     const rightAlgo = normalizeAlgo(payload.right?.algo)
+    const scene = sceneForSeed(seed)
 
     const body: {
       seed: number
@@ -95,11 +182,11 @@ export async function POST(req: NextRequest) {
     } = {
       seed,
       mode,
-      left: buildPanel(leftAlgo, cache),
+      left: buildPanel(leftAlgo, payload.left?.params, cache, scene),
     }
 
     if (mode === "compare") {
-      body.right = buildPanel(rightAlgo, cache)
+      body.right = buildPanel(rightAlgo, payload.right?.params, cache, scene)
     }
 
     return NextResponse.json(body)

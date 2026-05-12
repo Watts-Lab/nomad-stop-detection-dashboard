@@ -1,0 +1,29 @@
+{
+  "fallback_animation": "/issue-images/ground-truth-placeholder.svg",
+  "panels": {
+    "dbstop": {
+      "title": "DBSTOP",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    },
+    "lachesis": {
+      "title": "Lachesis",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    },
+    "seqscan": {
+      "title": "SeqScan",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    },
+    "tadbscan": {
+      "title": "ST-DBSCAN",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    },
+    "dbscan": {
+      "title": "ST-DBSCAN",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    },
+    "gridbased": {
+      "title": "Grid-based",
+      "animation_data_url": "/issue-images/ground-truth-placeholder.svg"
+    }
+  }
+}

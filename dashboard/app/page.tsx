@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useCallback, useEffect, useRef } from "react"
+import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -172,12 +172,38 @@ type ComparePanelResponse = {
   title: string
   available: boolean
   animation_data_url: string | null
+  scene?: CompareScene | null
+  params?: Record<string, number>
 }
 type CompareApiResponse = {
   seed: number
   mode?: "single" | "compare"
   left: ComparePanelResponse
   right?: ComparePanelResponse
+}
+
+type CompareScene = {
+  crs: string
+  source: string
+  user_id: string
+  bounds: [number, number, number, number]
+  buildings: Array<{
+    id: string
+    type: string
+    rings: number[][][]
+  }>
+  pings: Array<{
+    x: number
+    y: number
+    timestamp: number
+  }>
+  truth: Array<{
+    location: string | null
+    timestamp: number
+    duration: number
+    x: number | null
+    y: number | null
+  }>
 }
 
 type MetricsPanelResponse = {
@@ -545,6 +571,241 @@ function DemoParameterControls({
   )
 }
 
+const DEMO_CLUSTER_COLORS = ["#4aa6b5", "#f07f3c", "#9c35a5", "#d84a6a", "#f3e66f", "#2f6577", "#7f91ee"]
+
+function distanceMeters(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
+function meanPoint(points: Array<{ x: number; y: number }>) {
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / Math.max(1, points.length),
+    y: points.reduce((sum, point) => sum + point.y, 0) / Math.max(1, points.length),
+  }
+}
+
+function assignDemoClusters(
+  algo: string,
+  pings: CompareScene["pings"],
+  params: Record<string, number> | undefined,
+): number[] {
+  if (pings.length === 0) return []
+  const labels = new Array(pings.length).fill(-1)
+  const normalized = algo === "dbscan" || algo === "st-dbscan" ? "tadbscan" : algo
+
+  if (normalized === "gridbased") {
+    const cellSize = Math.max(20, Number(params?.cell_size ?? 100))
+    const minTime = Math.max(1, Number(params?.min_time ?? 5)) * 60
+    const minX = Math.min(...pings.map((ping) => ping.x))
+    const minY = Math.min(...pings.map((ping) => ping.y))
+    const groups = new Map<string, number[]>()
+    pings.forEach((ping, index) => {
+      const key = `${Math.floor((ping.x - minX) / cellSize)}:${Math.floor((ping.y - minY) / cellSize)}`
+      groups.set(key, [...(groups.get(key) ?? []), index])
+    })
+    let cluster = 0
+    for (const indexes of groups.values()) {
+      const duration = pings[indexes[indexes.length - 1]].timestamp - pings[indexes[0]].timestamp
+      if (indexes.length >= 2 && duration >= minTime) {
+        indexes.forEach((index) => {
+          labels[index] = cluster
+        })
+        cluster += 1
+      }
+    }
+    return labels
+  }
+
+  if (normalized === "lachesis") {
+    const roam = Math.max(1, Number(params?.delta_roam ?? 20))
+    const dtMax = Math.max(1, Number(params?.dt_max ?? 60)) * 60
+    const durMin = Math.max(0, Number(params?.dur_min ?? 5)) * 60
+    const commit = (indexes: number[], cluster: number) => {
+      if (indexes.length < 2) return cluster
+      const duration = pings[indexes[indexes.length - 1]].timestamp - pings[indexes[0]].timestamp
+      if (duration < durMin) return cluster
+      indexes.forEach((index) => {
+        labels[index] = cluster
+      })
+      return cluster + 1
+    }
+
+    let cluster = 0
+    let current: number[] = [0]
+    for (let i = 1; i < pings.length; i += 1) {
+      const centroid = meanPoint(current.map((index) => pings[index]))
+      const gap = pings[i].timestamp - pings[i - 1].timestamp
+      if (gap <= dtMax && distanceMeters(pings[i], centroid) <= roam) {
+        current.push(i)
+      } else {
+        cluster = commit(current, cluster)
+        current = [i]
+      }
+    }
+    commit(current, cluster)
+    return labels
+  }
+
+  const dist = Math.max(1, Number(params?.dist_thresh ?? params?.eps_spatial ?? 10))
+  const timeThresh = Math.max(1, Number(params?.time_thresh ?? params?.T_max ?? 60)) * 60
+  const minPts = Math.max(1, Number(params?.min_pts ?? params?.minPts ?? 2))
+  const durMin = Math.max(0, Number(params?.dur_min ?? 5)) * 60
+  let cluster = 0
+  let current: number[] = [0]
+
+  const commit = (indexes: number[]) => {
+    if (indexes.length < minPts) return
+    const duration = pings[indexes[indexes.length - 1]].timestamp - pings[indexes[0]].timestamp
+    if (duration < durMin) return
+    indexes.forEach((index) => {
+      labels[index] = cluster
+    })
+    cluster += 1
+  }
+
+  for (let i = 1; i < pings.length; i += 1) {
+    const centroid = meanPoint(current.map((index) => pings[index]))
+    const gap = pings[i].timestamp - pings[i - 1].timestamp
+    const multiplier = normalized === "tadbscan" ? 1.4 : normalized === "dbstop" ? 1.1 : 1.0
+    if (gap <= timeThresh && distanceMeters(pings[i], centroid) <= dist * multiplier) {
+      current.push(i)
+    } else {
+      commit(current)
+      current = [i]
+    }
+  }
+  commit(current)
+  return labels
+}
+
+function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode: "single" | "compare" }) {
+  const scene = panel.scene
+  const [frame, setFrame] = useState(0)
+  const labels = useMemo(
+    () => scene ? assignDemoClusters(panel.algo, scene.pings, panel.params) : [],
+    [panel.algo, panel.params, scene],
+  )
+
+  useEffect(() => {
+    if (!scene || scene.pings.length === 0) return
+    setFrame(0)
+    const id = window.setInterval(() => {
+      setFrame((value) => (value + 1) % scene.pings.length)
+    }, 150)
+    return () => window.clearInterval(id)
+  }, [scene])
+
+  if (!scene) return null
+
+  const width = 980
+  const height = mode === "single" ? 560 : 420
+  const timelineHeight = 62
+  const mapHeight = height - timelineHeight
+  const [minX, minY, maxX, maxY] = scene.bounds
+  const dx = Math.max(1, maxX - minX)
+  const dy = Math.max(1, maxY - minY)
+  const project = (x: number, y: number) => ({
+    x: ((x - minX) / dx) * width,
+    y: mapHeight - ((y - minY) / dy) * mapHeight,
+  })
+  const pathPoints = scene.pings.slice(0, frame + 1).map((ping) => {
+    const pt = project(ping.x, ping.y)
+    return `${pt.x},${pt.y}`
+  }).join(" ")
+  const startTs = scene.pings[0]?.timestamp ?? 0
+  const endTs = scene.pings[scene.pings.length - 1]?.timestamp ?? startTs + 1
+  const timeSpan = Math.max(1, endTs - startTs)
+  const currentTs = scene.pings[frame]?.timestamp ?? startTs
+  const currentX = ((currentTs - startTs) / timeSpan) * width
+  const clusterIds = Array.from(new Set(labels.filter((label) => label >= 0)))
+
+  return (
+    <div className="h-full w-full rounded-md border border-border bg-[#eef1f4] p-2">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+        <rect x="0" y="0" width={width} height={mapHeight} fill="#d6d7d9" />
+        {scene.buildings.flatMap((building) =>
+          building.rings.map((ring, ringIndex) => {
+            const points = ring.map(([x, y]) => {
+              const pt = project(x, y)
+              return `${pt.x},${pt.y}`
+            }).join(" ")
+            return (
+              <polygon
+                key={`${building.id}-${ringIndex}`}
+                points={points}
+                fill={building.type.startsWith("r") ? "#969899" : "#8f9191"}
+                stroke="#f5f5f5"
+                strokeWidth="1.5"
+                opacity="0.92"
+              />
+            )
+          }),
+        )}
+        {pathPoints && (
+          <polyline points={pathPoints} fill="none" stroke="#263449" strokeWidth="2.4" opacity="0.45" />
+        )}
+        {clusterIds.map((cluster) => {
+          const members = scene.pings.filter((_ping, index) => labels[index] === cluster && index <= frame)
+          if (members.length === 0) return null
+          const center = meanPoint(members)
+          const radius = Math.max(22, Math.max(...members.map((ping) => distanceMeters(ping, center))) + 10)
+          const pt = project(center.x, center.y)
+          const rx = (radius / dx) * width
+          const ry = (radius / dy) * mapHeight
+          return (
+            <ellipse
+              key={`cluster-${cluster}`}
+              cx={pt.x}
+              cy={pt.y}
+              rx={rx}
+              ry={ry}
+              fill="none"
+              stroke={DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]}
+              strokeWidth="5"
+              opacity="0.9"
+            />
+          )
+        })}
+        {scene.pings.slice(0, frame + 1).map((ping, index) => {
+          const pt = project(ping.x, ping.y)
+          const cluster = labels[index]
+          const color = cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#111827"
+          return (
+            <circle
+              key={`${ping.timestamp}-${index}`}
+              cx={pt.x}
+              cy={pt.y}
+              r={cluster >= 0 ? 5.5 : 4.2}
+              fill={color}
+              opacity={cluster >= 0 ? 0.9 : 0.55}
+              stroke="#111827"
+              strokeWidth="0.8"
+            />
+          )
+        })}
+        <rect x="0" y={mapHeight + 10} width={width} height="1.5" fill="#111827" opacity="0.8" />
+        {scene.pings.map((ping, index) => {
+          const x = ((ping.timestamp - startTs) / timeSpan) * width
+          const cluster = labels[index]
+          return (
+            <line
+              key={`tick-${ping.timestamp}-${index}`}
+              x1={x}
+              x2={x}
+              y1={mapHeight + 12}
+              y2={mapHeight + 44}
+              stroke={cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#111827"}
+              strokeWidth={index <= frame ? 2 : 1}
+              opacity={index <= frame ? 0.95 : 0.25}
+            />
+          )
+        })}
+        <line x1={currentX} x2={currentX} y1={mapHeight + 4} y2={height - 4} stroke="#d84a6a" strokeWidth="3" />
+      </svg>
+    </div>
+  )
+}
+
 function CompareAnimationPanel({
   panel,
   mode = "compare",
@@ -552,25 +813,35 @@ function CompareAnimationPanel({
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
 }) {
-  const maxHeightClass = mode === "single" ? "max-h-[calc(100vh-300px)]" : "max-h-[calc(100vh-420px)]"
+  const panelHeightClass = mode === "single"
+    ? "h-[calc(100vh-250px)] min-h-[520px]"
+    : "h-[calc(100vh-330px)] min-h-[360px]"
   const hasAnimation = Boolean(panel?.available && panel?.animation_data_url)
+  const sceneMetadata = panel?.scene ? `${panel.scene.user_id} · ${panel.scene.crs}` : null
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="py-2 px-3 bg-muted/30 shrink-0">
-        <CardTitle className="text-sm font-semibold">{panel?.title ?? "No visualization"}</CardTitle>
+    <Card className="h-full min-h-0 overflow-hidden py-0">
+      <CardHeader className="py-3 px-4 bg-muted/30 shrink-0">
+        <CardTitle className="text-base font-semibold">{panel?.title ?? "No visualization"}</CardTitle>
+        {sceneMetadata && (
+          <p className="text-xs text-muted-foreground">{sceneMetadata}</p>
+        )}
       </CardHeader>
-      <CardContent className="p-2">
-        {hasAnimation ? (
-          <div className={`w-full ${maxHeightClass} flex justify-center`}>
+      <CardContent className="min-h-0 flex-1 p-2">
+        {panel?.scene ? (
+          <div className={`w-full ${panelHeightClass}`}>
+            <DemoSceneRenderer panel={panel} mode={mode} />
+          </div>
+        ) : hasAnimation ? (
+          <div className={`w-full ${panelHeightClass} flex justify-center`}>
             <img
               src={panel?.animation_data_url ?? ""}
               alt={panel?.title ?? "Algorithm animation"}
-              className={`mx-auto w-auto max-w-full ${maxHeightClass} h-auto object-contain rounded-md border border-border`}
+              className="h-full w-full object-contain rounded-md border border-border"
             />
           </div>
         ) : (
-          <div className={`w-full ${maxHeightClass} rounded-md border border-dashed border-border bg-muted/40`} />
+          <div className={`w-full ${panelHeightClass} rounded-md border border-dashed border-border bg-muted/40`} />
         )}
       </CardContent>
     </Card>
@@ -1292,8 +1563,8 @@ function NomadDashboard() {
           </div>
 
           {!compareMode ? (
-            <div className="grid lg:grid-cols-[1fr_330px] gap-3 items-start overflow-hidden">
-              <div className="flex flex-col gap-3">
+            <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+              <div className="flex min-h-0 flex-col gap-3">
                 <CompareAnimationPanel panel={compareApiData?.left} mode="single" />
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}
@@ -1327,9 +1598,9 @@ function NomadDashboard() {
               </Card>
             </div>
           ) : (
-            <div className="grid lg:grid-cols-[1fr_330px] gap-3 items-start overflow-hidden">
-              <div className="flex flex-col gap-3">
-                <div className="grid lg:grid-cols-2 gap-3">
+            <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+              <div className="flex min-h-0 flex-col gap-3">
+                <div className="grid min-h-0 lg:grid-cols-2 gap-3">
                   <CompareAnimationPanel panel={compareApiData?.left} mode="compare" />
                   <CompareAnimationPanel panel={compareApiData?.right} mode="compare" />
                 </div>

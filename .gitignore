@@ -11,6 +11,8 @@ dashboard/next-env.d.ts
 # Local caches and generated dashboard results
 cached_results/*
 !cached_results/.gitkeep
+!cached_results/**/
+!cached_results/**/*.json
 .turbo/
 .vercel/
 

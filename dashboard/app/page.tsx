@@ -13,39 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Home, Columns2, Play, Square } from "lucide-react"
+import { NomadNav } from "@/components/nomad-nav"
+import { ArrowLeft, Columns2, Play, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
-
-// ============ NOMAD Logo ============
-function CSSLabLogo({ className = "" }: { className?: string }) {
-  return (
-    <Image
-      src="/assets/logos/nomad-logo-white.svg"
-      alt="NOMAD"
-      width={212}
-      height={37}
-      priority
-      className={`h-8 w-auto brightness-0 invert ${className}`}
-    />
-  )
-}
-
-// ============ Navigation Buttons ============
-function NavButtons({ onHome, onBack }: { onHome: () => void; onBack?: () => void }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" onClick={onHome} title="Home">
-        <Home className="h-5 w-5" />
-      </Button>
-      {onBack && (
-        <Button variant="ghost" size="icon" onClick={onBack} title="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      )}
-    </div>
-  )
-}
 
 // ============ Floor Plan ============
 const rooms = [
@@ -560,7 +531,6 @@ function NomadDashboard() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [activeView, setActiveView] = useState<DashboardView>("home")
-  const [previousView, setPreviousView] = useState<DashboardView>("home")
   const [selectedTimeRange, setSelectedTimeRange] = useState<string | null>(null)
   const [expandedAlgorithm, setExpandedAlgorithm] = useState<string | null>(null)
   const [compareMode, setCompareMode] = useState(false)
@@ -804,26 +774,7 @@ function NomadDashboard() {
     setRightParamErrors({})
   }, [])
 
-  const goHome = () => {
-    setActiveView("home")
-    setExpandedAlgorithm(null)
-    syncUrl("home")
-  }
-
-  const goBack = () => {
-    let nextView: DashboardView
-    if (activeView === "metrics") {
-      nextView = "demo"
-    } else {
-      nextView = previousView
-    }
-    setActiveView(nextView)
-    setExpandedAlgorithm(null)
-    syncUrl(nextView)
-  }
-
   const navigateTo = (view: DashboardView) => {
-    setPreviousView(activeView)
     setActiveView(view)
     syncUrl(view)
   }
@@ -885,35 +836,11 @@ function NomadDashboard() {
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
+      <NomadNav />
+
       {/* HOME VIEW */}
       {activeView === "home" && (
         <div className="flex-1 overflow-y-auto">
-          <header className="sticky top-0 z-20 border-b border-[#263449] bg-[#111625]/92 backdrop-blur">
-            <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between px-5">
-              <button
-                aria-label="Go to home"
-                className="transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
-                onClick={goHome}
-              >
-                <CSSLabLogo />
-              </button>
-              <nav className="hidden items-center gap-4 text-[15px] font-medium text-[#94a1b7] lg:flex">
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={goHome}>Home</button>
-                <span aria-hidden="true" className="text-[#3a465d]">|</span>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("learn")}>Learn</button>
-                <span aria-hidden="true" className="text-[#3a465d]">|</span>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("demo")}>Compare Algorithms</button>
-                <span aria-hidden="true" className="text-[#3a465d]">|</span>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => navigateTo("metrics")}>Aggregated Metrics</button>
-                <span aria-hidden="true" className="text-[#3a465d]">|</span>
-                <button className="transition-colors hover:text-[#f2f4eb]" onClick={() => router.push("/about")}>About</button>
-              </nav>
-              <Button size="lg" onClick={() => navigateTo("demo")} className="h-11 bg-[#459ba4] px-6 text-[#08101c] hover:bg-[#62b8bf]">
-                Run Demo
-              </Button>
-            </div>
-          </header>
-
           <section className="nomad-hero min-h-[calc(100vh-74px)] border-b border-[#263449] px-5 py-6">
             <div className="mx-auto grid min-h-[calc(100vh-122px)] max-w-7xl items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="max-w-2xl">
@@ -980,16 +907,12 @@ function NomadDashboard() {
       {/* LEARN VIEW */}
       {activeView === "learn" && !expandedAlgorithm && (
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-          <div className="flex items-start justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <NavButtons onHome={goHome} onBack={goBack} />
-              <h2 className="text-3xl font-bold">Learn Algorithms</h2>
-            </div>
-            <CSSLabLogo className="mt-1 h-10 shrink-0" />
+          <div className="shrink-0 space-y-1">
+            <h2 className="text-3xl font-bold">Learn Algorithms</h2>
+            <p className="text-sm text-muted-foreground">
+              Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch before running the demo.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch before running the demo.
-          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-hidden">
             {algorithms.map((algo) => (
               <Card
@@ -1018,100 +941,105 @@ function NomadDashboard() {
       {/* EXPANDED ALGORITHM VIEW */}
       {activeView === "learn" && expandedAlgorithm && (
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-          <div className="flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <NavButtons
-                onHome={goHome}
-                onBack={() => {
-                  setExpandedAlgorithm(null)
-                  syncUrl("learn")
-                }}
-              />
-              <h2 className="text-2xl font-bold">{algorithms.find(a => a.id === expandedAlgorithm)?.name}</h2>
-            </div>
-            <CSSLabLogo />
-          </div>
           {(() => {
             const algo = algorithms.find(a => a.id === expandedAlgorithm)
             if (!algo) return null
             return (
-              <div className="flex-1 flex flex-col bg-muted/30 rounded-xl p-4 gap-3 overflow-hidden">
-                {/* Description */}
-                <Card className="shrink-0">
-                  <CardContent className="py-4">
-                    <p className="text-sm text-muted-foreground">{algo.description}</p>
-                    <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                      <p>Source: {algo.source}</p>
-                      {ALGORITHM_REFERENCES[algo.id]?.paper_url ? (
-                        <p>
-                          Paper:{" "}
-                          <a
-                            href={ALGORITHM_REFERENCES[algo.id].paper_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2"
-                          >
-                            {ALGORITHM_REFERENCES[algo.id].paper_label}
-                          </a>
-                        </p>
-                      ) : (
-                        <p>Paper: {ALGORITHM_REFERENCES[algo.id]?.paper_label}</p>
-                      )}
-                      {ALGORITHM_REFERENCES[algo.id]?.docs_url && (
-                        <p>
-                          Docs:{" "}
-                          <a
-                            href={ALGORITHM_REFERENCES[algo.id].docs_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2"
-                          >
-                            Stop detection documentation
-                          </a>
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                {/* Diagram and Parameters */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="p-4 h-full flex items-center justify-center">
-                      <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
-                    </CardContent>
-                  </Card>
-                  {/* Parameters table */}
-                  <Card className="overflow-hidden">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">Parameters</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="rounded-md border overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-medium">Name</th>
-                              <th className="px-3 py-2 text-left font-medium">Description</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {algo.parameters.map((param, idx) => (
-                              <tr key={param.name} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
-                                <td className="px-3 py-2 font-mono text-sm">{param.name}</td>
-                                <td className="px-3 py-2 text-muted-foreground text-sm">{param.description}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+              <>
+                <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setExpandedAlgorithm(null)
+                        syncUrl("learn")
+                      }}
+                      className="gap-2 px-2"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to algorithms
+                    </Button>
+                    <h2 className="text-2xl font-bold">{algo.name}</h2>
+                  </div>
+                  <Button onClick={() => handleAlgorithmSelect(algo.id)} size="lg">
+                    Demo
+                  </Button>
+                </div>
+                <div className="flex-1 flex flex-col bg-muted/30 rounded-xl p-4 gap-3 overflow-hidden">
+                  {/* Description */}
+                  <Card className="shrink-0">
+                    <CardContent className="py-4">
+                      <p className="text-sm text-muted-foreground">{algo.description}</p>
+                      <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                        <p>Source: {algo.source}</p>
+                        {ALGORITHM_REFERENCES[algo.id]?.paper_url ? (
+                          <p>
+                            Paper:{" "}
+                            <a
+                              href={ALGORITHM_REFERENCES[algo.id].paper_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-2"
+                            >
+                              {ALGORITHM_REFERENCES[algo.id].paper_label}
+                            </a>
+                          </p>
+                        ) : (
+                          <p>Paper: {ALGORITHM_REFERENCES[algo.id]?.paper_label}</p>
+                        )}
+                        {ALGORITHM_REFERENCES[algo.id]?.docs_url && (
+                          <p>
+                            Docs:{" "}
+                            <a
+                              href={ALGORITHM_REFERENCES[algo.id].docs_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-2"
+                            >
+                              Stop detection documentation
+                            </a>
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
+                  {/* Diagram and Parameters */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardContent className="p-4 h-full flex items-center justify-center">
+                        <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
+                      </CardContent>
+                    </Card>
+                    {/* Parameters table */}
+                    <Card className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">Parameters</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="rounded-md border overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium">Name</th>
+                                <th className="px-3 py-2 text-left font-medium">Description</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {algo.parameters.map((param, idx) => (
+                                <tr key={param.name} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                                  <td className="px-3 py-2 font-mono text-sm">{param.name}</td>
+                                  <td className="px-3 py-2 text-muted-foreground text-sm">{param.description}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
-                {/* Demo button */}
-                <Button onClick={() => handleAlgorithmSelect(algo.id)} size="lg" className="shrink-0">
-                  Demo
-                </Button>
-              </div>
+              </>
             )
           })()}
         </div>
@@ -1120,21 +1048,17 @@ function NomadDashboard() {
       {/* DEMO VIEW */}
       {activeView === "demo" && (
         <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-          <div className="flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <NavButtons onHome={goHome} onBack={goBack} />
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
               <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo"}</h2>
+              <p className="text-sm text-muted-foreground">
+                Dashboard-style preview: choose two algorithms and their own parameters, run, and inspect side-by-side map and barcode outputs.
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={() => setCompareMode(!compareMode)} className="gap-2">
-                {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
-              </Button>
-              <CSSLabLogo />
-            </div>
+            <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={() => setCompareMode(!compareMode)} className="gap-2">
+              {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Dashboard-style preview: choose two algorithms and their own parameters, run, and inspect side-by-side map and barcode outputs.
-          </p>
 
           {!compareMode ? (
             <div className="grid lg:grid-cols-[1fr_330px] gap-3 items-start overflow-hidden">
@@ -1359,18 +1283,8 @@ function NomadDashboard() {
       {/* AGGREGATED METRICS VIEW */}
       {activeView === "metrics" && (
         <div className="flex-1 flex flex-col p-4 pb-8 gap-3 min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <NavButtons onHome={goHome} onBack={goBack} />
-              <h2 className="text-2xl font-bold">Aggregated Metrics</h2>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="lg" onClick={handleNewMetricsTrajectory}>New Trajectory</Button>
-              <Button size="lg" onClick={() => void runMetricsVisualization()}>Run</Button>
-              <CSSLabLogo />
-            </div>
-          </div>
-          <div className="space-y-2">
+          <div className="shrink-0 space-y-2">
+            <h2 className="text-2xl font-bold">Aggregated Metrics</h2>
             <p className="text-sm text-muted-foreground">
               Each run sweeps one scale parameter and recomputes recall over sampled users.
             </p>
@@ -1459,6 +1373,10 @@ function NomadDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Button variant="outline" size="lg" className="w-full" onClick={handleNewMetricsTrajectory}>
+                  New Trajectory
+                </Button>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -1588,10 +1506,6 @@ function NomadDashboard() {
             </div>
           </div>
 
-          {/* Demo button */}
-          <Button onClick={() => navigateTo("demo")} size="lg" className="shrink-0 self-start">
-            Demo
-          </Button>
         </div>
       )}
     </div>

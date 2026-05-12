@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Lachesis accuracy in 2-stop trajectory</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+  <style>
+    body {
+      margin: 14px 28px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #chart {
+      width: min(100%, 1320px);
+      aspect-ratio: 5 / 3;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="chart"></div>
+
+  <script>
+    const chart = echarts.init(document.getElementById("chart"));
+
+    fetch("lachesis_results.json")
+      .then(res => res.json())
+      .then(data => {
+
+        // Scatter: individual results
+        const scatterData = data.map(d => [
+          d.delta_roam,
+          d.recall,
+          d.user_id
+        ]);
+
+        // Compute mean line
+        const grouped = {};
+        data.forEach(d => {
+          if (!grouped[d.delta_roam]) grouped[d.delta_roam] = [];
+          grouped[d.delta_roam].push(d.recall);
+        });
+
+        const meanLine = Object.entries(grouped)
+          .map(([delta, vals]) => [
+            Number(delta),
+            vals.reduce((a, b) => a + b, 0) / vals.length
+          ])
+          .sort((a, b) => a[0] - b[0]);
+
+        const bestByUser = {};
+        data.forEach(d => {
+          if (!bestByUser[d.user_id] || d.recall > bestByUser[d.user_id].recall) {
+            bestByUser[d.user_id] = d;
+          }
+        });
+
+        const perUserMaxData = Object.values(bestByUser).map(d => [
+          d.delta_roam,
+          d.recall,
+          d.user_id
+        ]);
+
+        const maxMean = Math.max(...meanLine.map(point => point[1]));
+        const xValues = data.map(d => d.delta_roam);
+        const minX = Math.min(...xValues);
+        const maxX = Math.max(...xValues);
+        const xPadding = (maxX - minX) * 0.025;
+        const maxMeanLine = [
+          [minX, maxMean],
+          [maxX, maxMean]
+        ];
+        const maxMeanLabel = `Max mean (${maxMean.toFixed(3)})`;
+
+        const option = {
+          title: {
+            text: "Lachesis accuracy in 2-stop trajectory",
+            left: "center",
+            textStyle: {
+              fontSize: 24,
+              fontWeight: "normal"
+            }
+          },
+          color: ["#1f77b4", "#e41a1c", "#1f77b4", "#000"],
+
+          legend: {
+            right: 24,
+            bottom: 22,
+            data: ["Per-user max", "Mean", maxMeanLabel],
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            borderColor: "#ddd",
+            borderWidth: 1,
+            padding: 12,
+            textStyle: {
+              fontSize: 18
+            }
+          },
+
+          grid: {
+            left: 82,
+            right: 32,
+            top: 64,
+            bottom: 82,
+            containLabel: true
+          },
+
+          tooltip: {
+            trigger: "item",
+            formatter: params => {
+              if (params.seriesType === "scatter") {
+                return `
+                  delta_roam: ${params.value[0]}<br/>
+                  recall: ${params.value[1]}<br/>
+                  user_id: ${params.value[2]}
+                `;
+              }
+              if (params.seriesName === maxMeanLabel) {
+                return `max mean accuracy: ${params.value[1].toFixed(3)}`;
+              }
+              return `delta_roam: ${params.value[0]}<br/>mean accuracy: ${params.value[1].toFixed(3)}`;
+            }
+          },
+
+          toolbox: {
+            feature: {
+              brush: {},
+              dataZoom: {},
+              saveAsImage: {}
+            }
+          },
+
+          brush: {
+            toolbox: ["rect", "polygon", "clear"],
+            xAxisIndex: 0
+          },
+
+          xAxis: {
+            type: "value",
+            name: "Roaming Distance (m)",
+            nameLocation: "center",
+            nameGap: 42,
+            min: minX - xPadding,
+            max: maxX + xPadding,
+            splitLine: {
+              lineStyle: {
+                color: "#ddd",
+                type: "dotted"
+              }
+            },
+            axisLabel: {
+              fontSize: 16
+            },
+            nameTextStyle: {
+              fontSize: 18
+            }
+          },
+
+          yAxis: {
+            type: "value",
+            name: "Accuracy",
+            nameLocation: "center",
+            nameGap: 48,
+            min: 0,
+            max: 1,
+            splitLine: {
+              lineStyle: {
+                color: "#ddd",
+                type: "dotted"
+              }
+            },
+            axisLabel: {
+              fontSize: 16
+            },
+            nameTextStyle: {
+              fontSize: 18
+            }
+          },
+
+          series: [
+            {
+              name: "Individual results",
+              type: "scatter",
+              data: scatterData,
+              symbolSize: 9,
+              itemStyle: {
+                color: "rgba(31, 119, 180, 0.055)",
+                borderColor: "rgba(31, 119, 180, 0.14)",
+                borderWidth: 1
+              }
+            },
+            {
+              name: "Per-user max",
+              type: "scatter",
+              data: perUserMaxData,
+              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbolSize: 10,
+              itemStyle: {
+                color: "rgba(255, 26, 26, 0.85)",
+                borderColor: "rgba(255, 26, 26, 0.85)",
+                borderWidth: 1
+              },
+              z: 6
+            },
+            {
+              name: "Mean",
+              type: "line",
+              data: meanLine,
+              symbol: "none",
+              lineStyle: {
+                color: "#1f77b4",
+                width: 3,
+                type: "solid"
+              },
+              z: 5
+            },
+            {
+              name: maxMeanLabel,
+              type: "line",
+              data: maxMeanLine,
+              symbol: "none",
+              lineStyle: {
+                color: "#000",
+                width: 2,
+                type: "dashed"
+              },
+              emphasis: {
+                disabled: true
+              }
+            }
+          ]
+        };
+
+        chart.setOption(option);
+        window.addEventListener("resize", () => chart.resize());
+      });
+  </script>
+</body>
+</html>

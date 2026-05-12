@@ -57,7 +57,7 @@ NOTEBOOK_PARAMETER_NOTES: dict[str, dict[str, Any]] = {
         "sweep_note": "UI sweep is scaled as 1.7 × value for Lachesis to mirror notebook setup.",
         "fixed_parameters": [
             "dt_max=60",
-            "dur_min=5 (function default)",
+            "dur_min=5",
         ],
     },
     "Sequential": {
@@ -66,7 +66,7 @@ NOTEBOOK_PARAMETER_NOTES: dict[str, dict[str, Any]] = {
         "fixed_parameters": [
             "dt_max=60",
             "method='centroid'",
-            "dur_min=5 (function default)",
+            "dur_min=5",
         ],
     },
     "SeqScan": {

@@ -21,48 +21,59 @@
   <div id="chart"></div>
 
   <script>
+    const DATA_URL = "lachesis_results.json";
     const chart = echarts.init(document.getElementById("chart"));
 
-    fetch("lachesis_results.json")
+    fetch(DATA_URL)
       .then(res => res.json())
       .then(data => {
+        const rows = data
+          .map(d => ({
+            user_id: d.user_id,
+            delta_roam: d.delta_roam,
+            recall: d.recall
+          }))
+          .sort((a, b) => a.user_id.localeCompare(b.user_id) || a.delta_roam - b.delta_roam);
 
         // Scatter: individual results
-        const scatterData = data.map(d => [
+        const scatterData = rows.map(d => [
           d.delta_roam,
           d.recall,
           d.user_id
         ]);
 
         // Compute mean line
-        const grouped = {};
-        data.forEach(d => {
-          if (!grouped[d.delta_roam]) grouped[d.delta_roam] = [];
-          grouped[d.delta_roam].push(d.recall);
+        const grouped = new Map();
+        rows.forEach(d => {
+          grouped.set(d.delta_roam, (grouped.get(d.delta_roam) || []).concat(d.recall));
         });
 
-        const meanLine = Object.entries(grouped)
+        const meanLine = Array.from(grouped)
           .map(([delta, vals]) => [
             Number(delta),
             vals.reduce((a, b) => a + b, 0) / vals.length
           ])
           .sort((a, b) => a[0] - b[0]);
 
-        const bestByUser = {};
-        data.forEach(d => {
-          if (!bestByUser[d.user_id] || d.recall > bestByUser[d.user_id].recall) {
-            bestByUser[d.user_id] = d;
-          }
+        const byUser = new Map();
+        rows.forEach(d => {
+          byUser.set(d.user_id, (byUser.get(d.user_id) || []).concat(d));
         });
 
-        const perUserMaxData = Object.values(bestByUser).map(d => [
+        const userTrajectoryData = Array.from(byUser.values())
+          .map(userRows => userRows.map(d => [d.delta_roam, d.recall, d.user_id]).concat([[null, null, null]]))
+          .flat();
+
+        const perUserMaxData = Array.from(byUser.values()).map(userRows => userRows.reduce(
+          (best, d) => d.recall > best.recall ? d : best
+        )).map(d => [
           d.delta_roam,
           d.recall,
           d.user_id
         ]);
 
         const maxMean = Math.max(...meanLine.map(point => point[1]));
-        const xValues = data.map(d => d.delta_roam);
+        const xValues = rows.map(d => d.delta_roam);
         const minX = Math.min(...xValues);
         const maxX = Math.max(...xValues);
         const xPadding = (maxX - minX) * 0.025;
@@ -81,12 +92,10 @@
               fontWeight: "normal"
             }
           },
-          color: ["#1f77b4", "#e41a1c", "#1f77b4", "#000"],
-
           legend: {
             right: 24,
             bottom: 22,
-            data: ["Per-user max", "Mean", maxMeanLabel],
+            data: ["Individual results", "Mean", "Per-user max", maxMeanLabel],
             backgroundColor: "rgba(255, 255, 255, 0.9)",
             borderColor: "#ddd",
             borderWidth: 1,
@@ -112,6 +121,13 @@
                   delta_roam: ${params.value[0]}<br/>
                   recall: ${params.value[1]}<br/>
                   user_id: ${params.value[2]}
+                `;
+              }
+              if (params.seriesName === "Per-user trajectories") {
+                return `
+                  user_id: ${params.value[2]}<br/>
+                  delta_roam: ${params.value[0]}<br/>
+                  recall: ${params.value[1].toFixed(3)}
                 `;
               }
               if (params.seriesName === maxMeanLabel) {
@@ -178,6 +194,17 @@
 
           series: [
             {
+              name: "Per-user trajectories",
+              type: "line",
+              data: userTrajectoryData,
+              symbol: "none",
+              lineStyle: {
+                color: "rgba(31, 119, 180, 0.08)",
+                width: 1
+              },
+              z: 2
+            },
+            {
               name: "Individual results",
               type: "scatter",
               data: scatterData,
@@ -186,7 +213,8 @@
                 color: "rgba(31, 119, 180, 0.055)",
                 borderColor: "rgba(31, 119, 180, 0.14)",
                 borderWidth: 1
-              }
+              },
+              z: 3
             },
             {
               name: "Per-user max",
@@ -211,6 +239,9 @@
                 width: 3,
                 type: "solid"
               },
+              itemStyle: {
+                color: "#1f77b4"
+              },
               z: 5
             },
             {
@@ -222,6 +253,9 @@
                 color: "#000",
                 width: 2,
                 type: "dashed"
+              },
+              itemStyle: {
+                color: "#000"
               },
               emphasis: {
                 disabled: true

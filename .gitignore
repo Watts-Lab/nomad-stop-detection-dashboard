@@ -6,6 +6,7 @@ node_modules/
 out/
 dist/
 build/
+dashboard/next-env.d.ts
 
 # Local caches and generated dashboard results
 cached_results/*

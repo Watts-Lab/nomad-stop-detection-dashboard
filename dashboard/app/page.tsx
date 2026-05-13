@@ -5,6 +5,7 @@ import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { NomadNav } from "@/components/nomad-nav"
-import { ArrowLeft, Columns2, Play, Square } from "lucide-react"
+import { Columns2, Play, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
 
@@ -105,110 +106,15 @@ function Timeline({ segments, selectedSegment, onSegmentClick }: { segments: Tim
   )
 }
 
-const NOTEBOOK_FIGURES: Record<string, { learn: string; metrics: string; source: string }> = {
-  dbstop: {
-    learn: "/notebook-figures/db_dist_thresh_acc.svg",
-    metrics: "/notebook-figures/db_dist_thresh_acc.svg",
-    source: "ta_seqscan_examples.ipynb (compare panel)",
-  },
-  lachesis: {
-    learn: "/notebook-figures/seq_delta_roam_acc.svg",
-    metrics: "/notebook-figures/lachesis_delta_roam_all_metrics_grid.svg",
-    source: "delta_roam_vs_acc_exp.ipynb",
-  },
-  seqscan: {
-    learn: "/notebook-figures/db_dist_thresh_acc.svg",
-    metrics: "/notebook-figures/db_dist_thresh_acc.svg",
-    source: "dist_thresh_vs_acc_exp.ipynb",
-  },
-  dbscan: {
-    learn: "/notebook-figures/db_dist_thresh_acc.svg",
-    metrics: "/notebook-figures/dbscan_dist_thresh_all_metrics_grid.svg",
-    source: "dist_thresh_vs_acc_exp.ipynb",
-  },
-  gridbased: {
-    learn: "/notebook-figures/exp1_all_metrics_grid.svg",
-    metrics: "/notebook-figures/exp1_all_metrics_grid.svg",
-    source: "exp_1_merge_vs_beta_ping.ipynb",
-  },
-  medoid: {
-    learn: "/notebook-figures/exp1_all_metrics_grid.svg",
-    metrics: "/notebook-figures/exp1_all_metrics_grid.svg",
-    source: "exp_1_merge_vs_beta_ping.ipynb",
-  },
-}
+const SEQUENTIAL_CARD_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms_card.svg"
+const SEQUENTIAL_EXPANDED_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms.svg"
+const DENSITY_CARD_DIAGRAM = "/assets/diagram-svgs/density_based_card.svg"
+const DENSITY_EXPANDED_DIAGRAM = "/assets/diagram-svgs/density_based.svg"
 
-const LEARN_CONCEPT_DIAGRAMS: Record<string, { src: string; objectPosition: string; caption: string }> = {
-  lachesis: {
-    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
-    objectPosition: "center 14%",
-    caption: "Sequential-style stop definition with roaming-area and duration constraints.",
-  },
-  seqscan: {
-    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
-    objectPosition: "center 58%",
-    caption: "Density-based stop clusters with temporal separation between stops.",
-  },
-  dbscan: {
-    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
-    objectPosition: "center 58%",
-    caption: "Density-based stop clusters with temporal separation between stops.",
-  },
-  dbstop: {
-    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
-    objectPosition: "center 58%",
-    caption: "Density-based stop clusters with temporal separation between stops.",
-  },
-}
-
-function NotebookFigure({
-  algorithmId,
-  mode,
-  alt,
-  className = "",
-}: {
-  algorithmId: string
-  mode: "learn" | "metrics"
-  alt: string
-  className?: string
-}) {
-  const fig = NOTEBOOK_FIGURES[algorithmId]
-  if (!fig) {
-    return <p className="text-sm text-muted-foreground">No notebook visualization available.</p>
-  }
-
-  return (
-    <img
-      src={mode === "learn" ? fig.learn : fig.metrics}
-      alt={alt}
-      className={`w-full h-full object-contain ${className}`}
-    />
-  )
-}
-
-function LearnConceptFigure({ algorithmId }: { algorithmId: string }) {
-  const diagram = LEARN_CONCEPT_DIAGRAMS[algorithmId]
-  if (!diagram) return null
-
-  return (
-    <Card className="py-0">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Concept Diagram</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 p-4">
-        <div className="h-[min(320px,36vh)] overflow-hidden rounded-md border border-border bg-muted/20">
-          <img
-            src={diagram.src}
-            alt={`${algorithmId} concept diagram`}
-            className="h-full w-full object-cover"
-            style={{ objectPosition: diagram.objectPosition }}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">{diagram.caption}</p>
-      </CardContent>
-    </Card>
-  )
-}
+const LEARN_FAMILIES = [
+  { id: "sequential", title: "Sequential Algorithms" },
+  { id: "density", title: "Density-Based Algorithms" },
+]
 
 function prototypeChartSrc(algorithm: string, sweepParameter: string): string {
   const params = new URLSearchParams({
@@ -445,34 +351,6 @@ const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: str
 function getMetricsSweepLimit(algorithm: string, parameter: string): { min: number; max: number } {
   const options = METRICS_SWEEP_PARAMETERS[algorithm] ?? []
   return options.find((option) => option.value === parameter) ?? options[0] ?? { min: 0, max: 50 }
-}
-
-const ALGORITHM_REFERENCES: Record<string, { paper_label: string; paper_url?: string; docs_url?: string }> = {
-  dbstop: {
-    paper_label: "NOMAD DBSTOP compare configuration",
-    docs_url: "https://nomad.readthedocs.io/en/latest/stop_detection.html#dbscan",
-  },
-  lachesis: {
-    paper_label: "Hariharan & Toyama (2004), Project Lachesis",
-    paper_url: "https://www.microsoft.com/en-us/research/publication/project-lachesis-parsing-and-modeling-location-histories/",
-    docs_url: "https://nomad.readthedocs.io/en/latest/stop_detection.html#lachesis",
-  },
-  seqscan: {
-    paper_label: "NOMAD SeqScan implementation notes",
-    docs_url: "https://nomad.readthedocs.io/en/latest/stop_detection.html#dbscan",
-  },
-  dbscan: {
-    paper_label: "Birant & Kut (2007), ST-DBSCAN",
-    paper_url: "https://doi.org/10.1016/j.datak.2006.01.013",
-    docs_url: "https://nomad.readthedocs.io/en/latest/stop_detection.html#dbscan",
-  },
-  gridbased: {
-    paper_label: "NOMAD grid-based stop detection",
-    docs_url: "https://nomad.readthedocs.io/en/latest/stop_detection.html#grid-based",
-  },
-  medoid: {
-    paper_label: "Medoid-based clustering family",
-  },
 }
 
 function validateAlgorithmParams(
@@ -776,7 +654,7 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
   const clusterIds = Array.from(new Set(labels.filter((label) => label >= 0)))
 
   return (
-    <div className="h-full w-full rounded-md border border-border bg-[#eef1f4] p-2">
+    <div className="h-full w-full rounded-md border border-border bg-[#111625] p-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
         <rect x="0" y="0" width={width} height={mapHeight} fill="#d6d7d9" />
         {scene.buildings.flatMap((building) =>
@@ -906,12 +784,90 @@ function CompareAnimationPanel({
 
 const algorithms = [
   {
+    id: "lachesis",
+    name: "Lachesis",
+    family: "sequential",
+    shortDesc: "Greedy sequential parsing with roaming-distance and duration thresholds.",
+    description: "Lachesis scans pings in time order and grows a candidate stop while the observed movement remains within a roaming-distance threshold, temporal gaps stay bounded, and the accumulated dwell time reaches a minimum duration.",
+    source: "Hariharan and Toyama (2004), Project Lachesis",
+    cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+    expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
+    parameters: [
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
+      { name: "delta_roam", defaultValue: "25", description: "Maximum roaming distance for a candidate stop, in meters." },
+    ],
+  },
+  {
+    id: "sequential-centroid",
+    name: "Sequential (centroid-anchored)",
+    family: "sequential",
+    shortDesc: "Sequential stop detection anchored by the evolving candidate centroid.",
+    description: "The centroid-anchored sequential method scans pings chronologically and updates the candidate stop center as the group grows. A stop is retained when the candidate satisfies the configured roaming-distance, gap, and dwell-time constraints.",
+    source: "NOMAD sequential stop detection, method='centroid'",
+    cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+    expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
+    parameters: [
+      { name: "delta_roam", defaultValue: "25", description: "Maximum distance from the candidate centroid, in meters." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "method", defaultValue: "centroid", description: "Anchoring rule for the candidate stop center." },
+    ],
+  },
+  {
+    id: "sequential-first",
+    name: "Sequential (first-anchored)",
+    family: "sequential",
+    shortDesc: "Sequential stop detection anchored by the first ping in the candidate stop.",
+    description: "The first-anchored sequential method scans pings chronologically and compares new pings with the first ping in the active candidate stop. This copy is provisional until the exact source language is added.",
+    source: "NOMAD sequential stop detection, method='first' (placeholder source)",
+    cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+    expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
+    parameters: [
+      { name: "delta_roam", defaultValue: "25", description: "Maximum distance from the first ping in the candidate stop, in meters." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "method", defaultValue: "first", description: "Anchoring rule for the candidate stop center." },
+    ],
+  },
+  {
+    id: "gridbased",
+    name: "Grid-Based",
+    family: "sequential",
+    shortDesc: "Cell-based dwell detection over a spatial grid.",
+    description: "Grid-Based stop detection assigns pings to spatial cells and identifies stops from sustained dwell within a cell. This copy is provisional until the final source text is added.",
+    source: "NOMAD grid-based stop detection",
+    cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+    expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
+    parameters: [
+      { name: "cell_size", defaultValue: "100", description: "Grid cell size, in meters." },
+      { name: "min_time", defaultValue: "5", description: "Minimum dwell time inside a cell, in minutes." },
+    ],
+  },
+  {
+    id: "dbscan",
+    name: "ST-DBSCAN",
+    family: "density",
+    shortDesc: "Density-based clustering with spatial and temporal neighborhood thresholds.",
+    description: "ST-DBSCAN extends DBSCAN with a temporal scale so pings must be close in both space and time to form stop clusters. The dashboard copy should later be aligned with the exact implementation notes.",
+    source: "Birant and Kut (2007), ST-DBSCAN",
+    cardDiagramSrc: DENSITY_CARD_DIAGRAM,
+    expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
+    parameters: [
+      { name: "eps_spatial", defaultValue: "50", description: "Spatial neighborhood radius, in meters." },
+      { name: "T_max", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage, in minutes." },
+      { name: "minPts", defaultValue: "3", description: "Minimum neighbors required for a core point." },
+    ],
+  },
+  {
     id: "dbstop",
     name: "DBSTOP",
-    shortDesc: "Density-based stop detection (notebook compare panel)",
-    description:
-      "DBSTOP is a density-based stop detection configuration used in this dashboard’s compare workflow. It is parameterized by time_thresh, dist_thresh, min_pts, and dur_min, and is visualized with the same map-and-barcode layout as the notebook compare panel so behavior can be inspected side-by-side against other methods.",
-    source: "ta_seqscan_examples.ipynb compare section",
+    family: "density",
+    shortDesc: "Density-based stop detection with distance, time, and duration constraints.",
+    description: "DBSTOP identifies dense groups of pings as stops using spatial distance, temporal neighborhood, minimum point count, and minimum duration parameters. This text is provisional until the final NOMAD reference copy is added.",
+    source: "NOMAD DBSTOP implementation notes",
+    cardDiagramSrc: DENSITY_CARD_DIAGRAM,
+    expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
       { name: "time_thresh", defaultValue: "60", description: "Temporal threshold (minutes)" },
       { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
@@ -920,23 +876,14 @@ const algorithms = [
     ],
   },
   {
-    id: "lachesis",
-    name: "Lachesis",
-    shortDesc: "Roaming-distance based stop detection",
-    description: "Lachesis is a greedy, sequential and threshold-based algorithm taking in three parameters: dur_min, dt_max, and delta_roam. The algorithm processes pings in time order, and builds a candidate stop by scanning trajectories and grouping consecutive pings into a cluster under the following conditions: (1) the cluster diameter is less than or equal to delta_roam, (2) has no temporal gaps larger than dt_max, and (3) the accumulated duration is equal to or greater than dur_min. Key limitations include (1) being highly sensitive to parameter choices, with a small delta_roam leading to splitting or missing stops, and a large delta_roam leading to merging stops, and (2) assuming continuous sampling, so GPS noise or sparse data can lead to fragmented stops.",
-    source: "Lachesis: A GPS-Based Human Mobility Pattern Analyzer",
-    parameters: [
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop (minutes)" },
-      { name: "dt_max", defaultValue: "60", description: "Maximum allowed temporal gap between pings (minutes)" },
-      { name: "delta_roam", defaultValue: "25", description: "Maximum roaming distance (meters)" }
-    ]
-  },
-  {
     id: "seqscan",
     name: "SeqScan",
-    shortDesc: "Sequential scanning with thresholds",
-    description: "SeqScan extends DBSCAN to spatio-temporal data while guaranteeing temporal separation between detected stops. Each stop is defined as a DBSCAN cluster computed over a local time context, using the reachability graph of core points (a ping with a minimum of min_pts neighbors at a distance below dist_thresh). The algorithm scans points in chronological order, maintaining both an active cluster and an active time context for neighbor queries. For each incoming ping, neighbors are queried within the active time context; if it is connected to the active cluster, the active cluster is expanded. Otherwise, DBSCAN is applied to the tail of the trajectory, starting from the last ping of the active cluster up to the incoming ping. If a cluster with duration at least dur_min is found in the tail, it becomes the new active cluster and the active time context is shifted, continuing until reaching the end of the trajectory.",
-    source: "Sequential Scan Algorithm for GPS Stop Detection",
+    family: "density",
+    shortDesc: "Density-based sequential scan with temporal separation between stops.",
+    description: "SeqScan applies density-based clustering within a moving temporal context, expanding active clusters while preserving temporal separation between detected stops.",
+    source: "NOMAD SeqScan implementation notes",
+    cardDiagramSrc: DENSITY_CARD_DIAGRAM,
+    expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
       { name: "time_thresh", defaultValue: "60", description: "Time threshold for stop detection (minutes)" },
       { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
@@ -945,38 +892,18 @@ const algorithms = [
     ]
   },
   {
-    id: "dbscan",
-    name: "ST-DBSCAN",
-    shortDesc: "Density-based spatiotemporal clustering",
-    description: "ST-DBSCAN extends classical DBSCAN by incorporating a second scale parameter to avoid long temporal gaps within detected stops, namely T_max, in addition to the spatial scale parameter eps_spatial and minPts, the usual density threshold in DBSCAN. In this way, it incorporates both spatial and temporal proximity to define reachability. Since stops are defined as components of the reachability graph of core points, ST-DBSCAN is robust to noise points that could break up stops in sequential algorithms. Standard ST-DBSCAN does not guarantee temporal separation, so clusters can overlap in time even if they represent different stops. In this dashboard, we extend it with a simple heuristic to remove overlaps in which every core point acts as a cutoff and prevents the merging of core points that are not neighbors of said point.",
-    source: "ST-DBSCAN: An algorithm for clustering spatial-temporal data",
+    id: "hdbscan",
+    name: "HDBSCAN",
+    family: "density",
+    shortDesc: "Hierarchical density-based clustering for variable-density stop patterns.",
+    description: "HDBSCAN is included as a density-based stop detection placeholder. The exact stop-detection formulation, parameter defaults, and source language still need to be confirmed.",
+    source: "Placeholder source: HDBSCAN reference or NOMAD implementation notes needed",
+    cardDiagramSrc: DENSITY_CARD_DIAGRAM,
+    expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "eps_spatial", defaultValue: "50", description: "Spatial radius epsilon (meters)" },
-      { name: "T_max", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage (minutes)" },
-      { name: "minPts", defaultValue: "3", description: "Minimum neighbors required for a core point" }
-    ]
-  },
-  {
-    id: "gridbased",
-    name: "Grid-based",
-    shortDesc: "Cell-based dwell time analysis",
-    description: "Divides the geographic area into grid cells and identifies stops based on dwell time within cells, useful for aggregated analysis at different spatial resolutions.",
-    source: "Grid-based Methods for Mobility Analysis",
-    parameters: [
-      { name: "cell_size", defaultValue: "100", description: "Grid cell size (meters)" },
-      { name: "min_time", defaultValue: "5", description: "Minimum time in cell (minutes)" }
-    ]
-  },
-  {
-    id: "medoid",
-    name: "Medoid-based",
-    shortDesc: "Representative point clustering",
-    description: "Uses medoid computation to find representative central points of potential stops, robust against outliers in noisy GPS data.",
-    source: "Medoid-based Clustering for GPS Trajectories",
-    parameters: [
-      { name: "radius", defaultValue: "50", description: "Search radius (meters)" },
-      { name: "min_duration", defaultValue: "60", description: "Minimum stop duration" }
-    ]
+      { name: "min_cluster_size", defaultValue: "TBD", description: "Minimum cluster size; placeholder until the implementation source is confirmed." },
+      { name: "min_samples", defaultValue: "TBD", description: "Density smoothing parameter; placeholder until the implementation source is confirmed." },
+    ],
   },
 ]
 
@@ -1012,7 +939,7 @@ const generateDataPoints = (): DataPoint[] => {
   return points
 }
 
-const DEMO_ALGORITHM_IDS = new Set(["dbstop", "lachesis", "seqscan", "dbscan", "gridbased"])
+const DEMO_ALGORITHM_IDS = new Set(algorithms.map((algorithm) => algorithm.id))
 const DASHBOARD_VIEWS = new Set(["home", "learn", "demo", "metrics"] as const)
 type DashboardView = "home" | "learn" | "demo" | "metrics"
 type DemoMode = "single" | "compare"
@@ -1250,13 +1177,6 @@ function NomadDashboard() {
     setMetricsApiData(null)
   }, [metricsOptions, metricsTrajectoryUser])
 
-  const handleAlgorithmSelect = (algorithmId: string) => {
-    setLeftAlgorithm(DEMO_ALGORITHM_IDS.has(algorithmId) ? algorithmId : "dbstop")
-    setExpandedAlgorithm(null)
-    setActiveView("demo")
-    syncUrl("demo")
-  }
-
   const handleLeftAlgorithmChange = useCallback((algorithmId: string) => {
     setLeftAlgorithm(algorithmId)
     setLeftParams({})
@@ -1303,9 +1223,24 @@ function NomadDashboard() {
     syncUrl("learn", algorithmId)
   }, [syncUrl])
 
+  const openLearnDemo = useCallback((algorithmId: string) => {
+    setLeftAlgorithm(algorithmId)
+    setLeftParams({})
+    setLeftParamErrors({})
+    setCompareMode(false)
+    setActiveView("demo")
+    syncUrl("demo", null, "single")
+  }, [syncUrl])
+
+  const openLearnDocumentation = useCallback((algorithmId: string) => {
+    document.getElementById(`learn-documentation-${algorithmId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }, [])
+
   const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
   const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
+  const expandedLearnAlgorithm = activeView === "learn" && expandedAlgorithm ? algorithms.find((a) => a.id === expandedAlgorithm) : null
+  const expandedLearnFamilyTitle = expandedLearnAlgorithm ? LEARN_FAMILIES.find((family) => family.id === expandedLearnAlgorithm.family)?.title ?? "Algorithm Family" : ""
   const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential"]
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
@@ -1463,146 +1398,160 @@ function NomadDashboard() {
       )}
 
       {/* LEARN VIEW */}
-      {activeView === "learn" && !expandedAlgorithm && (
-        <div className="flex-1 min-h-0 flex flex-col p-4 pb-6 gap-3 overflow-y-auto overflow-x-hidden">
-          <div className="shrink-0 space-y-1">
-            <h2 className="text-3xl font-bold">Learn Algorithms</h2>
-            <p className="text-sm text-muted-foreground">
-              Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch before running the demo.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-2">
-            {algorithms.map((algo) => (
-              <Card
-                key={algo.id}
-                className="cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
-                onClick={() => openLearnAlgorithm(algo.id)}
-              >
-                <CardHeader className="px-5 pt-5 pb-1 shrink-0">
-                  <CardTitle className="text-lg">{algo.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
-                  <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
-                  <div className="bg-muted/50 rounded-md h-[clamp(140px,18vh,190px)] p-2 overflow-hidden">
-                    <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} notebook visualization`} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Tap to open details, parameter definitions, and a direct path to the interactive demo.
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* EXPANDED ALGORITHM VIEW */}
-      {activeView === "learn" && expandedAlgorithm && (
-        <div className="flex-1 min-h-0 flex flex-col p-4 pb-6 gap-3 overflow-y-auto overflow-x-hidden">
-          {(() => {
-            const algo = algorithms.find(a => a.id === expandedAlgorithm)
-            if (!algo) return null
-            return (
-              <>
-                <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setExpandedAlgorithm(null)
-                        syncUrl("learn")
-                      }}
-                      className="gap-2 px-2"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to algorithms
-                    </Button>
-                    <h2 className="text-2xl font-bold">{algo.name}</h2>
-                  </div>
-                  <Button onClick={() => handleAlgorithmSelect(algo.id)} size="lg">
-                    Demo
-                  </Button>
-                </div>
-                <div className="flex flex-col bg-muted/30 rounded-xl p-4 gap-3">
-                  {/* Description */}
-                  <Card className="shrink-0">
-                    <CardContent className="py-4">
-                      <p className="text-sm text-muted-foreground">{algo.description}</p>
-                      <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                        <p>Source: {algo.source}</p>
-                        {ALGORITHM_REFERENCES[algo.id]?.paper_url ? (
-                          <p>
-                            Paper:{" "}
-                            <a
-                              href={ALGORITHM_REFERENCES[algo.id].paper_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline underline-offset-2"
-                            >
-                              {ALGORITHM_REFERENCES[algo.id].paper_label}
-                            </a>
-                          </p>
-                        ) : (
-                          <p>Paper: {ALGORITHM_REFERENCES[algo.id]?.paper_label}</p>
-                        )}
-                        {ALGORITHM_REFERENCES[algo.id]?.docs_url && (
-                          <p>
-                            Docs:{" "}
-                            <a
-                              href={ALGORITHM_REFERENCES[algo.id].docs_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline underline-offset-2"
-                            >
-                              Stop detection documentation
-                            </a>
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  {/* Diagram and Parameters */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                      <Card className="py-0">
-                        <CardContent className="p-4 h-[min(320px,36vh)] flex items-center justify-center">
-                          <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
+      {activeView === "learn" && (
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pb-6">
+          <div className={`flex min-h-0 flex-col gap-3 transition duration-200 ${expandedLearnAlgorithm ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
+            <div className="shrink-0 space-y-1">
+              <h2 className="text-3xl font-bold">Learn Algorithms</h2>
+              <p className="text-sm text-muted-foreground">
+                Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch.
+              </p>
+            </div>
+            <div className="space-y-5 pb-2">
+              {LEARN_FAMILIES.map((family) => (
+                <section key={family.id} className="space-y-3">
+                  <h3 className="text-xl font-semibold">{family.title}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    {algorithms.filter((algo) => algo.family === family.id).map((algo) => (
+                      <Card
+                        key={algo.id}
+                        className="group cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
+                        onClick={() => openLearnAlgorithm(algo.id)}
+                      >
+                        <CardHeader className="px-5 pt-5 pb-1 shrink-0">
+                          <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#94a1b7] transition-colors group-hover:border-[#8acac8] group-hover:text-[#f2f4eb]">
+                            {algo.name}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
+                          <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
+                          <div className="aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
+                            <img
+                              src={algo.cardDiagramSrc}
+                              alt={`${algo.name} card diagram`}
+                              className="w-full h-full object-contain p-1"
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium text-[#8acac8]">
+                            <span>View more</span>
+                            <img src="/assets/icons/learn-expand.svg" alt="" className="h-4 w-4" />
+                          </div>
                         </CardContent>
                       </Card>
-                      <LearnConceptFigure algorithmId={algo.id} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+
+          <Dialog
+            open={Boolean(expandedLearnAlgorithm)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setExpandedAlgorithm(null)
+                syncUrl("learn")
+              }
+            }}
+          >
+            {expandedLearnAlgorithm && (
+              <DialogContent
+                showCloseButton={false}
+                className="max-h-[calc(100vh-88px)] w-[calc(100vw-24px)] max-w-[min(1180px,calc(100vw-48px))] gap-0 overflow-hidden rounded-xl border-2 border-[#8acac8] bg-card p-0 shadow-2xl shadow-black/40 duration-200 sm:w-[calc(100vw-48px)] sm:max-h-[calc(100vh-120px)] sm:max-w-[min(1180px,calc(100vw-48px))]"
+              >
+                <div className="flex max-h-[calc(100vh-88px)] flex-col overflow-hidden sm:max-h-[calc(100vh-120px)]">
+                  <div className="shrink-0 px-5 pt-5 pb-4 md:px-8 md:pt-7">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 space-y-2">
+                        <DialogTitle className="inline-block border-b-2 border-[#8acac8] pb-2 text-2xl font-bold leading-tight text-[#f2f4eb]">
+                          {expandedLearnAlgorithm.name}
+                        </DialogTitle>
+                        <DialogDescription className="text-sm text-muted-foreground">
+                          {expandedLearnFamilyTitle}
+                        </DialogDescription>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExpandedAlgorithm(null)
+                          syncUrl("learn")
+                        }}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md p-0 text-xs font-medium text-[#8acac8] transition-colors hover:text-[#f2f4eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
+                      >
+                        Collapse
+                        <img src="/assets/icons/learn-collapse.svg" alt="" className="h-4 w-4" />
+                      </button>
                     </div>
-                    {/* Parameters table */}
-                    <Card className="overflow-hidden">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">Parameters</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="rounded-md border overflow-hidden">
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-5 md:px-8 md:pb-8">
+                    <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)] lg:items-start">
+                      <div className="min-w-0 space-y-4">
+                        <p className="break-words text-sm leading-relaxed text-muted-foreground md:text-base">
+                          {expandedLearnAlgorithm.description}
+                        </p>
+                        <div className="min-w-0 overflow-hidden rounded-md bg-[#111625]">
+                          <img
+                            src={expandedLearnAlgorithm.expandedDiagramSrc}
+                            alt={`${expandedLearnAlgorithm.name} expanded diagram`}
+                            className="block h-auto w-full max-w-full"
+                          />
+                        </div>
+                        <p id={`learn-documentation-${expandedLearnAlgorithm.id}`} className="scroll-mt-4 break-words text-sm text-muted-foreground">
+                          Source: {expandedLearnAlgorithm.source}
+                        </p>
+                      </div>
+
+                      <section className="min-w-0 rounded-lg border border-border bg-[#151b2c]/70 p-4 md:p-5">
+                        <h3 className="mb-4 text-lg font-semibold">Parameters</h3>
+                        <div className="overflow-x-auto rounded-md border">
                           <table className="w-full text-sm">
                             <thead className="bg-muted">
                               <tr>
                                 <th className="px-3 py-2 text-left font-medium">Name</th>
+                                <th className="px-3 py-2 text-left font-medium">Default</th>
                                 <th className="px-3 py-2 text-left font-medium">Description</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {algo.parameters.map((param, idx) => (
+                              {expandedLearnAlgorithm.parameters.map((param, idx) => (
                                 <tr key={param.name} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
                                   <td className="px-3 py-2 font-mono text-sm">{param.name}</td>
-                                  <td className="px-3 py-2 text-muted-foreground text-sm">{param.description}</td>
+                                  <td className="px-3 py-2 font-mono text-sm">{param.defaultValue}</td>
+                                  <td className="px-3 py-2 text-sm text-muted-foreground">{param.description}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </section>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 border-t border-border/70 px-5 py-4 md:px-8">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                      <Button
+                        size="lg"
+                        onClick={() => openLearnDemo(expandedLearnAlgorithm.id)}
+                        className="h-11 min-w-36 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]"
+                      >
+                        <Play className="h-5 w-5 fill-current" />
+                        Demo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => openLearnDocumentation(expandedLearnAlgorithm.id)}
+                        className="h-11 min-w-36 border-[#3a465d] bg-[#111625]/45 text-base font-semibold text-[#f2f4eb] hover:bg-[#242b3d]"
+                      >
+                        Documentation
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </>
-            )
-          })()}
+              </DialogContent>
+            )}
+          </Dialog>
         </div>
       )}
 

@@ -1402,7 +1402,7 @@ function NomadDashboard() {
                       onClick={() => openLearnAlgorithm(algo.id)}
                     >
                       <CardHeader className="px-5 pt-5 pb-1 shrink-0">
-                        <CardTitle className="text-lg underline decoration-transparent decoration-2 decoration-[#8acac8] underline-offset-4 transition-colors group-hover:decoration-[#8acac8]">
+                        <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#94a1b7] transition-colors group-hover:border-[#8acac8] group-hover:text-[#f2f4eb]">
                           {algo.name}
                         </CardTitle>
                       </CardHeader>

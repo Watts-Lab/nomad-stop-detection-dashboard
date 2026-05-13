@@ -138,6 +138,29 @@ const NOTEBOOK_FIGURES: Record<string, { learn: string; metrics: string; source:
   },
 }
 
+const LEARN_CONCEPT_DIAGRAMS: Record<string, { src: string; objectPosition: string; caption: string }> = {
+  lachesis: {
+    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
+    objectPosition: "center 14%",
+    caption: "Sequential-style stop definition with roaming-area and duration constraints.",
+  },
+  seqscan: {
+    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
+    objectPosition: "center 58%",
+    caption: "Density-based stop clusters with temporal separation between stops.",
+  },
+  dbscan: {
+    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
+    objectPosition: "center 58%",
+    caption: "Density-based stop clusters with temporal separation between stops.",
+  },
+  dbstop: {
+    src: "/assets/diagram-svgs/sequential-centroid-diagram.svg",
+    objectPosition: "center 58%",
+    caption: "Density-based stop clusters with temporal separation between stops.",
+  },
+}
+
 function NotebookFigure({
   algorithmId,
   mode,
@@ -161,6 +184,39 @@ function NotebookFigure({
       className={`w-full h-full object-contain ${className}`}
     />
   )
+}
+
+function LearnConceptFigure({ algorithmId }: { algorithmId: string }) {
+  const diagram = LEARN_CONCEPT_DIAGRAMS[algorithmId]
+  if (!diagram) return null
+
+  return (
+    <Card className="py-0">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Concept Diagram</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 p-4">
+        <div className="h-[min(320px,36vh)] overflow-hidden rounded-md border border-border bg-muted/20">
+          <img
+            src={diagram.src}
+            alt={`${algorithmId} concept diagram`}
+            className="h-full w-full object-cover"
+            style={{ objectPosition: diagram.objectPosition }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">{diagram.caption}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function prototypeChartSrc(algorithm: string, sweepParameter: string): string {
+  const params = new URLSearchParams({
+    title: `${algorithm} aggregated metrics (prototype)`,
+    x: sweepParameter || "delta_roam",
+    field: "delta_roam",
+  })
+  return `/echarts-prototype/index.html?${params.toString()}`
 }
 
 // ============ TYPES & DATA ============
@@ -1256,13 +1312,13 @@ function NomadDashboard() {
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
   const leftSweepParameters = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? []
   const rightSweepParameters = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? []
+  const leftMetricsPrototypeSrc = prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)
+  const rightMetricsPrototypeSrc = prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)
   const renderMetricsParameterRows = (
     algorithm: string,
     note: MetricsParameterNote | undefined,
-    selectedParameter: string,
   ) => {
     const rows = [
-      ["x_axis", selectedParameter],
       ...(note?.fixed_parameters ?? []).map((param) => {
         const [name, ...valueParts] = param.split("=")
         return [name, valueParts.join("=") || "fixed"]
@@ -1508,11 +1564,14 @@ function NomadDashboard() {
                   </Card>
                   {/* Diagram and Parameters */}
                   <div className="grid md:grid-cols-2 gap-4">
-                    <Card className="py-0">
-                      <CardContent className="p-4 h-[min(320px,36vh)] flex items-center justify-center">
-                        <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
-                      </CardContent>
-                    </Card>
+                    <div className="space-y-4">
+                      <Card className="py-0">
+                        <CardContent className="p-4 h-[min(320px,36vh)] flex items-center justify-center">
+                          <NotebookFigure algorithmId={algo.id} mode="learn" alt={`${algo.name} detailed notebook visualization`} />
+                        </CardContent>
+                      </Card>
+                      <LearnConceptFigure algorithmId={algo.id} />
+                    </div>
                     {/* Parameters table */}
                     <Card className="overflow-hidden">
                       <CardHeader className="pb-2">
@@ -1679,36 +1738,32 @@ function NomadDashboard() {
 
           <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch">
             <Card className="h-full min-h-0 overflow-hidden py-0">
-              <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
-                <CardTitle className="text-sm font-semibold">
-                  {metricsCompareMode ? "Metric Comparison" : (metricsApiData?.left?.title ?? metricsLeftAlgorithm)}
-                </CardTitle>
-              </CardHeader>
+              {!metricsCompareMode && (
+                <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
+                  <CardTitle className="text-sm font-semibold">
+                    {metricsApiData?.left?.title ?? metricsLeftAlgorithm}
+                  </CardTitle>
+                </CardHeader>
+              )}
               <CardContent className="min-h-0 flex-1 p-2">
                 <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
                   <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                    {metricsApiData?.left?.image_data_url ? (
-                      <img
-                        src={metricsApiData.left.image_data_url}
-                        alt={metricsApiData.left.title}
-                        className="h-full max-h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
-                    )}
+                    <iframe
+                      key={leftMetricsPrototypeSrc}
+                      src={leftMetricsPrototypeSrc}
+                      title={`${metricsLeftAlgorithm} aggregated metrics prototype`}
+                      className="h-full w-full border-0"
+                    />
                   </div>
 
                   {metricsCompareMode && (
                     <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                      {metricsApiData?.right?.image_data_url ? (
-                        <img
-                          src={metricsApiData.right.image_data_url}
-                          alt={metricsApiData.right.title}
-                          className="h-full max-h-full w-full object-contain"
-                        />
-                      ) : (
-                        <div className="h-full min-h-[180px] rounded-md border border-dashed border-border bg-muted/40" />
-                      )}
+                      <iframe
+                        key={rightMetricsPrototypeSrc}
+                        src={rightMetricsPrototypeSrc}
+                        title={`${metricsRightAlgorithm} aggregated metrics prototype`}
+                        className="h-full w-full border-0"
+                      />
                     </div>
                   )}
                 </div>
@@ -1740,7 +1795,7 @@ function NomadDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
-                {renderMetricsParameterRows(metricsLeftAlgorithm, leftParameterNote, metricsLeftParameter)}
+                {renderMetricsParameterRows(metricsLeftAlgorithm, leftParameterNote)}
 
                 {metricsCompareMode && (
                   <>
@@ -1760,7 +1815,7 @@ function NomadDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {renderMetricsParameterRows(metricsRightAlgorithm, rightParameterNote, metricsRightParameter)}
+                    {renderMetricsParameterRows(metricsRightAlgorithm, rightParameterNote)}
                   </>
                 )}
 
@@ -1769,14 +1824,6 @@ function NomadDashboard() {
                 </Button>
                 {metricsLoading && <p className="text-xs text-muted-foreground">Running notebook metric experiment...</p>}
                 {metricsError && <p className="text-xs text-red-500">{metricsError}</p>}
-                {metricsApiData?.meta && (
-                  <p className="text-xs text-muted-foreground">
-                    {metricsApiData.meta.cache_hit ? "Cache hit" : "Fresh run"} · {metricsApiData.meta.elapsed_sec.toFixed(2)}s
-                    {typeof metricsApiData.meta.cache_files === "number" && typeof metricsApiData.meta.cache_total_bytes === "number"
-                      ? ` · ${metricsApiData.meta.cache_files} files · ${(metricsApiData.meta.cache_total_bytes / 1024).toFixed(1)} KB`
-                      : ""}
-                  </p>
-                )}
               </CardContent>
             </Card>
           </div>

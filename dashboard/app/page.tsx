@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { NomadNav } from "@/components/nomad-nav"
-import { ArrowLeft, Columns2, Play, Square } from "lucide-react"
+import { Columns2, Play, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
 
@@ -1398,24 +1398,27 @@ function NomadDashboard() {
                   {algorithms.filter((algo) => algo.family === family.id).map((algo) => (
                     <Card
                       key={algo.id}
-                      className="cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
+                      className="group cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
                       onClick={() => openLearnAlgorithm(algo.id)}
                     >
                       <CardHeader className="px-5 pt-5 pb-1 shrink-0">
-                        <CardTitle className="text-lg">{algo.name}</CardTitle>
+                        <CardTitle className="text-lg underline decoration-transparent decoration-2 decoration-[#8acac8] underline-offset-4 transition-colors group-hover:decoration-[#8acac8]">
+                          {algo.name}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
-                        <div className="aspect-[7/3] overflow-hidden rounded-md bg-[#111625]">
+                        <div className="aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
                           <img
                             src={algo.cardDiagramSrc}
                             alt={`${algo.name} card diagram`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain p-1"
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Open details, parameter definitions, and source notes.
-                        </p>
+                        <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium text-[#8acac8]">
+                          <span>View more</span>
+                          <img src="/assets/icons/learn-expand.svg" alt="" className="h-4 w-4" />
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -1435,22 +1438,23 @@ function NomadDashboard() {
             const familyTitle = LEARN_FAMILIES.find((family) => family.id === algo.family)?.title ?? "Algorithm Family"
             return (
               <>
-                <div className="flex shrink-0 flex-wrap items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setExpandedAlgorithm(null)
-                      syncUrl("learn")
-                    }}
-                    className="gap-2 px-2"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to algorithms
-                  </Button>
+                <div className="relative flex shrink-0 items-start justify-between gap-3">
                   <div>
                     <h2 className="text-2xl font-bold">{algo.name}</h2>
                     <p className="text-sm text-muted-foreground">{familyTitle}</p>
+                  </div>
+                  <div className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedAlgorithm(null)
+                        syncUrl("learn")
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-md p-0 text-xs font-medium text-[#8acac8] transition-colors hover:text-[#f2f4eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
+                    >
+                      Collapse
+                      <img src="/assets/icons/learn-collapse.svg" alt="" className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 <div className="flex flex-col bg-muted/30 rounded-xl p-4 gap-3">

@@ -653,7 +653,7 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
   const clusterIds = Array.from(new Set(labels.filter((label) => label >= 0)))
 
   return (
-    <div className="h-full w-full rounded-md border border-border bg-[#eef1f4] p-2">
+    <div className="h-full w-full rounded-md border border-border bg-[#111625] p-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
         <rect x="0" y="0" width={width} height={mapHeight} fill="#d6d7d9" />
         {scene.buildings.flatMap((building) =>
@@ -1406,7 +1406,7 @@ function NomadDashboard() {
                       </CardHeader>
                       <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
-                        <div className="aspect-[7/3] overflow-hidden rounded-md bg-[#2c3642]">
+                        <div className="aspect-[7/3] overflow-hidden rounded-md bg-[#111625]">
                           <img
                             src={algo.cardDiagramSrc}
                             alt={`${algo.name} card diagram`}
@@ -1463,7 +1463,7 @@ function NomadDashboard() {
                     </CardContent>
                   </Card>
                   <div className="grid gap-4 md:grid-cols-2 md:items-start">
-                    <div className="overflow-hidden rounded-xl border border-border bg-[#2c3642]">
+                    <div className="overflow-hidden rounded-xl border border-border bg-[#111625]">
                       <img
                         src={algo.expandedDiagramSrc}
                         alt={`${algo.name} expanded diagram`}

@@ -97,9 +97,12 @@ function prettyAlgoName(algo: string): string {
   const names: Record<string, string> = {
     dbstop: "DBSTOP",
     lachesis: "Lachesis",
+    "sequential-centroid": "Sequential (centroid-anchored)",
+    "sequential-first": "Sequential (first-anchored)",
     seqscan: "SeqScan",
     tadbscan: "ST-DBSCAN",
     gridbased: "Grid-based",
+    hdbscan: "HDBSCAN",
   }
   return names[algo] ?? algo.toUpperCase()
 }

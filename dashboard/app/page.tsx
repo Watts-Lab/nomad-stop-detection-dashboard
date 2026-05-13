@@ -288,6 +288,16 @@ const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>>
     dt_max: { min: 1, max: 180, step: 1 },
     delta_roam: { min: 0, max: 120, step: 5 },
   },
+  "sequential-centroid": {
+    dur_min: { min: 0, max: 180, step: 5 },
+    dt_max: { min: 1, max: 180, step: 1 },
+    delta_roam: { min: 0, max: 120, step: 5 },
+  },
+  "sequential-first": {
+    dur_min: { min: 0, max: 180, step: 5 },
+    dt_max: { min: 1, max: 180, step: 1 },
+    delta_roam: { min: 0, max: 120, step: 5 },
+  },
   gridbased: {
     cell_size: { min: 25, max: 500, step: 1 },
     min_time: { min: 1, max: 180, step: 1 },
@@ -317,11 +327,21 @@ const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = 
     dur_min: { min: 0, max: 180, step: 5 },
     delta_roam: { min: 0, max: 120, step: 5 },
   },
+  "sequential-centroid": {
+    dur_min: { min: 0, max: 180, step: 5 },
+    delta_roam: { min: 0, max: 120, step: 5 },
+  },
+  "sequential-first": {
+    dur_min: { min: 0, max: 180, step: 5 },
+    delta_roam: { min: 0, max: 120, step: 5 },
+  },
 }
 
 const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   dbstop: "DBSTOP",
   lachesis: "Lachesis",
+  "sequential-centroid": "Sequential",
+  "sequential-first": "Sequential",
   seqscan: "SeqScan",
   dbscan: "ST-DBSCAN",
 }
@@ -365,15 +385,17 @@ function validateAlgorithmParams(
   for (const p of algoDef.parameters) {
     const constraint = constraints[p.name]
     const raw = values[p.name] ?? p.defaultValue
-    if (raw.trim() === "") {
+    const trimmed = raw.trim()
+    const num = Number(trimmed)
+
+    // Keep non-numeric fixed parameters (e.g., method='centroid') as informational only.
+    if (!constraint && !Number.isFinite(num)) continue
+
+    if (trimmed === "" || !Number.isFinite(num)) {
       errors[p.name] = "Enter a number."
       continue
     }
-    const num = Number(raw)
-    if (!Number.isFinite(num)) {
-      errors[p.name] = "Enter a number."
-      continue
-    }
+
     if (constraint) {
       if (constraint.allowedValues && !constraint.allowedValues.includes(num)) {
         errors[p.name] = `Allowed values: ${constraint.allowedValues.join(", ")}`
@@ -550,10 +572,11 @@ function assignDemoClusters(
     return labels
   }
 
-  if (normalized === "lachesis") {
+  if (normalized === "lachesis" || normalized === "sequential-centroid" || normalized === "sequential-first") {
     const roam = Math.max(1, Number(params?.delta_roam ?? 20))
     const dtMax = Math.max(1, Number(params?.dt_max ?? 60)) * 60
     const durMin = Math.max(0, Number(params?.dur_min ?? 5)) * 60
+    const anchorMode = normalized === "sequential-first" ? "first" : "centroid"
     const commit = (indexes: number[], cluster: number) => {
       if (indexes.length < 2) return cluster
       const duration = pings[indexes[indexes.length - 1]].timestamp - pings[indexes[0]].timestamp
@@ -567,9 +590,11 @@ function assignDemoClusters(
     let cluster = 0
     let current: number[] = [0]
     for (let i = 1; i < pings.length; i += 1) {
-      const centroid = meanPoint(current.map((index) => pings[index]))
+      const anchor = anchorMode === "first"
+        ? pings[current[0]]
+        : meanPoint(current.map((index) => pings[index]))
       const gap = pings[i].timestamp - pings[i - 1].timestamp
-      if (gap <= dtMax && distanceMeters(pings[i], centroid) <= roam) {
+      if (gap <= dtMax && distanceMeters(pings[i], anchor) <= roam) {
         current.push(i)
       } else {
         cluster = commit(current, cluster)
@@ -633,14 +658,19 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
 
   const width = 980
   const height = mode === "single" ? 560 : 420
-  const timelineHeight = 62
-  const mapHeight = height - timelineHeight
+  const mapInset = 12
+  const mapHeight = mode === "single" ? 370 : 265
+  const mapTop = mapInset
+  const mapWidth = width - mapInset * 2
+  const barcodeTop = mapTop + mapHeight + 18
+  const barcodeHeight = 56
+  const axisY = barcodeTop + barcodeHeight + 24
   const [minX, minY, maxX, maxY] = scene.bounds
   const dx = Math.max(1, maxX - minX)
   const dy = Math.max(1, maxY - minY)
   const project = (x: number, y: number) => ({
-    x: ((x - minX) / dx) * width,
-    y: mapHeight - ((y - minY) / dy) * mapHeight,
+    x: mapInset + ((x - minX) / dx) * mapWidth,
+    y: mapTop + mapHeight - ((y - minY) / dy) * mapHeight,
   })
   const pathPoints = scene.pings.slice(0, frame + 1).map((ping) => {
     const pt = project(ping.x, ping.y)
@@ -650,13 +680,33 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
   const endTs = scene.pings[scene.pings.length - 1]?.timestamp ?? startTs + 1
   const timeSpan = Math.max(1, endTs - startTs)
   const currentTs = scene.pings[frame]?.timestamp ?? startTs
-  const currentX = ((currentTs - startTs) / timeSpan) * width
+  const toX = (ts: number) => mapInset + ((ts - startTs) / timeSpan) * mapWidth
+  const currentX = toX(currentTs)
   const clusterIds = Array.from(new Set(labels.filter((label) => label >= 0)))
+  const stopRows = scene.truth.filter((row) => row.location && row.duration > 0)
+  const stopLocations = Array.from(new Set(stopRows.map((row) => row.location as string)))
+  const stopPalette = ["#F59E0B", "#8B5CF6", "#22D3EE", "#34D399", "#F472B6"]
+  const locationColor = new Map(stopLocations.map((location, i) => [location, stopPalette[i % stopPalette.length]]))
+  const timeTickCount = 4
+  const timeTicks = Array.from({ length: timeTickCount }, (_, i) => startTs + (i * timeSpan) / (timeTickCount - 1))
+  const formatClock = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
   return (
-    <div className="h-full w-full rounded-md border border-border bg-[#111625] p-2">
+    <div className="h-full w-full rounded-md border border-[#2B4667] bg-[#07172A] p-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-        <rect x="0" y="0" width={width} height={mapHeight} fill="#d6d7d9" />
+        <defs>
+          <linearGradient id="demoMapBg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#16355D" />
+            <stop offset="55%" stopColor="#0E2643" />
+            <stop offset="100%" stopColor="#0A1B33" />
+          </linearGradient>
+          <linearGradient id="demoFloorBg" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#2E3E56" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#1C2E48" stopOpacity="0.45" />
+          </linearGradient>
+        </defs>
+
+        <rect x={mapInset} y={mapTop} width={mapWidth} height={mapHeight} rx="10" fill="url(#demoMapBg)" stroke="#2C4E72" strokeWidth="1.2" />
         {scene.buildings.flatMap((building) =>
           building.rings.map((ring, ringIndex) => {
             const points = ring.map(([x, y]) => {
@@ -667,16 +717,16 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
               <polygon
                 key={`${building.id}-${ringIndex}`}
                 points={points}
-                fill={building.type.startsWith("r") ? "#969899" : "#8f9191"}
-                stroke="#f5f5f5"
-                strokeWidth="1.5"
-                opacity="0.92"
+                fill="url(#demoFloorBg)"
+                stroke="#456386"
+                strokeWidth="1"
+                opacity="0.95"
               />
             )
           }),
         )}
         {pathPoints && (
-          <polyline points={pathPoints} fill="none" stroke="#263449" strokeWidth="2.4" opacity="0.45" />
+          <polyline points={pathPoints} fill="none" stroke="#8EA6C4" strokeWidth="2.2" opacity="0.35" />
         )}
         {clusterIds.map((cluster) => {
           const members = scene.pings.filter((_ping, index) => labels[index] === cluster && index <= frame)
@@ -695,46 +745,87 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
               ry={ry}
               fill="none"
               stroke={DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]}
-              strokeWidth="5"
+              strokeWidth="3.2"
               opacity="0.9"
             />
           )
         })}
+        {scene.pings.map((ping, index) => {
+          const pt = project(ping.x, ping.y)
+          if (index > frame) {
+            return (
+              <circle
+                key={`future-${ping.timestamp}-${index}`}
+                cx={pt.x}
+                cy={pt.y}
+                r={2.1}
+                fill="#CAD5E4"
+                opacity="0.7"
+              />
+            )
+          }
+          return null
+        })}
         {scene.pings.slice(0, frame + 1).map((ping, index) => {
           const pt = project(ping.x, ping.y)
           const cluster = labels[index]
-          const color = cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#111827"
+          const color = cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#D5E2F2"
           return (
             <circle
               key={`${ping.timestamp}-${index}`}
               cx={pt.x}
               cy={pt.y}
-              r={cluster >= 0 ? 5.5 : 4.2}
+              r={cluster >= 0 ? 5.1 : 3.4}
               fill={color}
-              opacity={cluster >= 0 ? 0.9 : 0.55}
-              stroke="#111827"
-              strokeWidth="0.8"
+              opacity={cluster >= 0 ? 0.96 : 0.88}
+              stroke="#0B1A30"
+              strokeWidth="0.9"
             />
           )
         })}
-        <rect x="0" y={mapHeight + 10} width={width} height="1.5" fill="#111827" opacity="0.8" />
+
+        <rect x={mapInset} y={barcodeTop} width={mapWidth} height={barcodeHeight} rx="8" fill="#0A1E36" stroke="#2A4566" strokeWidth="1" />
+        {stopRows.map((row, index) => {
+          const start = row.timestamp
+          const end = row.timestamp + row.duration * 60
+          const x = toX(start)
+          const w = Math.max(2, toX(Math.min(end, endTs)) - x)
+          const color = locationColor.get(row.location as string) ?? "#60A5FA"
+          return (
+            <rect
+              key={`truth-${index}-${row.timestamp}`}
+              x={x}
+              y={barcodeTop + 6}
+              width={w}
+              height={barcodeHeight - 12}
+              rx="5"
+              fill={color}
+              opacity="0.18"
+            />
+          )
+        })}
         {scene.pings.map((ping, index) => {
-          const x = ((ping.timestamp - startTs) / timeSpan) * width
+          const x = toX(ping.timestamp)
           const cluster = labels[index]
           return (
             <line
               key={`tick-${ping.timestamp}-${index}`}
               x1={x}
               x2={x}
-              y1={mapHeight + 12}
-              y2={mapHeight + 44}
-              stroke={cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#111827"}
-              strokeWidth={index <= frame ? 2 : 1}
+              y1={barcodeTop + 10}
+              y2={barcodeTop + barcodeHeight - 10}
+              stroke={cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#9DB0C8"}
+              strokeWidth={index <= frame ? 2.1 : 1}
               opacity={index <= frame ? 0.95 : 0.25}
             />
           )
         })}
-        <line x1={currentX} x2={currentX} y1={mapHeight + 4} y2={height - 4} stroke="#d84a6a" strokeWidth="3" />
+        {timeTicks.map((ts) => (
+          <text key={`time-${ts}`} x={toX(ts)} y={axisY} fill="#8EA7C5" fontSize="14" textAnchor="middle">
+            {formatClock(ts)}
+          </text>
+        ))}
+        <line x1={currentX} x2={currentX} y1={mapTop + 4} y2={barcodeTop + barcodeHeight + 4} stroke="#67D3E3" strokeWidth="2.5" opacity="0.85" />
       </svg>
     </div>
   )
@@ -749,16 +840,16 @@ function CompareAnimationPanel({
 }) {
   const panelHeightClass = mode === "single"
     ? "h-[calc(100vh-250px)] min-h-[520px]"
-    : "h-[calc(100vh-330px)] min-h-[360px]"
+    : "h-[calc(100vh-320px)] min-h-[380px]"
   const hasAnimation = Boolean(panel?.available && panel?.animation_data_url)
   const sceneMetadata = panel?.scene ? `${panel.scene.user_id} · ${panel.scene.crs}` : null
 
   return (
-    <Card className="h-full min-h-0 overflow-hidden py-0">
-      <CardHeader className="py-3 px-4 bg-muted/30 shrink-0">
+    <Card className="h-full min-h-0 overflow-hidden border-[#244367] bg-[#0A1526] py-0">
+      <CardHeader className="py-3 px-4 bg-[#10213A]/90 shrink-0">
         <CardTitle className="text-base font-semibold">{panel?.title ?? "No visualization"}</CardTitle>
         {sceneMetadata && (
-          <p className="text-xs text-muted-foreground">{sceneMetadata}</p>
+          <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 p-2">
@@ -1019,9 +1110,9 @@ function NomadDashboard() {
       if (algoId === "seqscan") {
         out.min_pts = out.min_pts ?? 3
       }
-      if (algoId === "lachesis") {
+      if (algoId === "lachesis" || algoId === "sequential-centroid" || algoId === "sequential-first") {
         out.dt_max = out.dt_max ?? 60
-        out.delta_roam = out.delta_roam ?? 20
+        out.delta_roam = out.delta_roam ?? 25
         out.dur_min = out.dur_min ?? 5
       }
       return out

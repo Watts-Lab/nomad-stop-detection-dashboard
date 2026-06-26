@@ -1,0 +1,4 @@
+datetime,timestamp,duration,location,user_id,x,y,tz_offset
+2024-06-01 00:00:12,1717214412,90,w-x17-y10,jovial_jennings,-4265429.0,4393133.5,-14400
+2024-06-01 01:30:12,1717219812,1,,jovial_jennings,,,-14400
+2024-06-01 01:31:12,1717219872,89,r-x19-y11,jovial_jennings,-4265414.0,4393148.5,-14400

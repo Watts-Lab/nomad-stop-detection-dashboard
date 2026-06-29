@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from "react"
+import * as echarts from "echarts"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { NomadNav } from "@/components/nomad-nav"
+import { lachesisLabels, sequentialLabels, stopsFromLabels } from "@/lib/stop-detection"
 import { Columns2, Play, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
@@ -224,6 +226,16 @@ type MetricsOptionsResponse = {
 }
 
 type MetricsParameterNote = NonNullable<MetricsOptionsResponse["parameter_notes"]>[string]
+type EChartsParams = {
+  seriesId?: string
+  data: number[]
+  dataIndex: number
+  coordSys: { x: number; y: number; width: number; height: number }
+}
+type EChartsApi = {
+  coord: (value: Array<number | string>) => number[]
+  value: (index: number) => number
+}
 
 const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   Lachesis: {
@@ -527,7 +539,17 @@ function DemoParameterControls({
   )
 }
 
-const DEMO_CLUSTER_COLORS = ["#4aa6b5", "#f07f3c", "#9c35a5", "#d84a6a", "#f3e66f", "#2f6577", "#7f91ee"]
+const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
+const DEMO_BUILDING_COLORS: Record<string, string> = {
+  home: "#d3d7d0",
+  workplace: "#c8d8dd",
+  work: "#c8d8dd",
+  park: "#c6dcc1",
+  school: "#d7d0df",
+  retail: "#ded3c5",
+  shop: "#ded3c5",
+  building: "#d4d5d1",
+}
 
 function distanceMeters(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -549,6 +571,10 @@ function assignDemoClusters(
   const labels = new Array(pings.length).fill(-1)
   const normalized = algo === "dbscan" || algo === "st-dbscan" ? "tadbscan" : algo
 
+  if (normalized === "lachesis") return lachesisLabels(pings, params)
+  if (normalized === "sequential-centroid") return sequentialLabels(pings, params, "centroid")
+  if (normalized === "sequential-first") return sequentialLabels(pings, params, "sliding")
+
   if (normalized === "gridbased") {
     const cellSize = Math.max(20, Number(params?.cell_size ?? 100))
     const minTime = Math.max(1, Number(params?.min_time ?? 5)) * 60
@@ -569,39 +595,6 @@ function assignDemoClusters(
         cluster += 1
       }
     }
-    return labels
-  }
-
-  if (normalized === "lachesis" || normalized === "sequential-centroid" || normalized === "sequential-first") {
-    const roam = Math.max(1, Number(params?.delta_roam ?? 20))
-    const dtMax = Math.max(1, Number(params?.dt_max ?? 60)) * 60
-    const durMin = Math.max(0, Number(params?.dur_min ?? 5)) * 60
-    const anchorMode = normalized === "sequential-first" ? "first" : "centroid"
-    const commit = (indexes: number[], cluster: number) => {
-      if (indexes.length < 2) return cluster
-      const duration = pings[indexes[indexes.length - 1]].timestamp - pings[indexes[0]].timestamp
-      if (duration < durMin) return cluster
-      indexes.forEach((index) => {
-        labels[index] = cluster
-      })
-      return cluster + 1
-    }
-
-    let cluster = 0
-    let current: number[] = [0]
-    for (let i = 1; i < pings.length; i += 1) {
-      const anchor = anchorMode === "first"
-        ? pings[current[0]]
-        : meanPoint(current.map((index) => pings[index]))
-      const gap = pings[i].timestamp - pings[i - 1].timestamp
-      if (gap <= dtMax && distanceMeters(pings[i], anchor) <= roam) {
-        current.push(i)
-      } else {
-        cluster = commit(current, cluster)
-        current = [i]
-      }
-    }
-    commit(current, cluster)
     return labels
   }
 
@@ -637,196 +630,649 @@ function assignDemoClusters(
   return labels
 }
 
-function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode: "single" | "compare" }) {
+function DemoSceneRenderer({
+  panel,
+  mode,
+  currentTime,
+  onTimeChange,
+  syncMaster,
+}: {
+  panel: ComparePanelResponse
+  mode: "single" | "compare"
+  currentTime: number | null
+  onTimeChange: (timestamp: number) => void
+  syncMaster: boolean
+}) {
   const scene = panel.scene
-  const [frame, setFrame] = useState(0)
+  const mapRef = useRef<HTMLDivElement | null>(null)
+  const timelineRef = useRef<HTMLDivElement | null>(null)
+  const toggleButtonRef = useRef<HTMLButtonElement | null>(null)
+  const replayButtonRef = useRef<HTMLButtonElement | null>(null)
+  const selectedTimestampRef = useRef<number | null>(null)
+  const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const labels = useMemo(
     () => scene ? assignDemoClusters(panel.algo, scene.pings, panel.params) : [],
     [panel.algo, panel.params, scene],
   )
+  const chartData = useMemo(() => {
+    if (!scene || scene.pings.length === 0) return null
+
+    const pings = scene.pings.map((ping, index) => ({
+      i: index,
+      x: ping.x,
+      y: ping.y,
+      t: ping.timestamp,
+      time: new Date(ping.timestamp * 1000).toISOString().slice(11, 19) + " UTC",
+      cluster: labels[index],
+    }))
+    const pingData = pings.map((ping) => [ping.x, ping.y, ping.cluster, ping.i, ping.t])
+    const buildings = scene.buildings.flatMap((building) =>
+      building.rings.map((ring) => {
+        const xs = ring.map(([x]) => x)
+        const ys = ring.map(([, y]) => y)
+        const minX = Math.min(...xs)
+        const maxX = Math.max(...xs)
+        const minY = Math.min(...ys)
+        const maxY = Math.max(...ys)
+        return {
+          type: building.type,
+          coords: ring,
+          center: [(minX + maxX) / 2, (minY + maxY) / 2],
+          minX,
+          maxX,
+          minY,
+          maxY,
+        }
+      }),
+    )
+    const destinationFor = (x: number, y: number) => {
+      const containing = buildings.find((building) =>
+        x >= building.minX && x <= building.maxX && y >= building.minY && y <= building.maxY
+      )
+      return (containing ?? buildings.reduce((best, building) =>
+        Math.hypot(x - building.center[0], y - building.center[1]) < Math.hypot(x - best.center[0], y - best.center[1])
+          ? building
+          : best
+      )).center
+    }
+    const routeBetween = (start: number[], end: number[]) => [
+      start,
+      [(start[0] + end[0]) / 2, start[1]],
+      [(start[0] + end[0]) / 2, end[1]],
+      end,
+    ].filter((point, index, route) => index === 0 || point[0] !== route[index - 1][0] || point[1] !== route[index - 1][1])
+    const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
+    const dtMaxSec = Number(panel.params?.dt_max ?? 60) * 60
+    const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
+      ...stop,
+      destination: destinationFor(stop.x, stop.y),
+      radius: Math.max(
+        stop.diameter / 2,
+        Number(panel.params?.delta_roam ?? panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0),
+      ),
+      circleReveal: Math.min(stop.end, stop.start + revealDelay),
+      label: `Stop ${stop.cluster}`,
+      startTime: new Date(stop.start * 1000).toISOString().slice(11, 16) + " UTC",
+      endTime: new Date(stop.end * 1000).toISOString().slice(11, 16) + " UTC",
+    }))
+    const segments = stops.map((stop, index) => {
+      const startPoint = index === 0 ? destinationFor(scene.pings[0].x, scene.pings[0].y) : stops[index - 1].destination
+      const start = index === 0 ? scene.pings[0].timestamp : stops[index - 1].end
+      return {
+        stopIndex: stop.index,
+        cluster: stop.cluster,
+        start,
+        end: Math.max(start + 30, stop.end),
+        points: routeBetween(startPoint, stop.destination),
+      }
+    }).filter((segment) => segment.points.length > 1)
+    const start = scene.pings[0].timestamp
+    const end = scene.pings[scene.pings.length - 1].timestamp
+    const times = new Set([start, end])
+    for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
+    pings.forEach((ping) => times.add(ping.t))
+    stops.forEach((stop) => {
+      times.add(stop.start)
+      times.add(stop.end)
+      times.add(stop.circleReveal)
+    })
+    segments.forEach((segment) => {
+      times.add(segment.start)
+      times.add(segment.end)
+    })
+
+    return {
+      buildings,
+      pings,
+      pingData,
+      stops,
+      segments,
+      stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
+      stopCircleData: stops.map((stop) => [stop.x, stop.y, stop.radius, stop.cluster, stop.index]),
+      stopCircleRevealTimes: stops.map((stop) => stop.circleReveal),
+      stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
+      stopEndTimes: stops.map((stop) => stop.end),
+      dtMaxSec,
+      durMinSec: revealDelay,
+      timeSequence: Array.from(times).sort((a, b) => a - b),
+    }
+  }, [labels, panel.params, scene])
 
   useEffect(() => {
-    if (!scene || scene.pings.length === 0) return
-    setFrame(0)
-    const id = window.setInterval(() => {
-      setFrame((value) => (value + 1) % scene.pings.length)
-    }, 150)
-    return () => window.clearInterval(id)
-  }, [scene])
+    if (!scene || !chartData || !mapRef.current || !timelineRef.current) return
+
+    const mapEl = mapRef.current
+    const mapChart = echarts.init(mapEl, null, { renderer: "canvas" })
+    const timelineChart = echarts.init(timelineRef.current, null, { renderer: "canvas" })
+    const minX = Math.min(scene.bounds[0], ...chartData.buildings.map((building) => building.minX), ...scene.pings.map((ping) => ping.x))
+    const minY = Math.min(scene.bounds[1], ...chartData.buildings.map((building) => building.minY), ...scene.pings.map((ping) => ping.y))
+    const maxX = Math.max(scene.bounds[2], ...chartData.buildings.map((building) => building.maxX), ...scene.pings.map((ping) => ping.x))
+    const maxY = Math.max(scene.bounds[3], ...chartData.buildings.map((building) => building.maxY), ...scene.pings.map((ping) => ping.y))
+    const xSpan = maxX - minX
+    const ySpan = maxY - minY
+    const xPad = Math.max(18, xSpan * 0.08)
+    const yPad = Math.max(18, ySpan * 0.08)
+    const mapBounds = () => {
+      const mapZoom = 1.6
+      const baseX = xSpan + xPad * 2
+      const baseY = ySpan + yPad * 2
+      const plotRatio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
+      const xRange = (baseX / baseY < plotRatio ? baseY * plotRatio : baseX) / mapZoom
+      const yRange = (baseX / baseY < plotRatio ? baseY : baseX / plotRatio) / mapZoom
+      const xCenter = (minX + maxX) / 2
+      const yCenter = (minY + maxY) / 2
+      return {
+        xMin: xCenter - xRange / 2,
+        xMax: xCenter + xRange / 2,
+        yMin: yCenter - yRange / 2,
+        yMax: yCenter + yRange / 2,
+      }
+    }
+    const applyMapBounds = () => {
+      const bounds = mapBounds()
+      mapChart.setOption({
+        xAxis: { min: bounds.xMin, max: bounds.xMax },
+        yAxis: { min: bounds.yMin, max: bounds.yMax },
+      })
+    }
+    const timeMin = scene.pings[0].timestamp * 1000
+    const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
+    const noisePings = chartData.pingData.filter((point) => point[2] < 0)
+    const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
+    const preparedSegments = chartData.segments.map((segment) => {
+      let length = 0
+      const cumulative = [0]
+      for (let index = 1; index < segment.points.length; index += 1) {
+        length += Math.hypot(
+          segment.points[index][0] - segment.points[index - 1][0],
+          segment.points[index][1] - segment.points[index - 1][1],
+        )
+        cumulative.push(length)
+      }
+      return { ...segment, cumulative, length }
+    })
+    let sequenceIndex = 0
+    let paused = true
+    let timer = 0
+
+    const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
+    const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
+      const target = segment.length * Math.max(0, progress)
+      const drawn = [segment.points[0]]
+      for (let index = 1; index < segment.points.length; index += 1) {
+        const previous = segment.points[index - 1]
+        const next = segment.points[index]
+        const segmentLength = segment.cumulative[index] - segment.cumulative[index - 1]
+        if (segment.cumulative[index] >= target) {
+          const local = segmentLength === 0 ? 1 : (target - segment.cumulative[index - 1]) / segmentLength
+          drawn.push([
+            previous[0] + (next[0] - previous[0]) * local,
+            previous[1] + (next[1] - previous[1]) * local,
+          ])
+          return drawn
+        }
+        drawn.push(next)
+      }
+      return drawn
+    }
+    const routeProgressAt = (timestampSeconds: number) => {
+      const completed: number[][][] = []
+      let active: number[][] = []
+      preparedSegments.forEach((segment) => {
+        if (timestampSeconds >= segment.end) {
+          completed.push(segment.points)
+          return
+        }
+        if (timestampSeconds >= segment.start) {
+          active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
+        }
+      })
+      return { completed, active }
+    }
+    const latestPingIndexAt = (timestampSeconds: number) => {
+      let index = 0
+      for (let candidate = 0; candidate < scene.pings.length; candidate += 1) {
+        if (scene.pings[candidate].timestamp <= timestampSeconds) index = candidate
+        else break
+      }
+      return index
+    }
+    const detectedCountFor = (timestampSeconds: number) => {
+      let count = 0
+      while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
+      return count
+    }
+    const circleCountFor = (timestampSeconds: number) => {
+      let count = 0
+      while (count < chartData.stopCircleRevealTimes.length && chartData.stopCircleRevealTimes[count] <= timestampSeconds) count += 1
+      return count
+    }
+    const activeClustersAt = (timestampSeconds: number) => {
+      const latestIndex = latestPingIndexAt(timestampSeconds)
+      const latestPing = chartData.pings[latestIndex]
+      return chartData.stops.flatMap((stop) => {
+        const members = chartData.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds)
+        if (members.length === 0) return []
+        const lastPing = members[members.length - 1]
+        const lastMemberIndex = chartData.pings.findIndex((ping) => ping.i === members[members.length - 1].i)
+        if (latestIndex > lastMemberIndex && latestPing.cluster !== stop.cluster && timestampSeconds > lastPing.t + chartData.dtMaxSec) return []
+        return [{ stop, firstPing: members[0], lastPing }]
+      })
+    }
+    const acceptWindowsAt = (timestampSeconds: number) => {
+      return activeClustersAt(timestampSeconds).map(({ stop, lastPing }) => {
+        const deadline = lastPing.t + chartData.dtMaxSec
+        return [lastPing.t * 1000, deadline * 1000, stop.cluster, stop.index]
+      })
+    }
+    const durMinLinesAt = (timestampSeconds: number) =>
+      chartData.stops.flatMap((stop) => {
+        const members = chartData.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds)
+        if (members.length === 0) return []
+        const firstPing = members[0]
+        return [[firstPing.t * 1000, (firstPing.t + chartData.durMinSec) * 1000, stop.cluster, stop.index]]
+      })
+    const renderScene = (timestampSeconds: number) => {
+      const latestPingIndex = latestPingIndexAt(timestampSeconds)
+      const route = routeProgressAt(timestampSeconds)
+      const detectedStopCount = detectedCountFor(timestampSeconds)
+
+      mapChart.setOption({
+        series: [
+          { id: "completed-paths", data: route.completed.map((points) => ({ coords: points })) },
+          { id: "active-path", data: route.active },
+          { id: "stop-circles", data: chartData.stopCircleData.slice(0, circleCountFor(timestampSeconds)) },
+          { id: "noise-pings", data: noisePings.filter((point) => point[4] <= timestampSeconds) },
+          { id: "cluster-pings", data: clusterPings.filter((point) => point[4] <= timestampSeconds) },
+          { id: "detected-stops", data: chartData.stopData.slice(0, detectedStopCount) },
+          { id: "current-ping", data: [chartData.pingData[latestPingIndex]] },
+        ],
+      })
+      timelineChart.setOption({
+        series: [
+          { id: "accept-windows", data: acceptWindowsAt(timestampSeconds) },
+          { id: "dur-min-lines", data: durMinLinesAt(timestampSeconds) },
+          { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
+          { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
+        ],
+      })
+    }
+    const syncSequenceIndex = (timestampSeconds: number) => {
+      let index = 0
+      for (let candidate = 0; candidate < chartData.timeSequence.length; candidate += 1) {
+        if (chartData.timeSequence[candidate] <= timestampSeconds) index = candidate
+        else break
+      }
+      sequenceIndex = index
+    }
+    const timestampFromOffset = (offsetX: number, offsetY: number) => {
+      const point = timelineChart.convertFromPixel({ gridIndex: 0 }, [offsetX, offsetY])
+      const timeMs = Array.isArray(point) ? point[0] : point
+      const minT = chartData.timeSequence[0]
+      const maxT = chartData.timeSequence[chartData.timeSequence.length - 1]
+      return Math.max(minT, Math.min(maxT, timeMs / 1000))
+    }
+    const seekTo = (timestampSeconds: number) => {
+      syncSequenceIndex(timestampSeconds)
+      onTimeChange(timestampSeconds)
+    }
+    let dragging = false
+    const onPointerMove = (event: MouseEvent) => {
+      if (!dragging || !timelineRef.current) return
+      const rect = timelineRef.current.getBoundingClientRect()
+      seekTo(timestampFromOffset(event.clientX - rect.left, event.clientY - rect.top))
+    }
+    const onPointerUp = () => {
+      dragging = false
+      window.removeEventListener("mousemove", onPointerMove)
+      window.removeEventListener("mouseup", onPointerUp)
+    }
+    const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent }) => {
+      event.event?.preventDefault()
+      window.clearTimeout(timer)
+      paused = true
+      dragging = true
+      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Play"
+      seekTo(timestampFromOffset(event.offsetX, event.offsetY))
+      window.addEventListener("mousemove", onPointerMove)
+      window.addEventListener("mouseup", onPointerUp)
+    }
+    const onTimelineWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      window.clearTimeout(timer)
+      paused = true
+      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Play"
+      const activeTime = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
+      const span = chartData.timeSequence[chartData.timeSequence.length - 1] - chartData.timeSequence[0]
+      seekTo(Math.max(chartData.timeSequence[0], Math.min(chartData.timeSequence[chartData.timeSequence.length - 1], activeTime + Math.sign(event.deltaY) * Math.max(10, span / 360))))
+    }
+    const advance = () => {
+      if (paused || !syncMaster) return
+      sequenceIndex = Math.min(sequenceIndex + 1, chartData.timeSequence.length - 1)
+      const timestampSeconds = chartData.timeSequence[sequenceIndex]
+      const previousStopCount = detectedCountFor(chartData.timeSequence[Math.max(0, sequenceIndex - 1)])
+      onTimeChange(timestampSeconds)
+      if (detectedCountFor(timestampSeconds) > previousStopCount) {
+        timer = window.setTimeout(advance, 60)
+        return
+      }
+      if (sequenceIndex < chartData.timeSequence.length - 1) {
+        timer = window.setTimeout(advance, 60)
+      } else {
+        paused = true
+        if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Replay"
+      }
+    }
+    const replay = () => {
+      window.clearTimeout(timer)
+      paused = false
+      sequenceIndex = 0
+      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Pause"
+      onTimeChange(chartData.timeSequence[0])
+      if (syncMaster) timer = window.setTimeout(advance, 300)
+    }
+    const toggle = () => {
+      if (sequenceIndex >= chartData.timeSequence.length - 1 && paused) {
+        replay()
+        return
+      }
+      paused = !paused
+      if (toggleButtonRef.current) toggleButtonRef.current.textContent = paused ? "Play" : "Pause"
+      if (!paused && syncMaster) timer = window.setTimeout(advance, 160)
+    }
+    const resize = () => {
+      mapChart.resize()
+      applyMapBounds()
+      timelineChart.resize()
+    }
+    const bounds = mapBounds()
+
+    mapChart.setOption({
+      animation: true,
+      animationDurationUpdate: 120,
+      grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
+      xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+      yAxis: { type: "value", min: bounds.yMin, max: bounds.yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+      tooltip: {
+        trigger: "item",
+        borderWidth: 0,
+        backgroundColor: "rgba(32, 33, 36, 0.92)",
+        textStyle: { color: "#ffffff" },
+        formatter(params: EChartsParams) {
+          if (params.seriesId === "detected-stops") {
+            const stop = chartData.stops[params.data[3]]
+            return `${stop.label}<br>${stop.startTime} - ${stop.endTime}<br>${stop.nPings} pings / ${stop.duration} min`
+          }
+          if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping") {
+            const ping = chartData.pings[params.data[3]]
+            const cluster = ping.cluster < 0 ? "Noise" : `Cluster ${ping.cluster}`
+            return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}`
+          }
+          return ""
+        },
+      },
+      series: [
+        {
+          id: "buildings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 0,
+          data: chartData.buildings.map((_, index) => index),
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const building = chartData.buildings[params.dataIndex]
+            return {
+              type: "polygon",
+              shape: { points: building.coords.map((coord) => api.coord(coord)) },
+              style: { fill: DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building, stroke: "#ffffff", lineWidth: 1 },
+            }
+          },
+        },
+        {
+          id: "completed-paths",
+          name: "Inferred street route",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          polyline: true,
+          silent: true,
+          z: 2,
+          data: [],
+          lineStyle: {
+            color: "#1f6d6a",
+            width: 2.4,
+            opacity: 0.78,
+          },
+        },
+        {
+          id: "active-path",
+          name: "Active route",
+          type: "line",
+          coordinateSystem: "cartesian2d",
+          smooth: 0.38,
+          showSymbol: false,
+          silent: true,
+          z: 4,
+          data: [],
+          lineStyle: {
+            color: "#0f766e",
+            width: 4,
+            opacity: 0.95,
+            shadowBlur: 10,
+            shadowColor: "rgba(15, 118, 110, 0.26)",
+          },
+        },
+        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: chartData.pingData, symbolSize: 5, itemStyle: { color: "rgba(31, 35, 38, 0.13)" } },
+        {
+          id: "stop-circles",
+          name: "Stop radius",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 4,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const center = api.coord([api.value(0), api.value(1)])
+            const edge = api.coord([Number(api.value(0)) + Number(api.value(2)), api.value(1)])
+            const radius = Math.abs(edge[0] - center[0])
+            return {
+              type: "circle",
+              shape: { cx: center[0], cy: center[1], r: radius },
+              style: { fill: "rgba(246, 215, 70, 0.08)", stroke: clusterColor(Number(api.value(3))), lineWidth: 2, opacity: 0.85 },
+            }
+          },
+        },
+        { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 7, itemStyle: { color: "rgba(31, 35, 38, 0.72)" } },
+        { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
+        { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
+        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
+      ],
+    })
+
+    timelineChart.setOption({
+      animation: true,
+      animationDurationUpdate: 120,
+      grid: { left: 34, right: 22, top: 0, bottom: 28 },
+      xAxis: {
+        type: "time",
+        min: timeMin,
+        max: timeMax,
+        axisLine: { lineStyle: { color: "#a9aea5" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#626760", formatter: (value: number) => new Date(value).toISOString().slice(11, 16) },
+        splitLine: { show: true, lineStyle: { color: "#edf0ea" } },
+      },
+      yAxis: { min: 0, max: 1, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+      tooltip: { show: false },
+      series: [
+        {
+          id: "ping-ticks",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 1,
+          data: chartData.pingData.map((_, index) => index),
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const ping = chartData.pings[params.dataIndex]
+            const top = api.coord([ping.t * 1000, 0.72])
+            const bottom = api.coord([ping.t * 1000, 0.28])
+            return { type: "line", shape: { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }, style: { stroke: "rgba(32, 33, 36, 0.18)", lineWidth: 1 } }
+          },
+        },
+        {
+          id: "accept-windows",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 2,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const windowStart = api.coord([api.value(0), 0.08])
+            const windowEnd = api.coord([api.value(1), 0.2])
+            const clip = { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height }
+            const shape = echarts.graphic.clipRectByRect(
+              { x: windowStart[0], y: windowEnd[1], width: Math.max(2, windowEnd[0] - windowStart[0]), height: windowStart[1] - windowEnd[1] },
+              clip,
+            )
+            if (!shape) return null
+            const color = clusterColor(Number(api.value(2)))
+            return {
+              type: "group",
+              children: [
+                { type: "rect", shape, style: { fill: color, opacity: 0.14 } },
+                { type: "line", shape: { x1: windowEnd[0], y1: windowEnd[1], x2: windowEnd[0], y2: windowStart[1] }, style: { stroke: color, lineWidth: 2, opacity: 0.85 } },
+              ],
+            }
+          },
+        },
+        {
+          id: "dur-min-lines",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 3,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const lineStart = api.coord([api.value(0), 0.77])
+            const lineEnd = api.coord([api.value(1), 0.77])
+            const tickTop = api.coord([api.value(1), 0.8])
+            const color = clusterColor(Number(api.value(2)))
+            return {
+              type: "group",
+              children: [
+                { type: "line", shape: { x1: lineStart[0], y1: lineStart[1], x2: lineEnd[0], y2: lineEnd[1] }, style: { stroke: color, lineWidth: 3, opacity: 0.9 } },
+                { type: "line", shape: { x1: lineEnd[0], y1: tickTop[1], x2: lineEnd[0], y2: lineStart[1] }, style: { stroke: color, lineWidth: 2, opacity: 0.85 } },
+              ],
+            }
+          },
+        },
+        {
+          id: "stop-bars",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          z: 4,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const start = api.coord([api.value(0), 0.24])
+            const end = api.coord([api.value(1), 0.76])
+            const shape = echarts.graphic.clipRectByRect(
+              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
+              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
+            )
+            return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.44 } } : null
+          },
+        },
+        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 5, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
+      ],
+    })
+
+    const toggleButton = toggleButtonRef.current
+    const replayButton = replayButtonRef.current
+    const timelineEl = timelineRef.current
+    renderSceneRef.current = (timestampSeconds) => {
+      syncSequenceIndex(timestampSeconds)
+      renderScene(timestampSeconds)
+    }
+    const initialTimestamp = selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    renderSceneRef.current(initialTimestamp)
+    if (syncMaster && selectedTimestampRef.current === null) {
+      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Replay"
+    }
+    if (syncMaster) {
+      toggleButton?.addEventListener("click", toggle)
+      replayButton?.addEventListener("click", replay)
+    }
+    window.addEventListener("resize", resize)
+    timelineEl.style.cursor = "ew-resize"
+    timelineChart.getZr().on("mousedown", onTimelinePointerDown)
+    timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
+
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener("resize", resize)
+      window.removeEventListener("mousemove", onPointerMove)
+      window.removeEventListener("mouseup", onPointerUp)
+      toggleButton?.removeEventListener("click", toggle)
+      replayButton?.removeEventListener("click", replay)
+      timelineChart.getZr().off("mousedown", onTimelinePointerDown)
+      timelineEl.removeEventListener("wheel", onTimelineWheel)
+      renderSceneRef.current = null
+      mapChart.dispose()
+      timelineChart.dispose()
+    }
+  }, [chartData, onTimeChange, scene, syncMaster])
+
+  useEffect(() => {
+    if (!chartData || currentTime !== null) return
+    onTimeChange(chartData.timeSequence[chartData.timeSequence.length - 1])
+  }, [chartData, currentTime, onTimeChange])
+
+  useEffect(() => {
+    if (!chartData || currentTime === null) return
+    selectedTimestampRef.current = currentTime
+    renderSceneRef.current?.(currentTime)
+  }, [chartData, currentTime])
 
   if (!scene) return null
 
-  const width = 980
-  const height = mode === "single" ? 560 : 420
-  const mapInset = 12
-  const mapHeight = mode === "single" ? 370 : 265
-  const mapTop = mapInset
-  const mapWidth = width - mapInset * 2
-  const barcodeTop = mapTop + mapHeight + 18
-  const barcodeHeight = 56
-  const axisY = barcodeTop + barcodeHeight + 24
-  const [minX, minY, maxX, maxY] = scene.bounds
-  const dx = Math.max(1, maxX - minX)
-  const dy = Math.max(1, maxY - minY)
-  const project = (x: number, y: number) => ({
-    x: mapInset + ((x - minX) / dx) * mapWidth,
-    y: mapTop + mapHeight - ((y - minY) / dy) * mapHeight,
-  })
-  const pathPoints = scene.pings.slice(0, frame + 1).map((ping) => {
-    const pt = project(ping.x, ping.y)
-    return `${pt.x},${pt.y}`
-  }).join(" ")
-  const startTs = scene.pings[0]?.timestamp ?? 0
-  const endTs = scene.pings[scene.pings.length - 1]?.timestamp ?? startTs + 1
-  const timeSpan = Math.max(1, endTs - startTs)
-  const currentTs = scene.pings[frame]?.timestamp ?? startTs
-  const toX = (ts: number) => mapInset + ((ts - startTs) / timeSpan) * mapWidth
-  const currentX = toX(currentTs)
-  const clusterIds = Array.from(new Set(labels.filter((label) => label >= 0)))
-  const stopRows = scene.truth.filter((row) => row.location && row.duration > 0)
-  const stopLocations = Array.from(new Set(stopRows.map((row) => row.location as string)))
-  const stopPalette = ["#F59E0B", "#8B5CF6", "#22D3EE", "#34D399", "#F472B6"]
-  const locationColor = new Map(stopLocations.map((location, i) => [location, stopPalette[i % stopPalette.length]]))
-  const timeTickCount = 4
-  const timeTicks = Array.from({ length: timeTickCount }, (_, i) => startTs + (i * timeSpan) / (timeTickCount - 1))
-  const formatClock = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-
   return (
-    <div className="h-full w-full rounded-md border border-[#2B4667] bg-[#07172A] p-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <linearGradient id="demoMapBg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#16355D" />
-            <stop offset="55%" stopColor="#0E2643" />
-            <stop offset="100%" stopColor="#0A1B33" />
-          </linearGradient>
-          <linearGradient id="demoFloorBg" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2E3E56" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#1C2E48" stopOpacity="0.45" />
-          </linearGradient>
-        </defs>
-
-        <rect x={mapInset} y={mapTop} width={mapWidth} height={mapHeight} rx="10" fill="url(#demoMapBg)" stroke="#2C4E72" strokeWidth="1.2" />
-        {scene.buildings.flatMap((building) =>
-          building.rings.map((ring, ringIndex) => {
-            const points = ring.map(([x, y]) => {
-              const pt = project(x, y)
-              return `${pt.x},${pt.y}`
-            }).join(" ")
-            return (
-              <polygon
-                key={`${building.id}-${ringIndex}`}
-                points={points}
-                fill="url(#demoFloorBg)"
-                stroke="#456386"
-                strokeWidth="1"
-                opacity="0.95"
-              />
-            )
-          }),
-        )}
-        {pathPoints && (
-          <polyline points={pathPoints} fill="none" stroke="#8EA6C4" strokeWidth="2.2" opacity="0.35" />
-        )}
-        {clusterIds.map((cluster) => {
-          const members = scene.pings.filter((_ping, index) => labels[index] === cluster && index <= frame)
-          if (members.length === 0) return null
-          const center = meanPoint(members)
-          const radius = Math.max(22, Math.max(...members.map((ping) => distanceMeters(ping, center))) + 10)
-          const pt = project(center.x, center.y)
-          const rx = (radius / dx) * width
-          const ry = (radius / dy) * mapHeight
-          return (
-            <ellipse
-              key={`cluster-${cluster}`}
-              cx={pt.x}
-              cy={pt.y}
-              rx={rx}
-              ry={ry}
-              fill="none"
-              stroke={DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]}
-              strokeWidth="3.2"
-              opacity="0.9"
-            />
-          )
-        })}
-        {scene.pings.map((ping, index) => {
-          const pt = project(ping.x, ping.y)
-          if (index > frame) {
-            return (
-              <circle
-                key={`future-${ping.timestamp}-${index}`}
-                cx={pt.x}
-                cy={pt.y}
-                r={2.1}
-                fill="#CAD5E4"
-                opacity="0.7"
-              />
-            )
-          }
-          return null
-        })}
-        {scene.pings.slice(0, frame + 1).map((ping, index) => {
-          const pt = project(ping.x, ping.y)
-          const cluster = labels[index]
-          const color = cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#D5E2F2"
-          return (
-            <circle
-              key={`${ping.timestamp}-${index}`}
-              cx={pt.x}
-              cy={pt.y}
-              r={cluster >= 0 ? 5.1 : 3.4}
-              fill={color}
-              opacity={cluster >= 0 ? 0.96 : 0.88}
-              stroke="#0B1A30"
-              strokeWidth="0.9"
-            />
-          )
-        })}
-
-        <rect x={mapInset} y={barcodeTop} width={mapWidth} height={barcodeHeight} rx="8" fill="#0A1E36" stroke="#2A4566" strokeWidth="1" />
-        {stopRows.map((row, index) => {
-          const start = row.timestamp
-          const end = row.timestamp + row.duration * 60
-          const x = toX(start)
-          const w = Math.max(2, toX(Math.min(end, endTs)) - x)
-          const color = locationColor.get(row.location as string) ?? "#60A5FA"
-          return (
-            <rect
-              key={`truth-${index}-${row.timestamp}`}
-              x={x}
-              y={barcodeTop + 6}
-              width={w}
-              height={barcodeHeight - 12}
-              rx="5"
-              fill={color}
-              opacity="0.18"
-            />
-          )
-        })}
-        {scene.pings.map((ping, index) => {
-          const x = toX(ping.timestamp)
-          const cluster = labels[index]
-          return (
-            <line
-              key={`tick-${ping.timestamp}-${index}`}
-              x1={x}
-              x2={x}
-              y1={barcodeTop + 10}
-              y2={barcodeTop + barcodeHeight - 10}
-              stroke={cluster >= 0 ? DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length] : "#9DB0C8"}
-              strokeWidth={index <= frame ? 2.1 : 1}
-              opacity={index <= frame ? 0.95 : 0.25}
-            />
-          )
-        })}
-        {timeTicks.map((ts) => (
-          <text key={`time-${ts}`} x={toX(ts)} y={axisY} fill="#8EA7C5" fontSize="14" textAnchor="middle">
-            {formatClock(ts)}
-          </text>
-        ))}
-        <line x1={currentX} x2={currentX} y1={mapTop + 4} y2={barcodeTop + barcodeHeight + 4} stroke="#67D3E3" strokeWidth="2.5" opacity="0.85" />
-      </svg>
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+      <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-md border border-[#d7dbd2] bg-white/92 px-2 py-1 shadow-sm">
+          <button ref={toggleButtonRef} type="button" disabled={!syncMaster} className="h-8 rounded-md border border-[#bfc6bb] bg-white px-3 text-xs font-semibold text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73] disabled:cursor-default disabled:opacity-50">
+            Pause
+          </button>
+          <button ref={replayButtonRef} type="button" disabled={!syncMaster} className="h-8 rounded-md border border-[#bfc6bb] bg-white px-3 text-xs font-semibold text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73] disabled:cursor-default disabled:opacity-50">
+            Replay
+          </button>
+        </div>
+      </div>
+      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" />
+      <div className={`flex shrink-0 flex-col bg-white ${mode === "single" ? "h-28" : "h-24"}`}>
+        <div ref={timelineRef} className="min-h-0 flex-1" />
+        <div className="shrink-0 border-t border-[#d7dbd2] bg-white px-3 py-1 text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
+          Timeline
+        </div>
+      </div>
     </div>
   )
 }
@@ -834,13 +1280,16 @@ function DemoSceneRenderer({ panel, mode }: { panel: ComparePanelResponse; mode:
 function CompareAnimationPanel({
   panel,
   mode = "compare",
+  currentTime,
+  onTimeChange,
+  syncMaster = true,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
+  currentTime: number | null
+  onTimeChange: (timestamp: number) => void
+  syncMaster?: boolean
 }) {
-  const panelHeightClass = mode === "single"
-    ? "h-[calc(100vh-250px)] min-h-[520px]"
-    : "h-[calc(100vh-320px)] min-h-[380px]"
   const hasAnimation = Boolean(panel?.available && panel?.animation_data_url)
   const sceneMetadata = panel?.scene ? `${panel.scene.user_id} · ${panel.scene.crs}` : null
 
@@ -852,13 +1301,13 @@ function CompareAnimationPanel({
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 p-2">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-2">
         {panel?.scene ? (
-          <div className={`w-full ${panelHeightClass}`}>
-            <DemoSceneRenderer panel={panel} mode={mode} />
+          <div className="min-h-0 w-full flex-1">
+            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} />
           </div>
         ) : hasAnimation ? (
-          <div className={`w-full ${panelHeightClass} flex justify-center`}>
+          <div className="flex min-h-0 w-full flex-1 justify-center">
             <img
               src={panel?.animation_data_url ?? ""}
               alt={panel?.title ?? "Algorithm animation"}
@@ -866,7 +1315,7 @@ function CompareAnimationPanel({
             />
           </div>
         ) : (
-          <div className={`w-full ${panelHeightClass} rounded-md border border-dashed border-border bg-muted/40`} />
+          <div className="min-h-0 w-full flex-1 rounded-md border border-dashed border-border bg-muted/40" />
         )}
       </CardContent>
     </Card>
@@ -1055,6 +1504,7 @@ function NomadDashboard() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
+  const [demoTime, setDemoTime] = useState<number | null>(null)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
@@ -1130,6 +1580,7 @@ function NomadDashboard() {
     setCompareLoading(true)
     setCompareError(null)
     setCompareApiData(null)
+    setDemoTime(null)
     try {
       const res = await fetch("/api/algorithm-compare", {
         method: "POST",
@@ -1155,6 +1606,7 @@ function NomadDashboard() {
       }
       const data = (await res.json()) as CompareApiResponse
       if (requestId !== compareRequestIdRef.current) return
+      setDemoTime(null)
       setCompareApiData(data)
     } catch (err) {
       if (requestId !== compareRequestIdRef.current) return
@@ -1664,7 +2116,7 @@ function NomadDashboard() {
           {!compareMode ? (
             <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
               <div className="flex min-h-0 flex-col gap-3">
-                <CompareAnimationPanel panel={compareApiData?.left} mode="single" />
+                <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} />
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}
               </div>
@@ -1700,8 +2152,8 @@ function NomadDashboard() {
             <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
               <div className="flex min-h-0 flex-col gap-3">
                 <div className="grid min-h-0 lg:grid-cols-2 gap-3">
-                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" />
-                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" />
+                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} />
+                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} />
                 </div>
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}

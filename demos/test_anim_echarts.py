@@ -2,20 +2,22 @@
 
 Run this file from the repository root:
 
-    python examples/test_anim_echarts.py
+    python demos/test_anim_echarts.py
 
-It writes ``examples/test_anim_echarts.html`` with the Garden City trajectory,
+It writes ``demos/test_anim_echarts.html`` with the Garden City trajectory,
 Lachesis stop labels, and a browser-side ECharts animation.
 """
 
-from __future__ import annotations
-
+import geopandas as gpd
 import json
 import os
+import pandas as pd
 import sys
 import tempfile
 import types
 from pathlib import Path
+
+from shapely.geometry import Point
 
 
 OUTPUT_FILE = Path(__file__).with_suffix(".html")
@@ -23,7 +25,7 @@ ECHARTS_URL = "https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _prepare_optional_imports() -> None:
+def _prepare_optional_imports():
     """Keep this example runnable in lightweight local environments."""
 
     if str(REPO_ROOT) not in sys.path:
@@ -45,17 +47,15 @@ def _prepare_optional_imports() -> None:
         sys.modules["tqdm"] = tqdm_module
 
 
-def _clean_float(value, digits: int = 3):
-    import pandas as pd
-
+def _clean_float(value, digits=3):
+    """value: numeric. digits: int."""
     if pd.isna(value):
         return None
     return round(float(value), digits)
 
 
-def _format_utc(timestamp: int, with_seconds: bool = True) -> str:
-    import pandas as pd
-
+def _format_utc(timestamp, with_seconds=True):
+    """timestamp: Unix seconds. with_seconds: bool."""
     fmt = "%H:%M:%S UTC" if with_seconds else "%H:%M UTC"
     return pd.to_datetime(int(timestamp), unit="s", utc=True).strftime(fmt)
 
@@ -78,9 +78,8 @@ def _polygon_coords(geometry):
     return polygons
 
 
-def _stop_destination(stop: dict, city):
-    from shapely.geometry import Point
-
+def _stop_destination(stop, city):
+    """stop: dict. city: GeoDataFrame."""
     stop_point = Point(stop["x"], stop["y"])
     containing = city[city.geometry.contains(stop_point)]
     if len(containing) > 0:
@@ -91,9 +90,8 @@ def _stop_destination(stop: dict, city):
     return [_clean_float(destination.x), _clean_float(destination.y)]
 
 
-def _nearest_building_id_mercator(point: tuple[float, float], buildings):
-    from shapely.geometry import Point
-
+def _nearest_building_id_mercator(point, buildings):
+    """point: tuple[float, float]. buildings: GeoDataFrame."""
     stop_point = Point(point)
     containing = buildings[buildings.geometry.contains(stop_point)]
     if len(containing) > 0:
@@ -102,9 +100,8 @@ def _nearest_building_id_mercator(point: tuple[float, float], buildings):
     return str(buildings.loc[nearest_index, "id"])
 
 
-def _mercator_route_points(route_points: list[tuple[float, float]], city):
-    import pandas as pd
-
+def _mercator_route_points(route_points, city):
+    """route_points: list[tuple[float, float]]. city: City."""
     if not route_points:
         return []
     route = pd.DataFrame(route_points, columns=["x", "y"])
@@ -112,7 +109,8 @@ def _mercator_route_points(route_points: list[tuple[float, float]], city):
     return [[_clean_float(row.x), _clean_float(row.y)] for row in route.itertuples()]
 
 
-def _street_route_between_buildings(origin_id: str, destination_id: str, city):
+def _street_route_between_buildings(origin_id, destination_id, city):
+    """origin_id: str. destination_id: str. city: City."""
     if origin_id == destination_id:
         building = city.buildings_gdf.loc[destination_id]
         inside = building.geometry.representative_point()
@@ -152,11 +150,9 @@ def _street_route_between_buildings(origin_id: str, destination_id: str, city):
     return _mercator_route_points(deduped, city)
 
 
-def build_payload() -> dict:
+def build_payload():
+    """Return the ECharts payload dict."""
     _prepare_optional_imports()
-
-    import geopandas as gpd
-    import pandas as pd
 
     from nomad.city_gen import City
     import nomad.filters as filters
@@ -201,49 +197,66 @@ def build_payload() -> dict:
         **params,
     ).to_numpy()
 
-    pings = []
-    for index, row in traj.iterrows():
-        timestamp = int(row[traj_cols["timestamp"]])
-        pings.append(
-            {
-                "i": int(index),
-                "x": _clean_float(row[traj_cols["x"]]),
-                "y": _clean_float(row[traj_cols["y"]]),
-                "t": timestamp,
-                "time": _format_utc(timestamp),
-                "cluster": int(labels[index]),
-            }
-        )
+    ping_records = traj.assign(
+        i=traj.index,
+        x=traj[traj_cols["x"]].round(3),
+        y=traj[traj_cols["y"]].round(3),
+        t=traj[traj_cols["timestamp"]].astype(int),
+        cluster=labels.astype(int),
+    )[["i", "x", "y", "t", "cluster"]]
+    ping_records["time"] = pd.to_datetime(
+        ping_records["t"],
+        unit="s",
+        utc=True,
+    ).dt.strftime("%H:%M:%S UTC")
+    pings = ping_records[["i", "x", "y", "t", "time", "cluster"]].to_dict("records")
 
-    stop_records = []
-    for index, row in stops.iterrows():
-        start = int(row["unix_ts"])
-        end = int(row["end_timestamp"])
-        cluster = int(row["cluster"])
-        stop_records.append(
-            {
-                "i": int(index),
-                "cluster": cluster,
-                "x": _clean_float(row["x"]),
-                "y": _clean_float(row["y"]),
-                "start": start,
-                "end": end,
-                "duration": int(row["duration"]),
-                "nPings": int(row["n_pings"]),
-                "diameter": _clean_float(row["diameter"], 2),
-                "label": f"Stop {cluster}",
-                "startTime": _format_utc(start, with_seconds=False),
-                "endTime": _format_utc(end, with_seconds=False),
-            }
-        )
+    stop_records_df = stops.assign(
+        i=stops.index,
+        x=stops["x"].round(3),
+        y=stops["y"].round(3),
+        start=stops["unix_ts"].astype(int),
+        end=stops["end_timestamp"].astype(int),
+        duration=stops["duration"].astype(int),
+        nPings=stops["n_pings"].astype(int),
+        diameter=stops["diameter"].round(2),
+    )
+    stop_records_df["cluster"] = stop_records_df["cluster"].astype(int)
+    stop_records_df["label"] = "Stop " + stop_records_df["cluster"].astype(str)
+    stop_records_df["startTime"] = pd.to_datetime(
+        stop_records_df["start"],
+        unit="s",
+        utc=True,
+    ).dt.strftime("%H:%M UTC")
+    stop_records_df["endTime"] = pd.to_datetime(
+        stop_records_df["end"],
+        unit="s",
+        utc=True,
+    ).dt.strftime("%H:%M UTC")
+    stop_records = stop_records_df[
+        [
+            "i",
+            "cluster",
+            "x",
+            "y",
+            "start",
+            "end",
+            "duration",
+            "nPings",
+            "diameter",
+            "label",
+            "startTime",
+            "endTime",
+        ]
+    ].to_dict("records")
 
     city = gpd.read_parquet(data_dir / "garden-city-buildings-mercator.parquet")
     route_city = City.from_geopackage(data_dir / "garden-city.gpkg")
     route_city.compute_shortest_paths(callable_only=True)
-    buildings = []
+    building_records = []
     for index, row in city.reset_index(drop=True).iterrows():
         for polygon in _polygon_coords(row.geometry):
-            buildings.append(
+            building_records.append(
                 {
                     "i": int(index),
                     "type": str(row.get("building_type", "building")),
@@ -282,9 +295,7 @@ def build_payload() -> dict:
 
     xs = [ping["x"] for ping in pings] + [stop["x"] for stop in stop_records]
     ys = [ping["y"] for ping in pings] + [stop["y"] for stop in stop_records]
-    for building in buildings:
-        xs.extend(point[0] for point in building["coords"])
-        ys.extend(point[1] for point in building["coords"])
+    building_bounds = city.total_bounds
 
     return {
         "meta": {
@@ -296,18 +307,19 @@ def build_payload() -> dict:
         },
         "pings": pings,
         "stops": stop_records,
-        "buildings": buildings,
+        "buildings": building_records,
         "segments": segments,
         "bounds": {
-            "xMin": min(xs),
-            "xMax": max(xs),
-            "yMin": min(ys),
-            "yMax": max(ys),
+            "xMin": min(min(xs), building_bounds[0]),
+            "xMax": max(max(xs), building_bounds[2]),
+            "yMin": min(min(ys), building_bounds[1]),
+            "yMax": max(max(ys), building_bounds[3]),
         },
     }
 
 
-def build_html(payload: dict) -> str:
+def build_html(payload):
+    """payload: dict."""
     data_json = json.dumps(payload, separators=(",", ":"))
     return f"""<!doctype html>
 <html lang="en">
@@ -565,6 +577,8 @@ def build_html(payload: dict) -> str:
     const yPad = Math.max(18, ySpan * 0.08);
     const timeMin = DATA.pings[0].t * 1000;
     const timeMax = DATA.pings[DATA.pings.length - 1].t * 1000;
+    const dtMaxSec = Number(DATA.meta.params.dt_max ?? 60) * 60;
+    const durMinSec = Number(DATA.meta.params.dur_min ?? 5) * 60;
 
     let timer = null;
     let paused = false;
@@ -610,46 +624,83 @@ def build_html(payload: dict) -> str:
     }}
 
     const timeSequence = buildTimeSequence();
+    const pingData = DATA.pings.map(pointDatum);
+    const stopData = DATA.stops.map(stopDatum);
+    const stopBarData = DATA.stops.map(stopBarDatum);
+    const noisePingData = pingData.filter((point) => point[2] < 0);
+    const clusterPingData = pingData.filter((point) => point[2] >= 0);
+    const stopEndTimes = DATA.stops.map((stop) => stop.end);
+    const preparedSegments = DATA.segments.map(prepareSegment).filter(Boolean);
 
-    function pathLength(points) {{
-      let total = 0;
-      for (let index = 1; index < points.length; index += 1) {{
-        total += Math.hypot(
-          points[index][0] - points[index - 1][0],
-          points[index][1] - points[index - 1][1]
+    function prepareSegment(segment) {{
+      if (segment.points.length < 2) return null;
+      let length = 0;
+      const cumulative = [0];
+      for (let index = 1; index < segment.points.length; index += 1) {{
+        length += Math.hypot(
+          segment.points[index][0] - segment.points[index - 1][0],
+          segment.points[index][1] - segment.points[index - 1][1]
         );
+        cumulative.push(length);
       }}
-      return total;
+      return {{ ...segment, cumulative, length }};
     }}
 
-    function partialPath(points, progress) {{
-      if (points.length <= 1) return points.slice();
-      const total = pathLength(points);
-      if (total === 0 || progress >= 1) return points.slice();
-      const target = total * Math.max(0, progress);
-      let travelled = 0;
-      const drawn = [points[0]];
+    function partialPath(segment, progress) {{
+      if (segment.length === 0 || progress >= 1) return segment.points.slice();
+      const target = segment.length * Math.max(0, progress);
+      const drawn = [segment.points[0]];
 
-      for (let index = 1; index < points.length; index += 1) {{
-        const previous = points[index - 1];
-        const next = points[index];
-        const segmentLength = Math.hypot(next[0] - previous[0], next[1] - previous[1]);
-        if (travelled + segmentLength >= target) {{
-          const local = segmentLength === 0 ? 1 : (target - travelled) / segmentLength;
+      for (let index = 1; index < segment.points.length; index += 1) {{
+        const previous = segment.points[index - 1];
+        const next = segment.points[index];
+        const segmentLength = segment.cumulative[index] - segment.cumulative[index - 1];
+        if (segment.cumulative[index] >= target) {{
+          const local = segmentLength === 0 ? 1 : (target - segment.cumulative[index - 1]) / segmentLength;
           drawn.push([
             previous[0] + (next[0] - previous[0]) * local,
             previous[1] + (next[1] - previous[1]) * local
           ]);
           return drawn;
         }}
-        travelled += segmentLength;
         drawn.push(next);
       }}
       return drawn;
     }}
 
     function detectedCountFor(timestampSeconds) {{
-      return DATA.stops.filter((stop) => stop.end <= timestampSeconds).length;
+      let count = 0;
+      while (count < stopEndTimes.length && stopEndTimes[count] <= timestampSeconds) count += 1;
+      return count;
+    }}
+
+    function activeClustersAt(timestampSeconds) {{
+      const latestIndex = latestPingIndexAt(timestampSeconds);
+      const latestPing = DATA.pings[latestIndex];
+      return DATA.stops.flatMap((stop) => {{
+        const members = DATA.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds);
+        if (members.length === 0) return [];
+        const lastMemberIndex = DATA.pings.findIndex((ping) => ping.i === members[members.length - 1].i);
+        if (latestIndex > lastMemberIndex && latestPing.cluster !== stop.cluster) return [];
+        return [{{ stop, firstPing: members[0] }}];
+      }});
+    }}
+
+    function acceptWindowsAt(timestampSeconds) {{
+      const latestPing = DATA.pings[latestPingIndexAt(timestampSeconds)];
+      return activeClustersAt(timestampSeconds).map(({{ stop, firstPing }}) => {{
+        const deadline = Math.min(latestPing.t + dtMaxSec, stop.end + dtMaxSec);
+        return [firstPing.t * 1000, deadline * 1000, stop.cluster, stop.i];
+      }});
+    }}
+
+    function durMinLinesAt(timestampSeconds) {{
+      return DATA.stops.flatMap((stop) => {{
+        const members = DATA.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds);
+        if (members.length === 0) return [];
+        const firstPing = members[0];
+        return [[firstPing.t * 1000, (firstPing.t + durMinSec) * 1000, stop.cluster, stop.i]];
+      }});
     }}
 
     function latestPingIndexAt(timestampSeconds) {{
@@ -665,8 +716,7 @@ def build_html(payload: dict) -> str:
       const completed = [];
       let active = [];
 
-      DATA.segments.forEach((segment) => {{
-        if (!segment || segment.points.length < 2) return;
+      preparedSegments.forEach((segment) => {{
         if (timestampSeconds >= segment.end) {{
           completed.push(segment.points);
           return;
@@ -674,7 +724,7 @@ def build_html(payload: dict) -> str:
         if (timestampSeconds >= segment.start) {{
           const duration = Math.max(1, segment.end - segment.start);
           const progress = (timestampSeconds - segment.start) / duration;
-          active = partialPath(segment.points, progress);
+          active = partialPath(segment, progress);
         }}
       }});
 
@@ -785,7 +835,7 @@ def build_html(payload: dict) -> str:
             coordinateSystem: "cartesian2d",
             silent: true,
             z: 3,
-            data: DATA.pings.map(pointDatum),
+            data: pingData,
             symbolSize: 5,
             itemStyle: {{ color: "rgba(31, 35, 38, 0.13)" }}
           }},
@@ -883,7 +933,7 @@ def build_html(payload: dict) -> str:
             coordinateSystem: "cartesian2d",
             silent: true,
             z: 1,
-            data: DATA.pings.map((_, index) => index),
+            data: pingData.map((_, index) => index),
             renderItem(params, api) {{
               const ping = DATA.pings[params.dataIndex];
               const top = api.coord([ping.t * 1000, 0.72]);
@@ -896,10 +946,79 @@ def build_html(payload: dict) -> str:
             }}
           }},
           {{
+            id: "accept-windows",
+            type: "custom",
+            coordinateSystem: "cartesian2d",
+            silent: true,
+            z: 2,
+            data: [],
+            renderItem(params, api) {{
+              const windowStart = api.coord([api.value(0), 0.08]);
+              const windowEnd = api.coord([api.value(1), 0.2]);
+              const clip = {{
+                x: params.coordSys.x,
+                y: params.coordSys.y,
+                width: params.coordSys.width,
+                height: params.coordSys.height
+              }};
+              const shape = echarts.graphic.clipRectByRect(
+                {{
+                  x: windowStart[0],
+                  y: windowEnd[1],
+                  width: Math.max(2, windowEnd[0] - windowStart[0]),
+                  height: windowStart[1] - windowEnd[1]
+                }},
+                clip
+              );
+              if (!shape) return null;
+              const color = clusterColor(api.value(2));
+              return {{
+                type: "group",
+                children: [
+                  {{ type: "rect", shape, style: {{ fill: color, opacity: 0.14 }} }},
+                  {{
+                    type: "line",
+                    shape: {{ x1: windowEnd[0], y1: windowEnd[1], x2: windowEnd[0], y2: windowStart[1] }},
+                    style: {{ stroke: color, lineWidth: 2, opacity: 0.85 }}
+                  }}
+                ]
+              }};
+            }}
+          }},
+          {{
+            id: "dur-min-lines",
+            type: "custom",
+            coordinateSystem: "cartesian2d",
+            silent: true,
+            z: 3,
+            data: [],
+            renderItem(params, api) {{
+              const lineStart = api.coord([api.value(0), 0.77]);
+              const lineEnd = api.coord([api.value(1), 0.77]);
+              const tickTop = api.coord([api.value(1), 0.8]);
+              const color = clusterColor(api.value(2));
+              return {{
+                type: "group",
+                children: [
+                  {{
+                    type: "line",
+                    shape: {{ x1: lineStart[0], y1: lineStart[1], x2: lineEnd[0], y2: lineEnd[1] }},
+                    style: {{ stroke: color, lineWidth: 3, opacity: 0.9 }}
+                  }},
+                  {{
+                    type: "line",
+                    shape: {{ x1: lineEnd[0], y1: tickTop[1], x2: lineEnd[0], y2: lineStart[1] }},
+                    style: {{ stroke: color, lineWidth: 2, opacity: 0.85 }}
+                  }}
+                ]
+              }};
+            }}
+          }},
+          {{
             id: "stop-bars",
             type: "custom",
             coordinateSystem: "cartesian2d",
-            z: 2,
+            z: 4,
             data: [],
             renderItem(params, api) {{
               const start = api.coord([api.value(0), 0.24]);
@@ -934,7 +1053,7 @@ def build_html(payload: dict) -> str:
             type: "line",
             coordinateSystem: "cartesian2d",
             showSymbol: false,
-            z: 3,
+            z: 5,
             data: [],
             lineStyle: {{ color: "#202124", width: 2 }}
           }}
@@ -945,11 +1064,9 @@ def build_html(payload: dict) -> str:
     function renderScene(timestampSeconds) {{
       currentTimestamp = timestampSeconds;
       const latestPingIndex = latestPingIndexAt(timestampSeconds);
-      const current = DATA.pings[latestPingIndex];
-      const visible = DATA.pings.filter((point) => point.t <= timestampSeconds);
-      const noise = visible.filter((point) => point.cluster < 0).map(pointDatum);
-      const clustered = visible.filter((point) => point.cluster >= 0).map(pointDatum);
-      const visibleStops = DATA.stops.slice(0, detectedStopCount);
+      const visiblePingCount = latestPingIndex + 1;
+      const visibleNoise = noisePingData.filter((point) => point[4] <= timestampSeconds);
+      const visibleClustered = clusterPingData.filter((point) => point[4] <= timestampSeconds);
       const route = routeProgressAt(timestampSeconds);
 
       mapChart.setOption({{
@@ -964,19 +1081,19 @@ def build_html(payload: dict) -> str:
           }},
           {{
             id: "noise-pings",
-            data: noise
+            data: visibleNoise
           }},
           {{
             id: "cluster-pings",
-            data: clustered
+            data: visibleClustered
           }},
           {{
             id: "detected-stops",
-            data: visibleStops.map(stopDatum)
+            data: stopData.slice(0, detectedStopCount)
           }},
           {{
             id: "current-ping",
-            data: [pointDatum(current)]
+            data: [pingData[latestPingIndex]]
           }}
         ]
       }});
@@ -984,8 +1101,16 @@ def build_html(payload: dict) -> str:
       timeChart.setOption({{
         series: [
           {{
+            id: "accept-windows",
+            data: acceptWindowsAt(timestampSeconds)
+          }},
+          {{
+            id: "dur-min-lines",
+            data: durMinLinesAt(timestampSeconds)
+          }},
+          {{
             id: "stop-bars",
-            data: visibleStops.map(stopBarDatum)
+            data: stopBarData.slice(0, detectedStopCount)
           }},
           {{
             id: "cursor",
@@ -995,7 +1120,7 @@ def build_html(payload: dict) -> str:
       }});
 
       currentTimeEl.textContent = formatTime(timestampSeconds);
-      pingCountEl.textContent = `${{visible.length}} / ${{DATA.pings.length}}`;
+      pingCountEl.textContent = `${{visiblePingCount}} / ${{DATA.pings.length}}`;
       stopCountEl.textContent = `${{detectedStopCount}} / ${{DATA.stops.length}}`;
     }}
 
@@ -1067,7 +1192,8 @@ def build_html(payload: dict) -> str:
 """
 
 
-def main() -> None:
+def main():
+    """Write the demo HTML file."""
     payload = build_payload()
     OUTPUT_FILE.write_text(build_html(payload), encoding="utf-8")
     print(f"Wrote {OUTPUT_FILE}")

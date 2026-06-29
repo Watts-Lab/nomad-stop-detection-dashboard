@@ -123,21 +123,11 @@ function sceneForSeed(seed: number): CompareSceneResponse | null {
     .sort((a, b) => a.timestamp - b.timestamp)
 
   if (pings.length === 0) return null
-  const xs = pings.map((ping) => ping.x)
-  const ys = pings.map((ping) => ping.y)
-  const pad = 90
-  const bounds: [number, number, number, number] = [
-    Math.min(...xs) - pad,
-    Math.min(...ys) - pad,
-    Math.max(...xs) + pad,
-    Math.max(...ys) + pad,
-  ]
-
   return {
     crs: scene.crs,
     source: scene.source,
     user_id: user,
-    bounds,
+    bounds: scene.bounds,
     buildings: scene.buildings,
     pings,
     truth,

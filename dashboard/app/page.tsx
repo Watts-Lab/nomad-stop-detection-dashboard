@@ -15,9 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { NomadNav } from "@/components/nomad-nav"
 import { lachesisLabels, sequentialLabels, stopsFromLabels } from "@/lib/stop-detection"
-import { Columns2, Play, Square } from "lucide-react"
+import { Columns2, Pause, Play, RotateCcw, Square } from "lucide-react"
 
 const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
 
@@ -646,10 +647,11 @@ function DemoSceneRenderer({
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
-  const toggleButtonRef = useRef<HTMLButtonElement | null>(null)
-  const replayButtonRef = useRef<HTMLButtonElement | null>(null)
+  const toggleRef = useRef<() => void>(() => {})
+  const replayRef = useRef<() => void>(() => {})
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const labels = useMemo(
     () => scene ? assignDemoClusters(panel.algo, scene.pings, panel.params) : [],
     [panel.algo, panel.params, scene],
@@ -814,6 +816,10 @@ function DemoSceneRenderer({
     let sequenceIndex = 0
     let paused = true
     let timer = 0
+    const syncPlaybackState = () => {
+      const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
+      setPlaybackState(atEnd && paused ? "complete" : paused ? "paused" : "playing")
+    }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
     const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
@@ -952,7 +958,7 @@ function DemoSceneRenderer({
       window.clearTimeout(timer)
       paused = true
       dragging = true
-      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Play"
+      syncPlaybackState()
       seekTo(timestampFromOffset(event.offsetX, event.offsetY))
       window.addEventListener("mousemove", onPointerMove)
       window.addEventListener("mouseup", onPointerUp)
@@ -961,7 +967,7 @@ function DemoSceneRenderer({
       event.preventDefault()
       window.clearTimeout(timer)
       paused = true
-      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Play"
+      syncPlaybackState()
       const activeTime = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
       const span = chartData.timeSequence[chartData.timeSequence.length - 1] - chartData.timeSequence[0]
       seekTo(Math.max(chartData.timeSequence[0], Math.min(chartData.timeSequence[chartData.timeSequence.length - 1], activeTime + Math.sign(event.deltaY) * Math.max(10, span / 360))))
@@ -980,24 +986,20 @@ function DemoSceneRenderer({
         timer = window.setTimeout(advance, 60)
       } else {
         paused = true
-        if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Replay"
+        syncPlaybackState()
       }
     }
     const replay = () => {
       window.clearTimeout(timer)
       paused = false
       sequenceIndex = 0
-      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Pause"
       onTimeChange(chartData.timeSequence[0])
+      setPlaybackState("playing")
       if (syncMaster) timer = window.setTimeout(advance, 300)
     }
     const toggle = () => {
-      if (sequenceIndex >= chartData.timeSequence.length - 1 && paused) {
-        replay()
-        return
-      }
       paused = !paused
-      if (toggleButtonRef.current) toggleButtonRef.current.textContent = paused ? "Play" : "Pause"
+      syncPlaybackState()
       if (!paused && syncMaster) timer = window.setTimeout(advance, 160)
     }
     const resize = () => {
@@ -1205,22 +1207,19 @@ function DemoSceneRenderer({
       ],
     })
 
-    const toggleButton = toggleButtonRef.current
-    const replayButton = replayButtonRef.current
     const timelineEl = timelineRef.current
+    toggleRef.current = toggle
+    replayRef.current = replay
     renderSceneRef.current = (timestampSeconds) => {
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
     }
     const initialTimestamp = selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    sequenceIndex = chartData.timeSequence.findIndex((timestamp) => timestamp >= initialTimestamp)
+    if (sequenceIndex < 0) sequenceIndex = chartData.timeSequence.length - 1
+    paused = true
+    syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
-    if (syncMaster && selectedTimestampRef.current === null) {
-      if (toggleButtonRef.current) toggleButtonRef.current.textContent = "Replay"
-    }
-    if (syncMaster) {
-      toggleButton?.addEventListener("click", toggle)
-      replayButton?.addEventListener("click", replay)
-    }
     window.addEventListener("resize", resize)
     timelineEl.style.cursor = "ew-resize"
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
@@ -1231,8 +1230,8 @@ function DemoSceneRenderer({
       window.removeEventListener("resize", resize)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
-      toggleButton?.removeEventListener("click", toggle)
-      replayButton?.removeEventListener("click", replay)
+      toggleRef.current = () => {}
+      replayRef.current = () => {}
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
       timelineEl.removeEventListener("wheel", onTimelineWheel)
       renderSceneRef.current = null
@@ -1256,16 +1255,42 @@ function DemoSceneRenderer({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
-      <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-md border border-[#d7dbd2] bg-white/92 px-2 py-1 shadow-sm">
-          <button ref={toggleButtonRef} type="button" disabled={!syncMaster} className="h-8 rounded-md border border-[#bfc6bb] bg-white px-3 text-xs font-semibold text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73] disabled:cursor-default disabled:opacity-50">
-            Pause
-          </button>
-          <button ref={replayButtonRef} type="button" disabled={!syncMaster} className="h-8 rounded-md border border-[#bfc6bb] bg-white px-3 text-xs font-semibold text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73] disabled:cursor-default disabled:opacity-50">
-            Replay
-          </button>
+      {syncMaster && (
+        <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
+          <TooltipProvider delayDuration={300}>
+            <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-white/92 px-1 py-1 shadow-sm">
+              {playbackState !== "complete" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => toggleRef.current()}
+                      aria-label={playbackState === "playing" ? "Pause" : "Play"}
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-white text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]"
+                    >
+                      {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => replayRef.current()}
+                    aria-label="Replay"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-white text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Replay</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
-      </div>
+      )}
       <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" />
       <div className={`flex shrink-0 flex-col bg-white ${mode === "single" ? "h-28" : "h-24"}`}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
@@ -2151,9 +2176,9 @@ function NomadDashboard() {
           ) : (
             <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
               <div className="flex min-h-0 flex-col gap-3">
-                <div className="grid min-h-0 lg:grid-cols-2 gap-3">
-                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} />
-                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} />
+                <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
+                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} />
+                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} />
                 </div>
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}

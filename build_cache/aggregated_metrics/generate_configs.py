@@ -5,8 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import nomad.data as data_folder
-
 
 def main():
     key = None
@@ -14,7 +12,12 @@ def main():
         key = sys.argv[1]
 
     output_dir = Path(__file__).resolve().parent
-    data_dir = Path(data_folder.__file__).parent
+
+    def config_path(*parts):
+        return Path(*parts).as_posix()
+
+    city_file = config_path("garden-city.gpkg")
+    buildings_file = config_path("garden-city-buildings-mercator.parquet")
 
     registry = {}
 
@@ -114,13 +117,13 @@ def main():
         "N": N,
         "name_count": 2,
         "name_seed": 2025,
-        "city_file": str(data_dir / "garden-city.gpkg"),
-        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-        "destination_diary_file": str(output_dir / "exp_1_destinations_balanced.csv"),
+        "city_file": city_file,
+        "buildings_file": buildings_file,
+        "destination_diary_file": config_path("exp_1_destinations_balanced.csv"),
         "output_files": {
-            "sparse_path": str(output_dir / "sparse_traj_1"),
-            "diaries_path": str(output_dir / "diaries_1"),
-            "homes_path": str(output_dir / "homes_1"),
+            "sparse_path": config_path("sparse_traj_1"),
+            "diaries_path": config_path("diaries_1"),
+            "homes_path": config_path("homes_1"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",
@@ -139,13 +142,13 @@ def main():
         "N": N,
         "name_count": 2,
         "name_seed": 2025,
-        "city_file": str(data_dir / "garden-city.gpkg"),
-        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-        "destination_diary_file": str(output_dir / "exp_1_destinations_unbalanced.csv"),
+        "city_file": city_file,
+        "buildings_file": buildings_file,
+        "destination_diary_file": config_path("exp_1_destinations_unbalanced.csv"),
         "output_files": {
-            "sparse_path": str(output_dir / "sparse_traj_2"),
-            "diaries_path": str(output_dir / "diaries_2"),
-            "homes_path": str(output_dir / "homes_2"),
+            "sparse_path": config_path("sparse_traj_2"),
+            "diaries_path": config_path("diaries_2"),
+            "homes_path": config_path("homes_2"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",
@@ -168,13 +171,13 @@ def main():
         "N": 250,
         "name_count": 2,
         "name_seed": 2025,
-        "city_file": str(data_dir / "garden-city.gpkg"),
-        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-        "destination_diary_file": str(output_dir / "exp_2_stops.csv"),
+        "city_file": city_file,
+        "buildings_file": buildings_file,
+        "destination_diary_file": config_path("exp_2_stops.csv"),
         "output_files": {
-            "sparse_path": str(output_dir / "sparse_default"),
-            "diaries_path": str(output_dir / "diaries_default"),
-            "homes_path": str(output_dir / "homes_default"),
+            "sparse_path": config_path("sparse_default"),
+            "diaries_path": config_path("diaries_default"),
+            "homes_path": config_path("homes_default"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",
@@ -193,13 +196,13 @@ def main():
         "N": 250,
         "name_count": 2,
         "name_seed": 2025,
-        "city_file": str(data_dir / "garden-city.gpkg"),
-        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-        "destination_diary_file": str(output_dir / "exp_2_stops.csv"),
+        "city_file": city_file,
+        "buildings_file": buildings_file,
+        "destination_diary_file": config_path("exp_2_stops.csv"),
         "output_files": {
-            "sparse_path": str(output_dir / "sparse_beta_5"),
-            "diaries_path": str(output_dir / "diaries_beta_5"),
-            "homes_path": str(output_dir / "homes_beta_5"),
+            "sparse_path": config_path("sparse_beta_5"),
+            "diaries_path": config_path("diaries_beta_5"),
+            "homes_path": config_path("homes_beta_5"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",
@@ -218,13 +221,13 @@ def main():
         "N": 250,
         "name_count": 2,
         "name_seed": 2025,
-        "city_file": str(data_dir / "garden-city.gpkg"),
-        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-        "destination_diary_file": str(output_dir / "exp_2_stops.csv"),
+        "city_file": city_file,
+        "buildings_file": buildings_file,
+        "destination_diary_file": config_path("exp_2_stops.csv"),
         "output_files": {
-            "sparse_path": str(output_dir / "sparse_beta_8_5"),
-            "diaries_path": str(output_dir / "diaries_beta_8_5"),
-            "homes_path": str(output_dir / "homes_beta_8_5"),
+            "sparse_path": config_path("sparse_beta_8_5"),
+            "diaries_path": config_path("diaries_beta_8_5"),
+            "homes_path": config_path("homes_beta_8_5"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",
@@ -253,13 +256,13 @@ def main():
                 "N": 2000,
                 "name_count": 3,
                 "name_seed": 2025,
-                "city_file": str(data_dir / "garden-city.gpkg"),
-                "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
-                "destination_diary_file": str(output_dir / "exp_2_stops_aws.csv"),
+                "city_file": city_file,
+                "buildings_file": buildings_file,
+                "destination_diary_file": config_path("exp_2_stops_aws.csv"),
                 "output_files": {
-                    "sparse_path": str(output_dir / f"sparse_{k}"),
-                    "diaries_path": str(output_dir / f"diaries_{k}"),
-                    "homes_path": str(output_dir / f"homes_{k}"),
+                    "sparse_path": config_path(f"sparse_{k}"),
+                    "diaries_path": config_path(f"diaries_{k}"),
+                    "homes_path": config_path(f"homes_{k}"),
                 },
                 "agent_params": {
                     "agent_homes": "h-x14-y11",

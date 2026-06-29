@@ -33,11 +33,13 @@ import nomad.stop_detection.density_based as DENSITY_BASED
 import nomad.stop_detection.dbscan as TADBSCAN
 import nomad.stop_detection.dbstop as DBSTOP
 import nomad.stop_detection.utils as STOP_UTILS
+import nomad.data as data_folder
 import nomad.visit_attribution.visit_attribution as visits
 from nomad.contact_estimation import compute_stop_detection_metrics
 
 ROBUST_BASE_DIR = REPO_ROOT / "examples" / "research" / "robustness-of-algorithms"
 ROBUST_CONFIG_PATH = ROBUST_BASE_DIR / "config_2_stops.json"
+NOMAD_DATA_DIR = Path(data_folder.__file__).parent
 ROBUST_POI_LOCATIONS = ("w-x17-y10", "r-x19-y11")
 SCRIPT_VERSION = "v4"
 CACHE_DIR = Path(tempfile.gettempdir()) / "nomad_newapp_algorithm_metrics"
@@ -128,6 +130,18 @@ def _resolve_parquet_path(path_value: str) -> Path:
     return p
 
 
+def _resolve_config_path(path_value: str) -> Path:
+    p = Path(path_value)
+    if p.is_absolute():
+        return p
+
+    robust_path = ROBUST_BASE_DIR / p
+    data_path = NOMAD_DATA_DIR / p
+    if data_path.exists() and not robust_path.exists():
+        return data_path
+    return robust_path
+
+
 @lru_cache(maxsize=1)
 def _load_bundle() -> dict[str, Any]:
     if not ROBUST_CONFIG_PATH.exists():
@@ -136,9 +150,7 @@ def _load_bundle() -> dict[str, Any]:
     config = json.loads(ROBUST_CONFIG_PATH.read_text())
     sparse_path = _resolve_parquet_path(str(config["output_files"]["sparse_path"]))
     diaries_path = _resolve_parquet_path(str(config["output_files"]["diaries_path"]))
-    buildings_path = Path(str(config["buildings_file"]))
-    if not buildings_path.is_absolute():
-        buildings_path = (ROBUST_BASE_DIR / buildings_path).resolve()
+    buildings_path = _resolve_config_path(str(config["buildings_file"]))
 
     sparse_df = pd.read_parquet(sparse_path).copy()
     diaries_df = pd.read_parquet(diaries_path).copy()

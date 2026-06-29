@@ -22,6 +22,7 @@ from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
+import nomad.data as data_folder
 import nomad.io.base as loader
 import nomad.stop_detection.utils as utils
 import nomad.stop_detection.lachesis as LACHESIS
@@ -37,6 +38,21 @@ from nomad.stop_detection.validation import (
 import warnings
 warnings.filterwarnings('ignore', message='Input is timezone-naive; assuming UTC')
 
+CONFIG_DIR = Path(__file__).resolve().parent
+NOMAD_DATA_DIR = Path(data_folder.__file__).parent
+
+
+def resolve_config_path(path_value):
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+
+    config_path = CONFIG_DIR / path
+    data_path = NOMAD_DATA_DIR / path
+    if data_path.exists() and not config_path.exists():
+        return data_path
+    return config_path
+
 # %% [markdown]
 # ## Load Files
 
@@ -45,15 +61,15 @@ key = '2_stops'
 results_output_dir = Path('../../cached_results')
 results_output_file = results_output_dir / 'lachesis_delta_roam_results.json'
 
-with open(f'config_{key}.json', 'r', encoding='utf-8') as f:
+with open(CONFIG_DIR / f'config_{key}.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
 
 out = config['output_files']
 
-poi_table = gpd.read_parquet(config['buildings_file']).rename(columns={'id': 'location'})
-sparse_df = loader.from_file(out['sparse_path'], format='parquet')
+poi_table = gpd.read_parquet(resolve_config_path(config['buildings_file'])).rename(columns={'id': 'location'})
+sparse_df = loader.from_file(resolve_config_path(out['sparse_path']), format='parquet')
 sparse_df.drop(columns=['datetime'], inplace=True)
-diaries_df = loader.from_file(out['diaries_path'], format='parquet').rename(
+diaries_df = loader.from_file(resolve_config_path(out['diaries_path']), format='parquet').rename(
     columns={'identifier': 'user_id'})
 poi_subset = poi_table.loc[poi_table.location.isin(diaries_df['location'].dropna())]
 

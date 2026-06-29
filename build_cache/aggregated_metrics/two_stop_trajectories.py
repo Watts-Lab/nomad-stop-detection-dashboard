@@ -15,12 +15,29 @@
 
 # %%
 import json
+from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
 
+import nomad.data as data_folder
 from nomad.city_gen import City
 from nomad.traj_gen import Population
+
+CONFIG_DIR = Path(__file__).resolve().parent
+NOMAD_DATA_DIR = Path(data_folder.__file__).parent
+
+
+def resolve_config_path(path_value):
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+
+    config_path = CONFIG_DIR / path
+    data_path = NOMAD_DATA_DIR / path
+    if data_path.exists() and not config_path.exists():
+        return data_path
+    return config_path
 
 # Small comparisons and prototypes.
 keys = ["2_stops", "beta_5", "beta_8_5"]
@@ -42,7 +59,7 @@ keys = [
 ]
 
 for key in keys:
-    config_file = f"config_{key}.json"
+    config_file = CONFIG_DIR / f"config_{key}.json"
 
     with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -50,7 +67,7 @@ for key in keys:
     par = config["agent_params"]
     out = config["output_files"]
 
-    city = City.from_geopackage(config["city_file"])
+    city = City.from_geopackage(resolve_config_path(config["city_file"]))
 
     poi_data = pd.DataFrame({
         "building_id": city.buildings_gdf["id"].values,
@@ -58,7 +75,7 @@ for key in keys:
         "y": city.buildings_gdf["door_point"].apply(lambda p: p[1]).values,
     })
 
-    destinations = pd.read_csv(config["destination_diary_file"], parse_dates=["datetime"])
+    destinations = pd.read_csv(resolve_config_path(config["destination_diary_file"]), parse_dates=["datetime"])
 
     population = Population(city)
     population.generate_agents(
@@ -87,9 +104,9 @@ for key in keys:
 
     population.reproject_to_mercator(sparse_traj=True, full_traj=False, diaries=True, poi_data=poi_data)
     population.save_pop(
-        sparse_path=out["sparse_path"],
-        diaries_path=out["diaries_path"],
-        homes_path=out["homes_path"],
+        sparse_path=resolve_config_path(out["sparse_path"]),
+        diaries_path=resolve_config_path(out["diaries_path"]),
+        homes_path=resolve_config_path(out["homes_path"]),
         beta_ping=par["beta_ping"],
         ha=par["ha"],
     )

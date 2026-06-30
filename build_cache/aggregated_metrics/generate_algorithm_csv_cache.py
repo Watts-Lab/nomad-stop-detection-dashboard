@@ -1,4 +1,5 @@
 import argparse
+from itertools import product
 import json
 from pathlib import Path
 
@@ -34,6 +35,14 @@ DEFAULT_ALGORITHMS = [
     "seqscan",
     "hdbscan",
 ]
+DELTA_ROAM_VALUES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+DIST_THRESH_VALUES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+DUR_MIN_VALUES = [5, 10]
+TIME_THRESH_VALUES = [60, 240]
+DT_MAX_VALUES = [60, 120]
+MIN_PTS_VALUES = [2, 3]
+CELL_SIZE_VALUES = [25, 50, 100, 250, 500]
+MIN_TIME_VALUES = [5, 10]
 PARAM_COLUMN_MAP = {
     "algorithm_id": "key",
     "cell_size": "cs",
@@ -43,6 +52,7 @@ PARAM_COLUMN_MAP = {
     "dur_min": "dmn",
     "time_thresh": "tt",
     "min_pts": "mp",
+    "min_time": "mt",
     "min_cluster_size": "mcs",
     "back_merge": "bm",
     "remove_overlaps": "ro",
@@ -57,9 +67,6 @@ def parse_args():
     parser.add_argument("--config-key", default="2_stops")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--algorithms", nargs="+", default=DEFAULT_ALGORITHMS)
-    parser.add_argument("--sweep-min", type=float, default=5)
-    parser.add_argument("--sweep-max", type=float, default=50)
-    parser.add_argument("--sweep-points", type=int, default=10)
     parser.add_argument("--max-users", type=int, default=None)
     parser.add_argument("--scene-only", action="store_true")
     return parser.parse_args()
@@ -217,153 +224,206 @@ def build_stops(labelled_pings):
     return stops.reset_index(drop=True)
 
 
-def label_lachesis(sparse_df, sweep_value):
-    actual_value = 1.7 * float(sweep_value)
+def param_grid(**values):
+    keys = list(values)
+    return [dict(zip(keys, row)) for row in product(*(values[key] for key in keys))]
+
+
+def label_lachesis(sparse_df, params):
     labels = LACHESIS.lachesis_labels(
         sparse_df,
-        dt_max=60,
-        delta_roam=actual_value,
-        dur_min=5,
+        dt_max=params["dmx"],
+        delta_roam=params["dr"],
+        dur_min=params["dmn"],
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dr": actual_value, "dmx": 60, "dmn": 5}
+    return labels
 
 
-def label_sequential_centroid(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_sequential_centroid(sparse_df, params):
     labels = SEQUENTIAL.detect_stops_labels(
         sparse_df,
-        delta_roam=actual_value,
-        dt_max=60,
-        dur_min=5,
+        delta_roam=params["dr"],
+        dt_max=params["dmx"],
+        dur_min=params["dmn"],
         method="centroid",
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dr": actual_value, "dmx": 60, "dmn": 5, "m": "centroid"}
+    return labels
 
 
-def label_sequential_first(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_sequential_first(sparse_df, params):
     labels = SEQUENTIAL.detect_stops_labels(
         sparse_df,
-        delta_roam=actual_value,
-        dt_max=60,
-        dur_min=5,
+        delta_roam=params["dr"],
+        dt_max=params["dmx"],
+        dur_min=params["dmn"],
         method="sliding",
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dr": actual_value, "dmx": 60, "dmn": 5, "m": "sliding"}
+    return labels
 
 
-def label_gridbased(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_gridbased(sparse_df, params):
     grid_df = sparse_df.copy()
     grid_df["location_id"] = (
         "g-"
-        + np.floor(grid_df["x"] / actual_value).astype(int).astype(str)
+        + np.floor(grid_df["x"] / params["cs"]).astype(int).astype(str)
         + "-"
-        + np.floor(grid_df["y"] / actual_value).astype(int).astype(str)
+        + np.floor(grid_df["y"] / params["cs"]).astype(int).astype(str)
     )
     labels = GRIDBASED.grid_based_labels(
         grid_df,
-        time_thresh=60,
+        time_thresh=params["mt"],
         min_cluster_size=2,
-        dur_min=5,
+        dur_min=params["mt"],
         traj_cols={"user_id": "user_id", "timestamp": "timestamp", "location_id": "location_id"},
     )
-    return labels, {"cs": actual_value, "tt": 60, "mcs": 2, "dmn": 5}
+    return labels
 
 
-def label_seqscan(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_seqscan(sparse_df, params):
     labels = DENSITY_BASED.seqscan_labels(
         sparse_df,
-        dist_thresh=actual_value,
-        time_thresh=60,
-        min_pts=2,
-        dur_min=5,
+        dist_thresh=params["dt"],
+        time_thresh=params["tt"],
+        min_pts=params["mp"],
+        dur_min=params["dmn"],
         back_merge=False,
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dt": actual_value, "tt": 60, "mp": 2, "dmn": 5, "bm": False}
+    return labels
 
 
-def label_st_dbscan(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_st_dbscan(sparse_df, params):
     labels = TADBSCAN.ta_dbscan_labels(
         sparse_df,
-        dist_thresh=actual_value,
-        time_thresh=60,
-        min_pts=2,
-        remove_overlaps=True,
+        dist_thresh=params["dt"],
+        time_thresh=params["tt"],
+        min_pts=params["mp"],
+        remove_overlaps=params["ro"],
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dt": actual_value, "tt": 60, "mp": 2, "ro": True}
+    return labels
 
 
-def label_dbstop(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_dbstop(sparse_df, params):
     labels = DBSTOP.dbstop_labels(
         sparse_df,
-        dist_thresh=actual_value,
-        time_thresh=60,
-        min_pts=2,
-        dur_min=5,
+        dist_thresh=params["dt"],
+        time_thresh=params["tt"],
+        min_pts=params["mp"],
+        dur_min=params["dmn"],
         back_merge=False,
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dt": actual_value, "tt": 60, "mp": 2, "dmn": 5, "bm": False}
+    return labels
 
 
-def label_hdbscan(sparse_df, sweep_value):
-    actual_value = float(sweep_value)
+def label_hdbscan(sparse_df, params):
     labels = HDBSCAN.hdbscan_labels(
         sparse_df,
-        dist_thresh=actual_value,
-        time_thresh=60,
-        min_pts=2,
+        dist_thresh=params["dt"],
+        time_thresh=params["tt"],
+        min_pts=params["mp"],
         min_cluster_size=1,
-        dur_min=5,
+        dur_min=params["dmn"],
         x="x",
         y="y",
         timestamp="timestamp",
     )
-    return labels, {"dt": actual_value, "tt": 60, "mp": 2, "mcs": 1, "dmn": 5}
+    return labels
 
 
 def algorithm_specs():
+    density_params = param_grid(
+        dt=DIST_THRESH_VALUES,
+        tt=TIME_THRESH_VALUES,
+        mp=MIN_PTS_VALUES,
+        dmn=DUR_MIN_VALUES,
+    )
     return pd.DataFrame(
         [
-            {"algorithm": "lachesis", "display_name": "Lachesis", "sweep_parameter": "dr", "labeler": label_lachesis},
+            {
+                "algorithm": "lachesis",
+                "display_name": "Lachesis",
+                "parameter_columns": ["dr", "dmx", "dmn"],
+                "labeler": label_lachesis,
+                "param_grid": param_grid(dr=DELTA_ROAM_VALUES, dmx=DT_MAX_VALUES, dmn=DUR_MIN_VALUES),
+            },
             {
                 "algorithm": "sequential_centroid",
                 "display_name": "Sequential (centroid-anchored)",
-                "sweep_parameter": "dr",
+                "parameter_columns": ["dr", "dmx", "dmn", "m"],
                 "labeler": label_sequential_centroid,
+                "param_grid": [
+                    {**params, "m": "centroid"}
+                    for params in param_grid(dr=DELTA_ROAM_VALUES, dmx=DT_MAX_VALUES, dmn=DUR_MIN_VALUES)
+                ],
             },
             {
                 "algorithm": "sequential_first",
                 "display_name": "Sequential (first-anchored)",
-                "sweep_parameter": "dr",
+                "parameter_columns": ["dr", "dmx", "dmn", "m"],
                 "labeler": label_sequential_first,
+                "param_grid": [
+                    {**params, "m": "sliding"}
+                    for params in param_grid(dr=DELTA_ROAM_VALUES, dmx=DT_MAX_VALUES, dmn=DUR_MIN_VALUES)
+                ],
             },
-            {"algorithm": "gridbased", "display_name": "Grid-Based", "sweep_parameter": "cs", "labeler": label_gridbased},
-            {"algorithm": "st_dbscan", "display_name": "ST-DBSCAN", "sweep_parameter": "dt", "labeler": label_st_dbscan},
-            {"algorithm": "dbstop", "display_name": "DBSTOP", "sweep_parameter": "dt", "labeler": label_dbstop},
-            {"algorithm": "seqscan", "display_name": "SeqScan", "sweep_parameter": "dt", "labeler": label_seqscan},
-            {"algorithm": "hdbscan", "display_name": "HDBSCAN", "sweep_parameter": "dt", "labeler": label_hdbscan},
+            {
+                "algorithm": "gridbased",
+                "display_name": "Grid-Based",
+                "parameter_columns": ["cs", "mt", "mcs"],
+                "labeler": label_gridbased,
+                "param_grid": [
+                    {**params, "mcs": 2}
+                    for params in param_grid(cs=CELL_SIZE_VALUES, mt=MIN_TIME_VALUES)
+                ],
+            },
+            {
+                "algorithm": "st_dbscan",
+                "display_name": "ST-DBSCAN",
+                "parameter_columns": ["dt", "tt", "mp", "ro"],
+                "labeler": label_st_dbscan,
+                "param_grid": [
+                    {**params, "ro": True}
+                    for params in param_grid(dt=DIST_THRESH_VALUES, tt=TIME_THRESH_VALUES, mp=MIN_PTS_VALUES)
+                ],
+            },
+            {
+                "algorithm": "dbstop",
+                "display_name": "DBSTOP",
+                "parameter_columns": ["dt", "tt", "mp", "dmn", "bm"],
+                "labeler": label_dbstop,
+                "param_grid": [{**params, "bm": False} for params in density_params],
+            },
+            {
+                "algorithm": "seqscan",
+                "display_name": "SeqScan",
+                "parameter_columns": ["dt", "tt", "mp", "dmn", "bm"],
+                "labeler": label_seqscan,
+                "param_grid": [{**params, "bm": False} for params in density_params],
+            },
+            {
+                "algorithm": "hdbscan",
+                "display_name": "HDBSCAN",
+                "parameter_columns": ["dt", "tt", "mp", "dmn", "mcs"],
+                "labeler": label_hdbscan,
+                "param_grid": [{**params, "mcs": 1} for params in density_params],
+            },
         ]
     ).set_index("algorithm")
 
@@ -396,7 +456,12 @@ def compute_metrics(stops_df, truth_df, algorithm, key, params):
     return pd.DataFrame(rows)
 
 
-def run_algorithm(spec, sparse_df, diaries_df, poi_subset, sweep_values, output_dir):
+def config_key(index, params):
+    key_parts = [f"{col}-{params[col]}" for col in sorted(params)]
+    return f"{index:03d}__{'__'.join(key_parts)}"
+
+
+def run_algorithm(spec, sparse_df, diaries_df, poi_subset, output_dir):
     labels_frames = []
     stops_frames = []
     metrics_frames = []
@@ -405,18 +470,16 @@ def run_algorithm(spec, sparse_df, diaries_df, poi_subset, sweep_values, output_
     algorithm_dir = output_dir / algorithm
     algorithm_dir.mkdir(parents=True, exist_ok=True)
 
-    for i, sweep_value in enumerate(sweep_values, start=1):
+    for i, params in enumerate(spec.param_grid, start=1):
         labelled_frames = []
-        params = None
         for _, user_sparse in sparse_df.groupby("user_id", sort=False):
             user_sparse = user_sparse.copy()
-            labels, params = spec.labeler(user_sparse, sweep_value)
+            labels = spec.labeler(user_sparse, params)
             user_labelled = user_sparse.drop(columns=["datetime"], errors="ignore").copy()
             user_labelled["cluster"] = labels
             labelled_frames.append(user_labelled)
         labelled = pd.concat(labelled_frames, ignore_index=True)
-        key_parts = [f"{col}-{params[col]}" for col in sorted(params)]
-        key = f"{i:03d}__{'__'.join(key_parts)}"
+        key = config_key(i, params)
         cached_configs.append({"key": key, "params": params.copy()})
 
         labelled["location"] = labelled["precomp_locations"]
@@ -444,7 +507,7 @@ def run_algorithm(spec, sparse_df, diaries_df, poi_subset, sweep_values, output_
     metrics_df.to_csv(algorithm_dir / "metrics.csv", index=False)
     return {
         "display_name": spec.display_name,
-        "sweep_parameter": spec.sweep_parameter,
+        "parameter_columns": spec.parameter_columns,
         "labels": f"{algorithm}/labels.csv",
         "stops": f"{algorithm}/stops.csv",
         "metrics": f"{algorithm}/metrics.csv",
@@ -452,13 +515,12 @@ def run_algorithm(spec, sparse_df, diaries_df, poi_subset, sweep_values, output_
     }
 
 
-def write_manifest(output_dir, config_key, files, users, sweep_values):
+def write_manifest(output_dir, config_key, files, users):
     manifest = {
         "config_key": config_key,
         "format": "stop-detection-dashboard-csv-cache-v1",
         "algorithms": list(files.keys()),
         "users": users.astype(str).tolist(),
-        "sweep_values": [float(value) for value in sweep_values],
         "parameter_columns": PARAM_COLUMN_MAP,
         "shared_files": {
             "scene": "scene.json",
@@ -476,7 +538,6 @@ def main():
     output_dir = Path(args.output_dir)
     config = read_config(args.config_key)
     specs = algorithm_specs().loc[args.algorithms]
-    sweep_values = np.linspace(args.sweep_min, args.sweep_max, args.sweep_points)
 
     sparse_df, diaries_df, poi_subset, buildings_df, users = load_inputs(config, args.max_users)
     if args.scene_only:
@@ -490,8 +551,8 @@ def main():
 
     files = {}
     for _, spec in specs.iterrows():
-        files[spec.name] = run_algorithm(spec, sparse_df, diaries_df, poi_subset, sweep_values, output_dir)
-    write_manifest(output_dir, args.config_key, files, users, sweep_values)
+        files[spec.name] = run_algorithm(spec, sparse_df, diaries_df, poi_subset, output_dir)
+    write_manifest(output_dir, args.config_key, files, users)
 
 
 if __name__ == "__main__":

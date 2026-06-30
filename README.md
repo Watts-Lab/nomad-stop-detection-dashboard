@@ -93,6 +93,13 @@ the full-name mapping. Each algorithm entry also includes `configs`, a list of c
 and `params` combinations. Dashboard controls should be generated from those cached configs
 rather than accepting arbitrary free-form values.
 
+The generated cache precomputes a static parameter grid:
+
+- Lachesis and sequential variants: `dr` in `5, 10, ..., 60`, `dmx` in `60, 120`, and `dmn` in `5, 10`.
+- SeqScan, DBSTOP, and HDBSCAN: `dt` in `0, 5, ..., 50`, `tt` in `60, 240`, `mp` in `2, 3`, and `dmn` in `5, 10`.
+- ST-DBSCAN: `dt` in `0, 5, ..., 50`, `tt` in `60, 240`, `mp` in `2, 3`, with `ro=true`.
+- Grid-Based: `cs` in `25, 50, 100, 250, 500` and `mt` in `5, 10`.
+
 `scene.json` contains the shared map, trajectory, and ground-truth objects. Missing ground-truth
 coordinates are emitted as JSON `null`, and building types are normalized for the frontend
 (`workplace` becomes `work`, `retail` becomes `shop`).

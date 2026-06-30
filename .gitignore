@@ -13,6 +13,7 @@ cached_results/*
 !cached_results/.gitkeep
 !cached_results/**/
 !cached_results/**/*.json
+!cached_results/**/*.csv
 .turbo/
 .vercel/
 

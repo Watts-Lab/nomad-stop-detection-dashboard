@@ -56,6 +56,54 @@ They serve placeholder/cached responses from:
 
 You can replace these JSON files with real cached outputs later, keeping the same response shapes.
 
+## Static CSV Cache
+
+For the ECharts-only dashboard path, generate browser-readable CSV caches ahead of time:
+
+```bash
+python build_cache/aggregated_metrics/generate_algorithm_csv_cache.py
+```
+
+By default this writes `cached_results/stop-detection-cache/` with shared `trajectory.csv`,
+`diary.csv`, `scene.json`, and `manifest.json` files plus one folder per algorithm:
+
+```text
+cached_results/stop-detection-cache/
+├── manifest.json
+├── scene.json
+├── trajectory.csv
+├── diary.csv
+├── lachesis/
+├── sequential_centroid/
+├── sequential_first/
+├── gridbased/
+├── st_dbscan/
+├── dbstop/
+├── seqscan/
+└── hdbscan/
+    ├── labels.csv
+    ├── stops.csv
+    └── metrics.csv
+```
+
+The frontend should load `manifest.json` first, then fetch the listed CSVs for the selected
+algorithm. Parameter columns use short keys such as `dt` for `dist_thresh`, `dr` for
+`delta_roam`, `cs` for `cell_size`, and `mcs` for `min_cluster_size`; the manifest records
+the full-name mapping. Each algorithm entry also includes `configs`, a list of cached `key`
+and `params` combinations. Dashboard controls should be generated from those cached configs
+rather than accepting arbitrary free-form values.
+
+`scene.json` contains the shared map, trajectory, and ground-truth objects. Missing ground-truth
+coordinates are emitted as JSON `null`, and building types are normalized for the frontend
+(`workplace` becomes `work`, `retail` becomes `shop`).
+
+For a fully static deployment, write the same cache under `dashboard/public`:
+
+```bash
+python build_cache/aggregated_metrics/generate_algorithm_csv_cache.py \
+  --output-dir dashboard/public/cached-results/stop-detection-cache
+```
+
 ## Notes
 
 - Static placeholder figures are in `dashboard/public`.

@@ -913,7 +913,7 @@ function DemoSceneRenderer({
           { id: "detected-stops", data: chartData.stopData.slice(0, detectedStopCount) },
           { id: "current-ping", data: [chartData.pingData[latestPingIndex]] },
         ],
-      })
+      }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
           { id: "accept-windows", data: acceptWindowsAt(timestampSeconds) },
@@ -921,7 +921,7 @@ function DemoSceneRenderer({
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
-      })
+      }, { lazyUpdate: true })
     }
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
@@ -1106,7 +1106,7 @@ function DemoSceneRenderer({
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 7, itemStyle: { color: "rgba(31, 35, 38, 0.72)" } },
         { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
         { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
-        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
+        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
       ],
     })
 
@@ -2145,11 +2145,11 @@ function NomadDashboard() {
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}
               </div>
-              <Card className="overflow-hidden">
+              <Card className="min-h-0 overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg font-semibold">{leftAlgo?.name || "Select Algorithm"}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto">
                   <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
@@ -2183,11 +2183,11 @@ function NomadDashboard() {
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}
               </div>
-              <Card className="overflow-hidden">
+              <Card className="min-h-0 overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg font-semibold">Compare Parameters</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">{leftAlgo?.name ?? "Left algorithm"}</h4>
                     <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>

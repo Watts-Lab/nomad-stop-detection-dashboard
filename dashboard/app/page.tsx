@@ -732,16 +732,6 @@ function DemoSceneRenderer({
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
     for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
-    pings.forEach((ping) => times.add(ping.t))
-    stops.forEach((stop) => {
-      times.add(stop.start)
-      times.add(stop.end)
-      times.add(stop.circleReveal)
-    })
-    segments.forEach((segment) => {
-      times.add(segment.start)
-      times.add(segment.end)
-    })
 
     return {
       buildings,
@@ -1112,7 +1102,8 @@ function DemoSceneRenderer({
 
     timelineChart.setOption({
       animation: true,
-      animationDurationUpdate: 120,
+      animationDurationUpdate: 180,
+      animationEasingUpdate: "cubicOut",
       grid: { left: 34, right: 22, top: 0, bottom: 28 },
       xAxis: {
         type: "time",

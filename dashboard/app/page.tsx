@@ -139,6 +139,8 @@ type ComparePanelResponse = {
   animation_data_url: string | null
   scene?: CompareScene | null
   params?: Record<string, number>
+  labels?: number[]
+  configKey?: string | null
 }
 type CompareApiResponse = {
   seed: number
@@ -169,6 +171,24 @@ type CompareScene = {
     x: number | null
     y: number | null
   }>
+  routes?: {
+    crs: string
+    source: string
+    doors: Array<{
+      id: string
+      type: string
+      door_cell_x: number
+      door_cell_y: number
+      x: number
+      y: number
+    }>
+    routes: Array<{
+      from: string
+      to: string
+      blocks: number[][]
+      path: number[][]
+    }>
+  } | null
 }
 
 type MetricsPanelResponse = {
@@ -278,75 +298,100 @@ type DemoEditableParam = ParameterConstraint & {
   label?: string
 }
 
+// Discrete values below mirror exactly the configurations present in
+// cached_results/stop-detection-cache (see manifest.json). The demo controls are
+// constrained to these so every selection maps to a real cached result.
+const TIME_THRESH_VALUES = [60, 240]
+const MIN_PTS_VALUES = [2, 3]
+const DUR_MIN_VALUES = [5, 10]
+
 const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>> = {
   dbstop: {
-    time_thresh: { min: 1, max: 180, step: 1 },
     dist_thresh: { min: 0, max: 50, step: 5 },
-    min_pts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
-    dur_min: { min: 0, max: 180, step: 5 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   seqscan: {
-    time_thresh: { min: 1, max: 180, step: 1 },
     dist_thresh: { min: 0, max: 50, step: 5 },
-    min_pts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
-    dur_min: { min: 0, max: 180, step: 5 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
+  },
+  hdbscan: {
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   dbscan: {
     eps_spatial: { min: 0, max: 50, step: 5 },
-    T_max: { min: 1, max: 180, step: 1 },
-    minPts: { min: 2, max: 3, step: 1, allowedValues: [2, 3] },
+    T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
   },
   lachesis: {
-    dur_min: { min: 0, max: 180, step: 5 },
-    dt_max: { min: 1, max: 180, step: 1 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-centroid": {
-    dur_min: { min: 0, max: 180, step: 5 },
-    dt_max: { min: 1, max: 180, step: 1 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-first": {
-    dur_min: { min: 0, max: 180, step: 5 },
-    dt_max: { min: 1, max: 180, step: 1 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
-    cell_size: { min: 25, max: 500, step: 1 },
-    min_time: { min: 1, max: 180, step: 1 },
-  },
-  medoid: {
-    radius: { min: 1, max: 500, step: 1 },
-    min_duration: { min: 1, max: 3600, step: 1 },
+    cell_size: { min: 25, max: 500, step: 25, allowedValues: [25, 50, 100, 250, 500] },
+    min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
 }
 
 const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
   dbstop: {
-    dur_min: { min: 0, max: 180, step: 5 },
     dist_thresh: { min: 0, max: 50, step: 5 },
-    min_pts: { min: 2, max: 3, step: 1 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   seqscan: {
-    dur_min: { min: 0, max: 180, step: 5 },
     dist_thresh: { min: 0, max: 50, step: 5 },
-    min_pts: { min: 2, max: 3, step: 1 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
+  },
+  hdbscan: {
+    dist_thresh: { min: 0, max: 50, step: 5 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   dbscan: {
     eps_spatial: { min: 0, max: 50, step: 5, label: "dist_thresh" },
-    minPts: { min: 2, max: 3, step: 1, label: "min_pts" },
+    T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES, label: "time_thresh" },
+    minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES, label: "min_pts" },
   },
   lachesis: {
-    dur_min: { min: 0, max: 180, step: 5 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-centroid": {
-    dur_min: { min: 0, max: 180, step: 5 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-first": {
-    dur_min: { min: 0, max: 180, step: 5 },
-    delta_roam: { min: 0, max: 120, step: 5 },
+    delta_roam: { min: 5, max: 60, step: 5 },
+    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
+  },
+  gridbased: {
+    cell_size: { min: 25, max: 500, step: 25, allowedValues: [25, 50, 100, 250, 500] },
+    min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
 }
 
@@ -552,6 +597,13 @@ const DEMO_BUILDING_COLORS: Record<string, string> = {
   building: "#d4d5d1",
 }
 
+function darkenHex(hex: string, amount: number) {
+  const color = hex.replace("#", "")
+  const value = Number.parseInt(color, 16)
+  const channel = (shift: number) => Math.max(0, Math.round(((value >> shift) & 255) * amount))
+  return `#${[16, 8, 0].map((shift) => channel(shift).toString(16).padStart(2, "0")).join("")}`
+}
+
 function distanceMeters(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
@@ -652,10 +704,13 @@ function DemoSceneRenderer({
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-  const labels = useMemo(
-    () => scene ? assignDemoClusters(panel.algo, scene.pings, panel.params) : [],
-    [panel.algo, panel.params, scene],
-  )
+  const labels = useMemo(() => {
+    if (!scene) return []
+    // Prefer the real cached labels from the stop-detection cache; fall back to the
+    // client-side approximation only if the cache has no matching rows for this user/config.
+    if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
+    return assignDemoClusters(panel.algo, scene.pings, panel.params)
+  }, [panel.labels, panel.algo, panel.params, scene])
   const chartData = useMemo(() => {
     if (!scene || scene.pings.length === 0) return null
 
@@ -677,6 +732,7 @@ function DemoSceneRenderer({
         const minY = Math.min(...ys)
         const maxY = Math.max(...ys)
         return {
+          id: building.id,
           type: building.type,
           coords: ring,
           center: [(minX + maxX) / 2, (minY + maxY) / 2],
@@ -687,15 +743,20 @@ function DemoSceneRenderer({
         }
       }),
     )
+    const buildingById = new Map(buildings.map((building) => [building.id, building]))
     const destinationFor = (x: number, y: number) => {
       const containing = buildings.find((building) =>
         x >= building.minX && x <= building.maxX && y >= building.minY && y <= building.maxY
       )
-      return (containing ?? buildings.reduce((best, building) =>
+      const destination = containing ?? buildings.reduce((best, building) =>
         Math.hypot(x - building.center[0], y - building.center[1]) < Math.hypot(x - best.center[0], y - best.center[1])
           ? building
           : best
-      )).center
+      )
+      return {
+        id: destination.type === "building" ? null : destination.id,
+        center: destination.center,
+      }
     }
     const routeBetween = (start: number[], end: number[]) => [
       start,
@@ -703,6 +764,17 @@ function DemoSceneRenderer({
       [(start[0] + end[0]) / 2, end[1]],
       end,
     ].filter((point, index, route) => index === 0 || point[0] !== route[index - 1][0] || point[1] !== route[index - 1][1])
+    const routeByPair = new Map(scene.routes?.routes.map((route) => [`${route.from}->${route.to}`, route.path]) ?? [])
+    const routeFor = (
+      start: { id: string | null; center: number[] },
+      end: { id: string | null; center: number[] },
+    ) => {
+      const cached = start.id && end.id ? routeByPair.get(`${start.id}->${end.id}`) : null
+      return {
+        points: cached ?? routeBetween(start.center, end.center),
+        isFallback: !cached,
+      }
+    }
     const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
     const dtMaxSec = Number(panel.params?.dt_max ?? 60) * 60
     const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
@@ -712,22 +784,24 @@ function DemoSceneRenderer({
         stop.diameter / 2,
         Number(panel.params?.delta_roam ?? panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0),
       ),
-      circleReveal: Math.min(stop.end, stop.start + revealDelay),
       label: `Stop ${stop.cluster}`,
       startTime: new Date(stop.start * 1000).toISOString().slice(11, 16) + " UTC",
       endTime: new Date(stop.end * 1000).toISOString().slice(11, 16) + " UTC",
     }))
-    const segments = stops.map((stop, index) => {
-      const startPoint = index === 0 ? destinationFor(scene.pings[0].x, scene.pings[0].y) : stops[index - 1].destination
-      const start = index === 0 ? scene.pings[0].timestamp : stops[index - 1].end
+    const truthStops = scene.truth.flatMap((row) => {
+      const building = row.location ? buildingById.get(row.location) : null
+      return building ? [{ ...row, destination: { id: row.location, center: building.center } }] : []
+    })
+    const segments = truthStops.slice(1).map((current, index) => {
+      const previous = truthStops[index]
       return {
-        stopIndex: stop.index,
-        cluster: stop.cluster,
-        start,
-        end: Math.max(start + 30, stop.end),
-        points: routeBetween(startPoint, stop.destination),
+        stopIndex: index,
+        cluster: index,
+        start: previous.timestamp + previous.duration * 60,
+        end: current.timestamp,
+        ...routeFor(previous.destination, current.destination),
       }
-    }).filter((segment) => segment.points.length > 1)
+    }).filter((segment) => segment.end > segment.start && segment.points.length > 1)
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
@@ -740,8 +814,6 @@ function DemoSceneRenderer({
       stops,
       segments,
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
-      stopCircleData: stops.map((stop) => [stop.x, stop.y, stop.radius, stop.cluster, stop.index]),
-      stopCircleRevealTimes: stops.map((stop) => stop.circleReveal),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
       dtMaxSec,
@@ -765,7 +837,7 @@ function DemoSceneRenderer({
     const xPad = Math.max(18, xSpan * 0.08)
     const yPad = Math.max(18, ySpan * 0.08)
     const mapBounds = () => {
-      const mapZoom = 1.6
+      const mapZoom = 1.7
       const baseX = xSpan + xPad * 2
       const baseY = ySpan + yPad * 2
       const plotRatio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
@@ -806,6 +878,7 @@ function DemoSceneRenderer({
     let sequenceIndex = 0
     let paused = true
     let timer = 0
+    let flashOn = false
     const syncPlaybackState = () => {
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
       setPlaybackState(atEnd && paused ? "complete" : paused ? "paused" : "playing")
@@ -832,18 +905,23 @@ function DemoSceneRenderer({
       return drawn
     }
     const routeProgressAt = (timestampSeconds: number) => {
-      const completed: number[][][] = []
-      let active: number[][] = []
+      const completedCached: number[][][] = []
+      const completedFallback: number[][][] = []
+      let activeCached: number[][] = []
+      let activeFallback: number[][] = []
       preparedSegments.forEach((segment) => {
         if (timestampSeconds >= segment.end) {
-          completed.push(segment.points)
+          if (segment.isFallback) completedFallback.push(segment.points)
+          else completedCached.push(segment.points)
           return
         }
         if (timestampSeconds >= segment.start) {
-          active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
+          const active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
+          if (segment.isFallback) activeFallback = active
+          else activeCached = active
         }
       })
-      return { completed, active }
+      return { completedCached, completedFallback, activeCached, activeFallback }
     }
     const latestPingIndexAt = (timestampSeconds: number) => {
       let index = 0
@@ -856,11 +934,6 @@ function DemoSceneRenderer({
     const detectedCountFor = (timestampSeconds: number) => {
       let count = 0
       while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
-      return count
-    }
-    const circleCountFor = (timestampSeconds: number) => {
-      let count = 0
-      while (count < chartData.stopCircleRevealTimes.length && chartData.stopCircleRevealTimes[count] <= timestampSeconds) count += 1
       return count
     }
     const activeClustersAt = (timestampSeconds: number) => {
@@ -888,6 +961,52 @@ function DemoSceneRenderer({
         const firstPing = members[0]
         return [[firstPing.t * 1000, (firstPing.t + chartData.durMinSec) * 1000, stop.cluster, stop.index]]
       })
+    const activeBuildingAt = (timestampSeconds: number) => {
+      const row = scene.truth.find((truth) =>
+        truth.location && timestampSeconds >= truth.timestamp && timestampSeconds <= truth.timestamp + truth.duration * 60
+      )
+      return row?.location ?? null
+    }
+    const buildingsSeriesData = (timestampSeconds: number) => {
+      const activeBuilding = activeBuildingAt(timestampSeconds)
+      return chartData.buildings.map((building, index) => [index, building.id === activeBuilding && flashOn ? 1 : 0])
+    }
+    // Places a direction arrow at the arc-length midpoint of a route polyline,
+    // pointing toward the next vertex so it reads as the agent's travel direction.
+    const arrowItemFor = (points: number[][], isFallback: boolean): number[] | null => {
+      if (!points || points.length < 2) return null
+      const segmentLengths: number[] = []
+      let total = 0
+      for (let index = 1; index < points.length; index += 1) {
+        const length = Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1])
+        segmentLengths.push(length)
+        total += length
+      }
+      if (total === 0) return null
+      const half = total / 2
+      let accumulated = 0
+      let segmentIndex = segmentLengths.length - 1
+      for (let index = 0; index < segmentLengths.length; index += 1) {
+        if (accumulated + segmentLengths[index] >= half) {
+          segmentIndex = index
+          break
+        }
+        accumulated += segmentLengths[index]
+      }
+      const start = points[segmentIndex]
+      const end = points[segmentIndex + 1]
+      const fraction = (half - accumulated) / (segmentLengths[segmentIndex] || 1)
+      const midX = start[0] + (end[0] - start[0]) * fraction
+      const midY = start[1] + (end[1] - start[1]) * fraction
+      return [midX, midY, end[0], end[1], isFallback ? 1 : 0]
+    }
+    const directionArrowsFor = (route: ReturnType<typeof routeProgressAt>) =>
+      [
+        ...route.completedCached.map((points) => arrowItemFor(points, false)),
+        ...route.completedFallback.map((points) => arrowItemFor(points, true)),
+        arrowItemFor(route.activeCached, false),
+        arrowItemFor(route.activeFallback, true),
+      ].filter((item): item is number[] => item !== null)
     const renderScene = (timestampSeconds: number) => {
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
@@ -895,13 +1014,16 @@ function DemoSceneRenderer({
 
       mapChart.setOption({
         series: [
-          { id: "completed-paths", data: route.completed.map((points) => ({ coords: points })) },
-          { id: "active-path", data: route.active },
-          { id: "stop-circles", data: chartData.stopCircleData.slice(0, circleCountFor(timestampSeconds)) },
+          { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
+          { id: "completed-paths", data: route.completedCached.map((points) => ({ coords: points })) },
+          { id: "completed-fallback-paths", data: route.completedFallback.map((points) => ({ coords: points })) },
+          { id: "active-path", data: route.activeCached },
+          { id: "active-fallback-path", data: route.activeFallback },
           { id: "noise-pings", data: noisePings.filter((point) => point[4] <= timestampSeconds) },
           { id: "cluster-pings", data: clusterPings.filter((point) => point[4] <= timestampSeconds) },
           { id: "detected-stops", data: chartData.stopData.slice(0, detectedStopCount) },
           { id: "current-ping", data: [chartData.pingData[latestPingIndex]] },
+          { id: "direction-arrows", data: directionArrowsFor(route) },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -1030,13 +1152,14 @@ function DemoSceneRenderer({
           coordinateSystem: "cartesian2d",
           silent: true,
           z: 0,
-          data: chartData.buildings.map((_, index) => index),
+          data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
-            const building = chartData.buildings[params.dataIndex]
+            const building = chartData.buildings[Number(api.value(0))]
+            const fill = DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
-              style: { fill: DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building, stroke: "#ffffff", lineWidth: 1 },
+              style: { fill: api.value(1) ? darkenHex(fill, 0.68) : fill, stroke: "#ffffff", lineWidth: api.value(1) ? 1.8 : 1 },
             }
           },
         },
@@ -1053,6 +1176,21 @@ function DemoSceneRenderer({
             color: "#1f6d6a",
             width: 2.4,
             opacity: 0.78,
+          },
+        },
+        {
+          id: "completed-fallback-paths",
+          name: "Fallback inferred route",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          polyline: true,
+          silent: true,
+          z: 2,
+          data: [],
+          lineStyle: {
+            color: "#d94b45",
+            width: 2.4,
+            opacity: 0.85,
           },
         },
         {
@@ -1073,30 +1211,62 @@ function DemoSceneRenderer({
             shadowColor: "rgba(15, 118, 110, 0.26)",
           },
         },
-        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: chartData.pingData, symbolSize: 5, itemStyle: { color: "rgba(31, 35, 38, 0.13)" } },
         {
-          id: "stop-circles",
-          name: "Stop radius",
-          type: "custom",
+          id: "active-fallback-path",
+          name: "Active fallback route",
+          type: "line",
           coordinateSystem: "cartesian2d",
+          smooth: 0.38,
+          showSymbol: false,
           silent: true,
           z: 4,
           data: [],
-          renderItem(_params: EChartsParams, api: EChartsApi) {
-            const center = api.coord([api.value(0), api.value(1)])
-            const edge = api.coord([Number(api.value(0)) + Number(api.value(2)), api.value(1)])
-            const radius = Math.abs(edge[0] - center[0])
-            return {
-              type: "circle",
-              shape: { cx: center[0], cy: center[1], r: radius },
-              style: { fill: "rgba(246, 215, 70, 0.08)", stroke: clusterColor(Number(api.value(3))), lineWidth: 2, opacity: 0.85 },
-            }
+          lineStyle: {
+            color: "#d94b45",
+            width: 4,
+            opacity: 0.95,
+            shadowBlur: 10,
+            shadowColor: "rgba(217, 75, 69, 0.26)",
           },
         },
+        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: chartData.pingData, symbolSize: 5, itemStyle: { color: "rgba(31, 35, 38, 0.13)" } },
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 7, itemStyle: { color: "rgba(31, 35, 38, 0.72)" } },
         { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
         { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
         { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
+        {
+          id: "direction-arrows",
+          name: "Travel direction",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 6,
+          data: [],
+          // Each datum is [midX, midY, aheadX, aheadY, isFallback]; the arrow is drawn
+          // in pixel space at the segment midpoint, pointing toward the "ahead" point.
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const mid = api.coord([api.value(0), api.value(1)])
+            const ahead = api.coord([api.value(2), api.value(3)])
+            let dx = ahead[0] - mid[0]
+            let dy = ahead[1] - mid[1]
+            const length = Math.hypot(dx, dy) || 1
+            dx /= length
+            dy /= length
+            const perpX = -dy
+            const perpY = dx
+            const reach = 8
+            const halfWidth = 5.5
+            const tip = [mid[0] + dx * reach, mid[1] + dy * reach]
+            const left = [mid[0] - dx * reach + perpX * halfWidth, mid[1] - dy * reach + perpY * halfWidth]
+            const right = [mid[0] - dx * reach - perpX * halfWidth, mid[1] - dy * reach - perpY * halfWidth]
+            const color = api.value(4) ? "#d94b45" : "#0f766e"
+            return {
+              type: "polygon",
+              shape: { points: [tip, left, right] },
+              style: { fill: color, stroke: "#ffffff", lineWidth: 1, opacity: 0.96 },
+            }
+          },
+        },
       ],
     })
 
@@ -1215,9 +1385,17 @@ function DemoSceneRenderer({
     timelineEl.style.cursor = "ew-resize"
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
+    const flashTimer = window.setInterval(() => {
+      const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
+      // Stop blinking once playback has reached the end of the timeline.
+      const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
+      flashOn = ended ? false : !flashOn
+      mapChart.setOption({ series: [{ id: "buildings", data: buildingsSeriesData(timestampSeconds) }] })
+    }, 500)
 
     return () => {
       window.clearTimeout(timer)
+      window.clearInterval(flashTimer)
       window.removeEventListener("resize", resize)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
@@ -1285,8 +1463,11 @@ function DemoSceneRenderer({
       <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" />
       <div className={`flex shrink-0 flex-col bg-white ${mode === "single" ? "h-28" : "h-24"}`}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
-        <div className="shrink-0 border-t border-[#d7dbd2] bg-white px-3 py-1 text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
-          Timeline
+        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
+          <span>Timeline</span>
+          <span className="font-mono tracking-normal text-[#202124]">
+            {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) + " UTC" : "--:--:-- UTC"}
+          </span>
         </div>
       </div>
     </div>
@@ -1452,13 +1633,15 @@ const algorithms = [
     name: "HDBSCAN",
     family: "density",
     shortDesc: "Hierarchical density-based clustering for variable-density stop patterns.",
-    description: "HDBSCAN is included as a density-based stop detection placeholder. The exact stop-detection formulation, parameter defaults, and source language still need to be confirmed.",
-    source: "Placeholder source: HDBSCAN reference or NOMAD implementation notes needed",
+    description: "HDBSCAN extends density-based clustering hierarchically, allowing stop clusters of varying density. In this dashboard it is swept over the same spatial/temporal thresholds as the other density methods.",
+    source: "Campello, Moulavi, and Sander (2013), HDBSCAN",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "min_cluster_size", defaultValue: "TBD", description: "Minimum cluster size; placeholder until the implementation source is confirmed." },
-      { name: "min_samples", defaultValue: "TBD", description: "Density smoothing parameter; placeholder until the implementation source is confirmed." },
+      { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
+      { name: "time_thresh", defaultValue: "60", description: "Temporal threshold (minutes)" },
+      { name: "min_pts", defaultValue: "3", description: "Minimum points for cluster core" },
+      { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" },
     ],
   },
 ]
@@ -1573,8 +1756,15 @@ function NomadDashboard() {
         out.time_thresh = out.T_max ?? 60
         out.min_pts = out.minPts ?? 3
       }
-      if (algoId === "seqscan") {
+      if (algoId === "dbstop" || algoId === "seqscan" || algoId === "hdbscan") {
+        out.dist_thresh = out.dist_thresh ?? 10
+        out.time_thresh = out.time_thresh ?? 60
         out.min_pts = out.min_pts ?? 3
+        out.dur_min = out.dur_min ?? 5
+      }
+      if (algoId === "gridbased") {
+        out.cell_size = out.cell_size ?? 100
+        out.min_time = out.min_time ?? 5
       }
       if (algoId === "lachesis" || algoId === "sequential-centroid" || algoId === "sequential-first") {
         out.dt_max = out.dt_max ?? 60

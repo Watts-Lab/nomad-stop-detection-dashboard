@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import {
   Select,
@@ -689,12 +690,16 @@ function DemoSceneRenderer({
   currentTime,
   onTimeChange,
   syncMaster,
+  showGroundTruth,
+  showStops,
 }: {
   panel: ComparePanelResponse
   mode: "single" | "compare"
   currentTime: number | null
   onTimeChange: (timestamp: number) => void
   syncMaster: boolean
+  showGroundTruth: boolean
+  showStops: boolean
 }) {
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -812,6 +817,7 @@ function DemoSceneRenderer({
       pings,
       pingData,
       stops,
+      truthStops,
       segments,
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
@@ -909,6 +915,7 @@ function DemoSceneRenderer({
       const completedFallback: number[][][] = []
       let activeCached: number[][] = []
       let activeFallback: number[][] = []
+      let next: number[][] = []
       preparedSegments.forEach((segment) => {
         if (timestampSeconds >= segment.end) {
           if (segment.isFallback) completedFallback.push(segment.points)
@@ -919,9 +926,11 @@ function DemoSceneRenderer({
           const active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
           if (segment.isFallback) activeFallback = active
           else activeCached = active
+          return
         }
+        if (next.length === 0) next = segment.points
       })
-      return { completedCached, completedFallback, activeCached, activeFallback }
+      return { completedCached, completedFallback, activeCached, activeFallback, next }
     }
     const latestPingIndexAt = (timestampSeconds: number) => {
       let index = 0
@@ -961,15 +970,23 @@ function DemoSceneRenderer({
         const firstPing = members[0]
         return [[firstPing.t * 1000, (firstPing.t + chartData.durMinSec) * 1000, stop.cluster, stop.index]]
       })
-    const activeBuildingAt = (timestampSeconds: number) => {
-      const row = scene.truth.find((truth) =>
-        truth.location && timestampSeconds >= truth.timestamp && timestampSeconds <= truth.timestamp + truth.duration * 60
+    const groundTruthAt = (timestampSeconds: number) => {
+      const current = chartData.truthStops.find((truth) =>
+        timestampSeconds >= truth.timestamp && timestampSeconds <= truth.timestamp + truth.duration * 60
       )
-      return row?.location ?? null
+      const next = chartData.truthStops.find((truth) => truth.timestamp > timestampSeconds)
+      return { current, next }
     }
     const buildingsSeriesData = (timestampSeconds: number) => {
-      const activeBuilding = activeBuildingAt(timestampSeconds)
-      return chartData.buildings.map((building, index) => [index, building.id === activeBuilding && flashOn ? 1 : 0])
+      const truth = groundTruthAt(timestampSeconds)
+      return chartData.buildings.map((building, index) => [
+        index,
+        showGroundTruth && building.id === truth.current?.location && flashOn
+          ? 1
+          : showGroundTruth && building.id === truth.next?.location
+            ? 2
+            : 0,
+      ]).sort((a, b) => a[1] - b[1])
     }
     // Places a direction arrow at the arc-length midpoint of a route polyline,
     // pointing toward the next vertex so it reads as the agent's travel direction.
@@ -1007,6 +1024,11 @@ function DemoSceneRenderer({
         arrowItemFor(route.activeCached, false),
         arrowItemFor(route.activeFallback, true),
       ].filter((item): item is number[] => item !== null)
+    const groundTruthPositionAt = (timestampSeconds: number, route: ReturnType<typeof routeProgressAt>) => {
+      const activeRoute = route.activeCached.length > 0 ? route.activeCached : route.activeFallback
+      if (activeRoute.length > 0) return activeRoute[activeRoute.length - 1]
+      return groundTruthAt(timestampSeconds).current?.destination.center ?? null
+    }
     const renderScene = (timestampSeconds: number) => {
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
@@ -1015,22 +1037,24 @@ function DemoSceneRenderer({
       mapChart.setOption({
         series: [
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
-          { id: "completed-paths", data: route.completedCached.map((points) => ({ coords: points })) },
-          { id: "completed-fallback-paths", data: route.completedFallback.map((points) => ({ coords: points })) },
-          { id: "active-path", data: route.activeCached },
-          { id: "active-fallback-path", data: route.activeFallback },
-          { id: "noise-pings", data: noisePings.filter((point) => point[4] <= timestampSeconds) },
-          { id: "cluster-pings", data: clusterPings.filter((point) => point[4] <= timestampSeconds) },
-          { id: "detected-stops", data: chartData.stopData.slice(0, detectedStopCount) },
-          { id: "current-ping", data: [chartData.pingData[latestPingIndex]] },
-          { id: "direction-arrows", data: directionArrowsFor(route) },
+          { id: "completed-paths", data: showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
+          { id: "completed-fallback-paths", data: showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
+          { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
+          { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
+          { id: "next-path", data: showGroundTruth && route.next.length > 0 ? [{ coords: route.next }] : [] },
+          { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds) : [] },
+          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds) : [] },
+          { id: "detected-stops", data: showStops ? chartData.stopData.slice(0, detectedStopCount) : [] },
+          { id: "current-ping", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]]] },
+          { id: "direction-arrows", data: showGroundTruth ? directionArrowsFor(route) : [] },
+          { id: "ground-truth-marker", data: showGroundTruth ? [groundTruthPositionAt(timestampSeconds, route)].filter(Boolean) : [] },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
-          { id: "accept-windows", data: acceptWindowsAt(timestampSeconds) },
-          { id: "dur-min-lines", data: durMinLinesAt(timestampSeconds) },
-          { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
+          { id: "accept-windows", data: showStops ? acceptWindowsAt(timestampSeconds) : [] },
+          { id: "dur-min-lines", data: showStops ? durMinLinesAt(timestampSeconds) : [] },
+          { id: "stop-bars", data: showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
       }, { lazyUpdate: true })
@@ -1156,10 +1180,15 @@ function DemoSceneRenderer({
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
             const fill = DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building
+            const state = Number(api.value(1))
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
-              style: { fill: api.value(1) ? darkenHex(fill, 0.68) : fill, stroke: "#ffffff", lineWidth: api.value(1) ? 1.8 : 1 },
+              style: {
+                fill: state === 1 ? darkenHex(fill, 0.68) : state === 2 ? "#b7dcd8" : fill,
+                stroke: state === 1 ? "#0f766e" : state === 2 ? "#65a9a4" : "#ffffff",
+                lineWidth: state === 1 ? 2 : state === 2 ? 1.5 : 1,
+              },
             }
           },
         },
@@ -1192,6 +1221,17 @@ function DemoSceneRenderer({
             width: 2.4,
             opacity: 0.85,
           },
+        },
+        {
+          id: "next-path",
+          name: "Next ground-truth route",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          polyline: true,
+          silent: true,
+          z: 2,
+          data: [],
+          lineStyle: { color: "#4b918d", width: 2, opacity: 0.38, type: "dashed" },
         },
         {
           id: "active-path",
@@ -1234,6 +1274,7 @@ function DemoSceneRenderer({
         { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
         { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
         { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
+        { id: "ground-truth-marker", name: "Ground truth position", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 9, data: [], symbolSize: 11, itemStyle: { color: "#0f766e", borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(15, 118, 110, 0.35)" } },
         {
           id: "direction-arrows",
           name: "Travel direction",
@@ -1407,7 +1448,7 @@ function DemoSceneRenderer({
       mapChart.dispose()
       timelineChart.dispose()
     }
-  }, [chartData, onTimeChange, scene, syncMaster])
+  }, [chartData, onTimeChange, scene, showGroundTruth, showStops, syncMaster])
 
   useEffect(() => {
     if (!chartData || currentTime !== null) return
@@ -1480,12 +1521,16 @@ function CompareAnimationPanel({
   currentTime,
   onTimeChange,
   syncMaster = true,
+  showGroundTruth,
+  showStops,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
   currentTime: number | null
   onTimeChange: (timestamp: number) => void
   syncMaster?: boolean
+  showGroundTruth: boolean
+  showStops: boolean
 }) {
   const hasAnimation = Boolean(panel?.available && panel?.animation_data_url)
   const sceneMetadata = panel?.scene ? `${panel.scene.user_id} · ${panel.scene.crs}` : null
@@ -1501,7 +1546,7 @@ function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-2">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} />
+            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} />
           </div>
         ) : hasAnimation ? (
           <div className="flex min-h-0 w-full flex-1 justify-center">
@@ -1704,6 +1749,8 @@ function NomadDashboard() {
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
   const [demoTime, setDemoTime] = useState<number | null>(null)
+  const [showGroundTruth, setShowGroundTruth] = useState(true)
+  const [showStops, setShowStops] = useState(true)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
@@ -2314,15 +2361,25 @@ function NomadDashboard() {
                 Dashboard-style preview: choose two algorithms and their own parameters, run, and inspect side-by-side map and barcode outputs.
               </p>
             </div>
-            <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={handleCompareModeToggle} className="gap-2">
-              {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
-            </Button>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
+                Ground Truth
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
+                Detected Stops
+              </label>
+              <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={handleCompareModeToggle} className="gap-2">
+                {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
+              </Button>
+            </div>
           </div>
 
           {!compareMode ? (
             <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
               <div className="flex min-h-0 flex-col gap-3">
-                <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} />
+                <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}
               </div>
@@ -2358,8 +2415,8 @@ function NomadDashboard() {
             <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
               <div className="flex min-h-0 flex-col gap-3">
                 <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} />
-                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} />
+                  <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} />
+                  <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
                 </div>
                 {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
                 {compareError && <p className="text-xs text-red-500">{compareError}</p>}

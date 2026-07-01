@@ -179,10 +179,10 @@ function DemoSceneRenderer({
     const maxY = Math.max(scene.bounds[3], ...chartData.buildings.map((building) => building.maxY), ...scene.pings.map((ping) => ping.y))
     const xSpan = maxX - minX
     const ySpan = maxY - minY
-    const xPad = Math.max(18, xSpan * 0.08)
-    const yPad = Math.max(18, ySpan * 0.08)
+    const xPad = Math.max(28, xSpan * 0.14)
+    const yPad = Math.max(28, ySpan * 0.14)
     const mapBounds = () => {
-      const mapZoom = 1.7
+      const mapZoom = 1.45
       const baseX = xSpan + xPad * 2
       const baseY = ySpan + yPad * 2
       const plotRatio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
@@ -501,10 +501,17 @@ function DemoSceneRenderer({
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
             const fill = DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building
+            const isActive = Boolean(api.value(1))
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
-              style: { fill: api.value(1) ? darkenHex(fill, 0.68) : fill, stroke: "#ffffff", lineWidth: api.value(1) ? 1.8 : 1 },
+              style: {
+                fill,
+                stroke: isActive ? darkenHex(fill, 0.48) : "#ffffff",
+                lineWidth: isActive ? 3 : 1,
+                shadowBlur: isActive ? 8 : 0,
+                shadowColor: isActive ? darkenHex(fill, 0.55) : "transparent",
+              },
             }
           },
         },
@@ -832,7 +839,7 @@ export function CompareAnimationPanel({
   onTimeChange: (timestamp: number) => void
   syncMaster?: boolean
 }) {
-  const sceneMetadata = panel?.scene ? `${panel.scene.user_id} · ${panel.scene.crs}` : null
+  const sceneMetadata = panel?.scene ? `Trajectory: ${panel.scene.user_id}` : null
 
   return (
     <Card className="h-full min-h-0 overflow-hidden border-[#244367] bg-[#0A1526] py-0">
@@ -842,7 +849,7 @@ export function CompareAnimationPanel({
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-2">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} />

@@ -21,11 +21,9 @@ type ComparePayload = {
 
 type CachedPanel = {
   title?: string
-  animation_data_url?: string | null
 }
 
 type CompareCache = {
-  fallback_animation?: string
   panels?: Record<string, CachedPanel>
 }
 
@@ -33,7 +31,6 @@ type ComparePanelResponse = {
   algo: string
   title: string
   available: boolean
-  animation_data_url: string | null
   scene?: CompareSceneResponse | null
   params?: Record<string, number>
   labels?: number[]
@@ -122,8 +119,6 @@ const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
   : path.resolve(process.cwd(), "..", "cached_results")
 
 const STOP_CACHE_DIR = path.join(CACHE_ROOT, "stop-detection-cache")
-
-const DEFAULT_FALLBACK_ANIMATION = "/issue-images/ground-truth-placeholder.svg"
 
 // Maps the normalized demo algorithm id to its directory key inside the cache.
 const ALGO_DIR: Record<string, string> = {
@@ -284,11 +279,17 @@ function sceneForSeed(seed: number): CompareSceneResponse | null {
   const user = scene.users[Math.abs(seed) % scene.users.length]
   const pings = scene.pings
     .filter((ping) => ping.user_id === user)
-    .map(({ user_id: _user_id, ...ping }) => ping)
+    .map((ping) => ({ x: ping.x, y: ping.y, timestamp: ping.timestamp }))
     .sort((a, b) => a.timestamp - b.timestamp)
   const truth = scene.truth
     .filter((row) => row.user_id === user)
-    .map(({ user_id: _user_id, ...row }) => row)
+    .map((row) => ({
+      location: row.location,
+      timestamp: row.timestamp,
+      duration: row.duration,
+      x: row.x,
+      y: row.y,
+    }))
     .sort((a, b) => a.timestamp - b.timestamp)
 
   if (pings.length === 0) return null
@@ -312,15 +313,12 @@ function buildPanel(
 ): ComparePanelResponse {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
-  const fallbackAnimation = cache?.fallback_animation ?? DEFAULT_FALLBACK_ANIMATION
-  const animation = fromCache?.animation_data_url ?? fallbackAnimation
   const cachedLabels = scene ? labelsForUser(normalized, scene.user_id, params ?? {}) : null
 
   return {
     algo: normalized,
     title: fromCache?.title ?? prettyAlgoName(normalized),
-    available: Boolean(scene || animation),
-    animation_data_url: animation,
+    available: Boolean(scene),
     scene,
     params: params ?? {},
     labels: cachedLabels?.labels,

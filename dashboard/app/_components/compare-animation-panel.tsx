@@ -125,7 +125,6 @@ function DemoSceneRenderer({
       }
     }
     const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
-    const dtMaxSec = Number(panel.params?.dt_max ?? 60) * 60
     const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
       ...stop,
       destination: destinationFor(stop.x, stop.y),
@@ -166,7 +165,6 @@ function DemoSceneRenderer({
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
-      dtMaxSec,
       durMinSec: revealDelay,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
@@ -289,24 +287,6 @@ function DemoSceneRenderer({
       while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
       return count
     }
-    const activeClustersAt = (timestampSeconds: number) => {
-      const latestIndex = latestPingIndexAt(timestampSeconds)
-      const latestPing = chartData.pings[latestIndex]
-      return chartData.stops.flatMap((stop) => {
-        const members = chartData.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds)
-        if (members.length === 0) return []
-        const lastPing = members[members.length - 1]
-        const lastMemberIndex = chartData.pings.findIndex((ping) => ping.i === members[members.length - 1].i)
-        if (latestIndex > lastMemberIndex && latestPing.cluster !== stop.cluster && timestampSeconds > lastPing.t + chartData.dtMaxSec) return []
-        return [{ stop, firstPing: members[0], lastPing }]
-      })
-    }
-    const acceptWindowsAt = (timestampSeconds: number) => {
-      return activeClustersAt(timestampSeconds).map(({ stop, lastPing }) => {
-        const deadline = lastPing.t + chartData.dtMaxSec
-        return [lastPing.t * 1000, deadline * 1000, stop.cluster, stop.index]
-      })
-    }
     const durMinLinesAt = (timestampSeconds: number) =>
       chartData.stops.flatMap((stop) => {
         const members = chartData.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds)
@@ -396,9 +376,8 @@ function DemoSceneRenderer({
       }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
-          { id: "accept-windows", data: showStops ? acceptWindowsAt(timestampSeconds) : [] },
-          { id: "dur-min-lines", data: showStops ? durMinLinesAt(timestampSeconds) : [] },
-          { id: "stop-bars", data: showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
+          { id: "dur-min-lines", data: durMinLinesAt(timestampSeconds) },
+          { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
       }, { lazyUpdate: true })
@@ -686,32 +665,6 @@ function DemoSceneRenderer({
             const top = api.coord([ping.t * 1000, 0.72])
             const bottom = api.coord([ping.t * 1000, 0.28])
             return { type: "line", shape: { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }, style: { stroke: "rgba(32, 33, 36, 0.18)", lineWidth: 1 } }
-          },
-        },
-        {
-          id: "accept-windows",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 2,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const windowStart = api.coord([api.value(0), 0.08])
-            const windowEnd = api.coord([api.value(1), 0.2])
-            const clip = { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height }
-            const shape = echarts.graphic.clipRectByRect(
-              { x: windowStart[0], y: windowEnd[1], width: Math.max(2, windowEnd[0] - windowStart[0]), height: windowStart[1] - windowEnd[1] },
-              clip,
-            )
-            if (!shape) return null
-            const color = clusterColor(Number(api.value(2)))
-            return {
-              type: "group",
-              children: [
-                { type: "rect", shape, style: { fill: color, opacity: 0.14 } },
-                { type: "line", shape: { x1: windowEnd[0], y1: windowEnd[1], x2: windowEnd[0], y2: windowStart[1] }, style: { stroke: color, lineWidth: 2, opacity: 0.85 } },
-              ],
-            }
           },
         },
         {

@@ -103,7 +103,7 @@ export function MetricsView({
                 <iframe
                   key={leftMetricsPrototypeSrc}
                   src={leftMetricsPrototypeSrc}
-                  title={`${metricsLeftAlgorithm} aggregated metrics prototype`}
+                  title={`${metricsLeftAlgorithm} aggregated metrics`}
                   className="h-full w-full border-0"
                 />
               </div>
@@ -113,7 +113,7 @@ export function MetricsView({
                   <iframe
                     key={rightMetricsPrototypeSrc}
                     src={rightMetricsPrototypeSrc}
-                    title={`${metricsRightAlgorithm} aggregated metrics prototype`}
+                    title={`${metricsRightAlgorithm} aggregated metrics`}
                     className="h-full w-full border-0"
                   />
                 </div>

@@ -30,10 +30,15 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
     sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
     fixed_parameters: ["dt_max=60", "dur_min=5"],
   },
-  Sequential: {
+  "Sequential (Centroid)": {
     source: "delta_roam_vs_acc_exp.ipynb",
     sweep_parameter: "delta_roam",
     fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
+  },
+  "Sequential (First)": {
+    source: "delta_roam_vs_acc_exp.ipynb",
+    sweep_parameter: "delta_roam",
+    fixed_parameters: ["dt_max=60", "method='sliding'", "dur_min=5"],
   },
   SeqScan: {
     source: "dist_thresh_vs_acc_exp.ipynb",
@@ -49,6 +54,16 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
     source: "ta_seqscan_examples.ipynb (dashboard compare path)",
     sweep_parameter: "dist_thresh",
     fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "back_merge=False"],
+  },
+  HDBSCAN: {
+    source: "cached_results/stop-detection-cache/hdbscan",
+    sweep_parameter: "dist_thresh",
+    fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "min_cluster_size=1"],
+  },
+  "Grid-Based": {
+    source: "cached_results/stop-detection-cache/gridbased",
+    sweep_parameter: "cell_size",
+    fixed_parameters: ["min_time=5", "min_cluster_size=2"],
   },
 }
 
@@ -149,10 +164,12 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
 export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   dbstop: "DBSTOP",
   lachesis: "Lachesis",
-  "sequential-centroid": "Sequential",
-  "sequential-first": "Sequential",
+  "sequential-centroid": "Sequential (Centroid)",
+  "sequential-first": "Sequential (First)",
   seqscan: "SeqScan",
   dbscan: "ST-DBSCAN",
+  hdbscan: "HDBSCAN",
+  gridbased: "Grid-Based",
 }
 
 export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
@@ -164,7 +181,11 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
-  Sequential: [
+  "Sequential (Centroid)": [
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  "Sequential (First)": [
     { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
@@ -175,6 +196,25 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
   "ST-DBSCAN": [
     { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
   ],
+  HDBSCAN: [
+    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  "Grid-Based": [
+    { value: "cell_size", label: "cell_size", min: 0, max: 500 },
+    { value: "min_time", label: "min_time", min: 0, max: 180 },
+  ],
+}
+
+export const METRICS_RESULTS_FILE: Record<string, string> = {
+  Lachesis: "lachesis_results.parquet",
+  "Sequential (Centroid)": "sequential_centroid_results.parquet",
+  "Sequential (First)": "sequential_first_results.parquet",
+  SeqScan: "seqscan_results.parquet",
+  "ST-DBSCAN": "st_dbscan_results.parquet",
+  DBSTOP: "dbstop_results.parquet",
+  HDBSCAN: "hdbscan_results.parquet",
+  "Grid-Based": "gridbased_results.parquet",
 }
 
 export const algorithms = [

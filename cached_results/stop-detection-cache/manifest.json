@@ -3,7 +3,7 @@
   "format": "stop-detection-dashboard-parquet-cache-v2",
   "coordinate_precision": 0,
   "coordinate_dtype": "int",
-  "algorithms": [
+  "algorithm_keys": [
     "lachesis",
     "sequential_centroid",
     "sequential_first",
@@ -13,6 +13,153 @@
     "seqscan",
     "hdbscan"
   ],
+  "algorithms": {
+    "lachesis": {
+      "display_name": "Lachesis",
+      "parameter_columns": [
+        "delta_roam",
+        "dt_max",
+        "dur_min"
+      ],
+      "labels": "lachesis/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "lachesis/stops/part-0.parquet",
+      "stops_dataset": "lachesis/stops",
+      "metrics": "lachesis/metrics.parquet"
+    },
+    "sequential_centroid": {
+      "display_name": "Sequential (centroid-anchored)",
+      "parameter_columns": [
+        "delta_roam",
+        "dt_max",
+        "dur_min",
+        "method"
+      ],
+      "labels": "sequential_centroid/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "sequential_centroid/stops/part-0.parquet",
+      "stops_dataset": "sequential_centroid/stops",
+      "metrics": "sequential_centroid/metrics.parquet"
+    },
+    "sequential_first": {
+      "display_name": "Sequential (first-anchored)",
+      "parameter_columns": [
+        "delta_roam",
+        "dt_max",
+        "dur_min",
+        "method"
+      ],
+      "labels": "sequential_first/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "sequential_first/stops/part-0.parquet",
+      "stops_dataset": "sequential_first/stops",
+      "metrics": "sequential_first/metrics.parquet"
+    },
+    "gridbased": {
+      "display_name": "Grid-Based",
+      "parameter_columns": [
+        "cell_size",
+        "min_time",
+        "min_cluster_size"
+      ],
+      "labels": "gridbased/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "gridbased/stops/part-0.parquet",
+      "stops_dataset": "gridbased/stops",
+      "metrics": "gridbased/metrics.parquet"
+    },
+    "st_dbscan": {
+      "display_name": "ST-DBSCAN",
+      "parameter_columns": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "remove_overlaps"
+      ],
+      "labels": "st_dbscan/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "st_dbscan/stops/part-0.parquet",
+      "stops_dataset": "st_dbscan/stops",
+      "metrics": "st_dbscan/metrics.parquet"
+    },
+    "dbstop": {
+      "display_name": "DBSTOP",
+      "parameter_columns": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "back_merge"
+      ],
+      "labels": "dbstop/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "dbstop/stops/part-0.parquet",
+      "stops_dataset": "dbstop/stops",
+      "metrics": "dbstop/metrics.parquet"
+    },
+    "seqscan": {
+      "display_name": "SeqScan",
+      "parameter_columns": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "back_merge"
+      ],
+      "labels": "seqscan/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "seqscan/stops/part-0.parquet",
+      "stops_dataset": "seqscan/stops",
+      "metrics": "seqscan/metrics.parquet"
+    },
+    "hdbscan": {
+      "display_name": "HDBSCAN",
+      "parameter_columns": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "min_cluster_size"
+      ],
+      "labels": "hdbscan/labels.parquet",
+      "labels_layout": "wide_by_config",
+      "label_join_key": [
+        "user_id",
+        "timestamp"
+      ],
+      "stops": "hdbscan/stops/part-0.parquet",
+      "stops_dataset": "hdbscan/stops",
+      "metrics": "hdbscan/metrics.parquet"
+    }
+  },
   "users": [
     "admiring_keller",
     "admiring_mestorf",
@@ -267,163 +414,25 @@
   ],
   "parameter_columns": {
     "algorithm_id": "key",
-    "cell_size": "cs",
-    "dist_thresh": "dt",
-    "delta_roam": "dr",
-    "dt_max": "dmx",
-    "dur_min": "dmn",
-    "time_thresh": "tt",
-    "min_pts": "mp",
-    "min_time": "mt",
-    "min_cluster_size": "mcs",
-    "back_merge": "bm",
-    "remove_overlaps": "ro",
-    "method": "m"
+    "cell_size": "cell_size",
+    "dist_thresh": "dist_thresh",
+    "delta_roam": "delta_roam",
+    "dt_max": "dt_max",
+    "dur_min": "dur_min",
+    "time_thresh": "time_thresh",
+    "min_pts": "min_pts",
+    "min_time": "min_time",
+    "min_cluster_size": "min_cluster_size",
+    "back_merge": "back_merge",
+    "remove_overlaps": "remove_overlaps",
+    "method": "method"
   },
   "shared_files": {
     "scene": "scene.json",
     "trajectory": "trajectory/part-0.parquet",
     "trajectory_dataset": "trajectory",
     "diary": "diary/part-0.parquet",
-    "diary_dataset": "diary"
-  },
-  "files": {
-    "lachesis": {
-      "display_name": "Lachesis",
-      "parameter_columns": [
-        "dr",
-        "dmx",
-        "dmn"
-      ],
-      "labels": "lachesis/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "lachesis/stops/part-0.parquet",
-      "stops_dataset": "lachesis/stops",
-      "metrics": "lachesis/metrics.parquet",
-      "configs": "lachesis/configs.parquet"
-    },
-    "sequential_centroid": {
-      "display_name": "Sequential (centroid-anchored)",
-      "parameter_columns": [
-        "dr",
-        "dmx",
-        "dmn",
-        "m"
-      ],
-      "labels": "sequential_centroid/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "sequential_centroid/stops/part-0.parquet",
-      "stops_dataset": "sequential_centroid/stops",
-      "metrics": "sequential_centroid/metrics.parquet",
-      "configs": "sequential_centroid/configs.parquet"
-    },
-    "sequential_first": {
-      "display_name": "Sequential (first-anchored)",
-      "parameter_columns": [
-        "dr",
-        "dmx",
-        "dmn",
-        "m"
-      ],
-      "labels": "sequential_first/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "sequential_first/stops/part-0.parquet",
-      "stops_dataset": "sequential_first/stops",
-      "metrics": "sequential_first/metrics.parquet",
-      "configs": "sequential_first/configs.parquet"
-    },
-    "gridbased": {
-      "display_name": "Grid-Based",
-      "parameter_columns": [
-        "cs",
-        "mt",
-        "mcs"
-      ],
-      "labels": "gridbased/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "gridbased/stops/part-0.parquet",
-      "stops_dataset": "gridbased/stops",
-      "metrics": "gridbased/metrics.parquet",
-      "configs": "gridbased/configs.parquet"
-    },
-    "st_dbscan": {
-      "display_name": "ST-DBSCAN",
-      "parameter_columns": [
-        "dt",
-        "tt",
-        "mp",
-        "ro"
-      ],
-      "labels": "st_dbscan/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "st_dbscan/stops/part-0.parquet",
-      "stops_dataset": "st_dbscan/stops",
-      "metrics": "st_dbscan/metrics.parquet",
-      "configs": "st_dbscan/configs.parquet"
-    },
-    "dbstop": {
-      "display_name": "DBSTOP",
-      "parameter_columns": [
-        "dt",
-        "tt",
-        "mp",
-        "dmn",
-        "bm"
-      ],
-      "labels": "dbstop/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "dbstop/stops/part-0.parquet",
-      "stops_dataset": "dbstop/stops",
-      "metrics": "dbstop/metrics.parquet",
-      "configs": "dbstop/configs.parquet"
-    },
-    "seqscan": {
-      "display_name": "SeqScan",
-      "parameter_columns": [
-        "dt",
-        "tt",
-        "mp",
-        "dmn",
-        "bm"
-      ],
-      "labels": "seqscan/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "seqscan/stops/part-0.parquet",
-      "stops_dataset": "seqscan/stops",
-      "metrics": "seqscan/metrics.parquet",
-      "configs": "seqscan/configs.parquet"
-    },
-    "hdbscan": {
-      "display_name": "HDBSCAN",
-      "parameter_columns": [
-        "dt",
-        "tt",
-        "mp",
-        "dmn",
-        "mcs"
-      ],
-      "labels": "hdbscan/labels.parquet",
-      "labels_layout": "wide_by_config",
-      "label_join_key": "ping_id",
-      "label_column_prefix": "c",
-      "stops": "hdbscan/stops/part-0.parquet",
-      "stops_dataset": "hdbscan/stops",
-      "metrics": "hdbscan/metrics.parquet",
-      "configs": "hdbscan/configs.parquet"
-    }
+    "diary_dataset": "diary",
+    "configs": "configs.json"
   }
 }

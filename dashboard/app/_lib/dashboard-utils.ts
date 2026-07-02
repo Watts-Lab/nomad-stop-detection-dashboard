@@ -6,7 +6,6 @@ import type { CompareScene } from "./types"
 export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
   const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
-    title: `${algorithm} aggregated metrics`,
     x: field,
     field,
     data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",

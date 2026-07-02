@@ -1,7 +1,6 @@
 import { Columns2, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CompareAnimationPanel } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
@@ -71,7 +70,7 @@ export function DemoView({
   openMetricsFromDemo: () => void
 }) {
   return (
-    <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
+    <div className="flex-1 flex flex-col p-4 gap-3 overflow-y-auto lg:overflow-hidden">
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-3xl space-y-1">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo"}</h2>
@@ -81,14 +80,6 @@ export function DemoView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
-            Ground Truth
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
-            Detected Stops
-          </label>
           <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={handleCompareModeToggle} className="gap-2">
             {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
           </Button>
@@ -96,9 +87,9 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+        <div className="grid flex-none min-h-0 gap-3 items-stretch overflow-visible lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:overflow-hidden">
           <div className="flex min-h-0 flex-col gap-3">
-            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
@@ -131,11 +122,11 @@ export function DemoView({
           </Card>
         </div>
       ) : (
-        <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+        <div className="grid flex-none min-h-0 gap-3 items-stretch overflow-visible lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:overflow-hidden">
           <div className="flex min-h-0 flex-col gap-3">
-            <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <div className="grid min-h-0 flex-none items-stretch gap-3 lg:flex-1 lg:grid-cols-2">
+              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
+              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
             </div>
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}

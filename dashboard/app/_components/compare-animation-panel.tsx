@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import { Pause, Play, RotateCcw } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
 import {
@@ -822,6 +823,8 @@ export function CompareAnimationPanel({
   syncMaster = true,
   showGroundTruth,
   showStops,
+  setShowGroundTruth,
+  setShowStops,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -830,15 +833,31 @@ export function CompareAnimationPanel({
   syncMaster?: boolean
   showGroundTruth: boolean
   showStops: boolean
+  setShowGroundTruth: (checked: boolean) => void
+  setShowStops: (checked: boolean) => void
 }) {
   const sceneMetadata = panel?.scene ? `Trajectory: ${panel.scene.user_id}` : null
 
   return (
-    <Card className="h-full min-h-0 overflow-hidden border-[#244367] bg-[#0A1526] py-0">
+    <Card className="h-full min-h-[520px] overflow-hidden border-[#244367] bg-[#0A1526] py-0 lg:min-h-0">
       <CardHeader className="py-3 px-4 bg-[#10213A]/90 shrink-0">
         <CardTitle className="text-base font-semibold">{panel?.title ?? "No visualization"}</CardTitle>
         {sceneMetadata && (
-          <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
+          <p className="truncate text-xs text-[#87A0BE]">{sceneMetadata}</p>
+        )}
+        {syncMaster && (
+          <CardAction className="self-center">
+            <div className="flex items-center gap-3 text-xs font-medium text-[#D8E4F2]">
+              <label className="flex cursor-pointer items-center gap-2">
+                <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
+                Ground Truth
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
+                Detected Stops
+              </label>
+            </div>
+          </CardAction>
         )}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">

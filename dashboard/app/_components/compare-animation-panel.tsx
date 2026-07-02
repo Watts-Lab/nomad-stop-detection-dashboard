@@ -150,6 +150,22 @@ function DemoSceneRenderer({
         ...routeFor(previous.destination, current.destination),
       }
     }).filter((segment) => segment.end > segment.start && segment.points.length > 1)
+    const focusBuildings = [
+      ...truthStops.flatMap((stop) => buildingById.get(stop.location) ?? []),
+      ...stops.flatMap((stop) => stop.destination.id ? buildingById.get(stop.destination.id) ?? [] : []),
+    ]
+    const focusPoints = [
+      ...pings.map((ping) => [ping.x, ping.y]),
+      ...segments.flatMap((segment) => segment.points),
+    ]
+    const focusXs = [
+      ...focusPoints.map(([x]) => x),
+      ...focusBuildings.flatMap((building) => [building.minX, building.maxX]),
+    ]
+    const focusYs = [
+      ...focusPoints.map(([, y]) => y),
+      ...focusBuildings.flatMap((building) => [building.minY, building.maxY]),
+    ]
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
@@ -162,6 +178,12 @@ function DemoSceneRenderer({
       stops,
       truthStops,
       segments,
+      focusBounds: {
+        minX: Math.min(...focusXs),
+        minY: Math.min(...focusYs),
+        maxX: Math.max(...focusXs),
+        maxY: Math.max(...focusYs),
+      },
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
@@ -176,10 +198,10 @@ function DemoSceneRenderer({
     const mapEl = mapRef.current
     const mapChart = echarts.init(mapEl, null, { renderer: "canvas" })
     const timelineChart = echarts.init(timelineRef.current, null, { renderer: "canvas" })
-    const minX = Math.min(scene.bounds[0], ...chartData.buildings.map((building) => building.minX), ...scene.pings.map((ping) => ping.x))
-    const minY = Math.min(scene.bounds[1], ...chartData.buildings.map((building) => building.minY), ...scene.pings.map((ping) => ping.y))
-    const maxX = Math.max(scene.bounds[2], ...chartData.buildings.map((building) => building.maxX), ...scene.pings.map((ping) => ping.x))
-    const maxY = Math.max(scene.bounds[3], ...chartData.buildings.map((building) => building.maxY), ...scene.pings.map((ping) => ping.y))
+    const minX = chartData.focusBounds.minX
+    const minY = chartData.focusBounds.minY
+    const maxX = chartData.focusBounds.maxX
+    const maxY = chartData.focusBounds.maxY
     const xSpan = maxX - minX
     const ySpan = maxY - minY
     const xPad = Math.max(28, xSpan * 0.14)

@@ -1,6 +1,6 @@
 import { Columns2, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CompareAnimationPanel } from "./compare-animation-panel"
@@ -74,7 +74,7 @@ export function DemoView({
     <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-3xl space-y-1">
-          <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo"}</h2>
+          <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           <p className="text-sm leading-snug text-muted-foreground">
             Visualize one algorithm or compare two side by side with separate parameters.
             The map shows the trajectory and detected stops; the timeline barcode displays the stops as you move through time.
@@ -89,9 +89,6 @@ export function DemoView({
             <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
             Detected Stops
           </label>
-          <Button variant={compareMode ? "default" : "outline"} size="lg" onClick={handleCompareModeToggle} className="gap-2">
-            {compareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
-          </Button>
         </div>
       </div>
 
@@ -103,10 +100,13 @@ export function DemoView({
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">{leftAlgo?.name || "Select Algorithm"}</CardTitle>
-            </CardHeader>
             <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+              <div className="flex justify-start">
+                <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
+                  <Columns2 className="h-4 w-4" />
+                  Compare Algorithms
+                </Button>
+              </div>
               <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                 <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                 <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
@@ -141,12 +141,15 @@ export function DemoView({
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">Compare Parameters</CardTitle>
-            </CardHeader>
             <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+              <div className="flex justify-start">
+              <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
+                <Square className="h-4 w-4" />
+                Single
+              </Button>
+              </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">{leftAlgo?.name ?? "Left algorithm"}</h4>
+                <h4 className="text-sm font-medium">Algorithm A</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                   <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
@@ -161,7 +164,7 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">{rightAlgo?.name ?? "Right algorithm"}</h4>
+                <h4 className="text-sm font-medium">Algorithm B</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
                   <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>

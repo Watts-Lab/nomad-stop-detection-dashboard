@@ -10,6 +10,7 @@ import {
   sampleDataPoints,
   timelineSegments,
 } from "../_lib/dashboard-data"
+import { publicPath } from "../_lib/public-path"
 import type { DashboardView, DataPoint, TimeSegment } from "../_lib/types"
 
 const rooms = [
@@ -105,7 +106,7 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
         <div className="mx-auto grid min-h-[calc(100vh-122px)] max-w-7xl items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="max-w-2xl">
             <Image
-              src="/assets/logos/nomad_logo_hero_white_teal.svg"
+              src={publicPath("/assets/logos/nomad_logo_hero_white_teal.svg")}
               alt="NOMAD"
               width={480}
               height={85}

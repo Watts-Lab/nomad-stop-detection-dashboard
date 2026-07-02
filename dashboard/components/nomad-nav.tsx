@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
+import { publicPath } from "@/app/_lib/public-path"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
@@ -23,11 +24,12 @@ export function NomadNav() {
       <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between gap-4 px-5">
         <Link
           href="/"
+          prefetch={false}
           aria-label="Go to home"
           className="transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
         >
           <Image
-            src="/assets/logos/nomad-logo-white.svg"
+            src={publicPath("/assets/logos/nomad-logo-white.svg")}
             alt="NOMAD"
             width={212}
             height={37}
@@ -41,6 +43,7 @@ export function NomadNav() {
               {index > 0 && <span aria-hidden="true" className="text-[#3a465d]">|</span>}
               <Link
                 href={item.href}
+                prefetch={false}
                 className={`border-b-2 pb-1 transition-colors ${
                   currentView === item.view
                     ? "border-[#8acac8] text-[#f2f4eb]"
@@ -53,7 +56,7 @@ export function NomadNav() {
           ))}
         </nav>
         <Button asChild size="lg" className="h-11 bg-[#459ba4] px-6 text-[#08101c] hover:bg-[#62b8bf]">
-          <Link href="/?view=demo">Run Demo</Link>
+          <Link href="/?view=demo" prefetch={false}>Run Demo</Link>
         </Button>
       </div>
     </header>

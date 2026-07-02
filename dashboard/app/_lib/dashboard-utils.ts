@@ -1,5 +1,6 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
 import { METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS } from "./dashboard-data"
+import { publicPath } from "./public-path"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { CompareScene } from "./types"
 
@@ -11,7 +12,7 @@ export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
     field,
     data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
   })
-  return `/echarts-prototype/index.html?${params.toString()}`
+  return `${publicPath("/echarts-prototype/index.html")}?${params.toString()}`
 }
 
 export function validateAlgorithmParams(

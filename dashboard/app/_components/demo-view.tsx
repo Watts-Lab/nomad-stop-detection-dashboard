@@ -76,8 +76,15 @@ export function DemoView({
         <div className="max-w-3xl space-y-1">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           <p className="text-sm leading-snug text-muted-foreground">
-            Visualize one algorithm or compare two side by side with separate parameters.
-            The map shows the trajectory and detected stops; the timeline barcode displays the stops as you move through time.
+            {compareMode ? (
+              <>
+                Put two algorithms on the same trip and watch how their results differ. Pick Algorithm A and Algorithm B with their own parameters, then visualize the shared trajectory: both maps move on the same clock, with light-gray streets, buildings, pings, ground-truth destinations, and detected stops shown side by side so it is easy to spot when one method misses, splits, merges, or confirms a stop differently. The timelines underneath compress each run into time, making the stop spans and reveal moments easier to compare at a glance.
+              </>
+            ) : (
+              <>
+                Choose an algorithm, tune its parameters, then visualize a trajectory or try a new one; the map plays through one person&apos;s movement over light-gray streets and buildings, showing raw pings, the current ping, ground-truth destinations when enabled, and colored detected stops as they become clear. The timeline underneath is the same trip laid out over time, so you can see when pings arrive and when the algorithm turns them into confirmed stops.
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">

@@ -172,6 +172,7 @@ function DemoSceneRenderer({
     for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
 
     return {
+      streets: scene.routes?.streets ?? [],
       buildings,
       pings,
       pingData,
@@ -516,11 +517,32 @@ function DemoSceneRenderer({
       },
       series: [
         {
-          id: "buildings",
+          id: "streets",
           type: "custom",
           coordinateSystem: "cartesian2d",
           silent: true,
           z: 0,
+          data: chartData.streets.map((_, index) => index),
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const street = chartData.streets[params.dataIndex]
+            return {
+              type: "polygon",
+              shape: { points: street.coords.map((coord) => api.coord(coord)) },
+              style: {
+                fill: "#e5e7eb",
+                stroke: "#d1d5db",
+                lineWidth: 0.8,
+                opacity: 0.7,
+              },
+            }
+          },
+        },
+        {
+          id: "buildings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 1,
           data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]

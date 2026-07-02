@@ -26,7 +26,7 @@ from nomad.city_gen import City
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CITY = Path(data_folder.__file__).parent / "garden-city.gpkg"
-DEFAULT_DIARY = REPO_ROOT / "cached_results" / "stop-detection-cache" / "diary.csv"
+DEFAULT_DIARY = REPO_ROOT / "stop-detection-cache" / "diary.csv"
 DEFAULT_OUT = REPO_ROOT / "cached_results" / "stop-detection-cache" / "routes.json"
 
 
@@ -48,6 +48,22 @@ def _to_mercator(city, cells):
     frame = pd.DataFrame(cells, columns=["x", "y"])
     merc = city.to_mercator(frame.copy())
     return [_round_point(row.x, row.y) for row in merc.itertuples(index=False)]
+
+
+def _street_records(city):
+    """city: City. Returns street polygon records in Web Mercator."""
+    street_coords = city.streets_gdf.loc[:, ["id", "geometry"]].copy()
+    street_coords["coords"] = street_coords.geometry.apply(lambda geom: list(geom.exterior.coords))
+    exploded = street_coords.loc[:, ["id", "coords"]].explode("coords")
+    merc = city.to_mercator(pd.DataFrame(exploded["coords"].tolist(), columns=["x", "y"]))
+    exploded = exploded.assign(coord=[_round_point(row.x, row.y) for row in merc.itertuples(index=False)])
+    return (
+        exploded.groupby("id", sort=False)["coord"]
+        .apply(list)
+        .rename("coords")
+        .reset_index()
+        .to_dict("records")
+    )
 
 
 def build_routes(city_path, diary_path, out_path):
@@ -121,6 +137,7 @@ def build_routes(city_path, diary_path, out_path):
     payload = {
         "crs": "EPSG:3857",
         "source": "Garden City shortest paths via nomad City.get_shortest_path",
+        "streets": _street_records(city),
         "doors": doors,
         "routes": routes,
     }

@@ -87,6 +87,10 @@ type SceneCache = {
 type RoutesCache = {
   crs: string
   source: string
+  streets?: Array<{
+    id: string
+    coords: number[][]
+  }>
   doors: Array<{
     id: string
     type: string

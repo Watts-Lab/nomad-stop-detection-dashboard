@@ -1,10 +1,11 @@
-import { Columns2, Square } from "lucide-react"
+import { BarChart3, Columns2, Play, RefreshCw, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CompareAnimationPanel } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
+import { revealClass } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
@@ -71,8 +72,8 @@ export function DemoView({
   openMetricsFromDemo: () => void
 }) {
   return (
-    <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
+      <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="max-w-3xl space-y-1">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           <p className="text-sm leading-snug text-muted-foreground">
@@ -100,7 +101,7 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
@@ -130,15 +131,24 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">New Trajectory</Button>
-                <Button onClick={handleVisualize} size="lg" className="w-full">Visualize</Button>
-                <Button onClick={openMetricsFromDemo} size="lg" className="w-full">Aggregated Metrics</Button>
+                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
+                  <RefreshCw className="h-4 w-4" />
+                  New Trajectory
+                </Button>
+                <Button onClick={handleVisualize} size="lg" className="nomad-action w-full">
+                  <Play className="h-4 w-4 fill-current" />
+                  Visualize
+                </Button>
+                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full">
+                  <BarChart3 className="h-4 w-4" />
+                  Aggregated Metrics
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       ) : (
-        <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
               <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} />
@@ -186,9 +196,18 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">New Trajectory</Button>
-                <Button onClick={handleVisualize} size="lg" className="w-full">Visualize</Button>
-                <Button onClick={openMetricsFromDemo} size="lg" className="w-full">Aggregated Metrics</Button>
+                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
+                  <RefreshCw className="h-4 w-4" />
+                  New Trajectory
+                </Button>
+                <Button onClick={handleVisualize} size="lg" className="nomad-action w-full">
+                  <Play className="h-4 w-4 fill-current" />
+                  Visualize
+                </Button>
+                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full">
+                  <BarChart3 className="h-4 w-4" />
+                  Aggregated Metrics
+                </Button>
               </div>
             </CardContent>
           </Card>

@@ -130,6 +130,29 @@
       linear-gradient(180deg, #111625 0%, #111625 58%, #151b2c 100%);
   }
 
+  .nomad-page-frame {
+    width: 100%;
+    max-width: 84rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  @media (min-width: 40rem) {
+    .nomad-page-frame {
+      padding-inline: 1.25rem;
+    }
+  }
+
+  .nomad-action {
+    background: #459ba4;
+    color: #08101c;
+    font-weight: 600;
+  }
+
+  .nomad-action:hover {
+    background: #62b8bf;
+  }
+
   .nomad-hero {
     position: relative;
     overflow: hidden;
@@ -150,5 +173,133 @@
   .nomad-soft-card {
     border-color: rgb(177 192 216 / 0.14);
     background: rgb(242 244 235 / 0.045);
+  }
+
+  .nomad-interactive-card {
+    border-color: rgb(38 52 73);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .nomad-interactive-card:hover {
+    border-color: rgb(138 202 200 / 0.55);
+    box-shadow: 0 14px 30px rgb(0 0 0 / 0.18);
+    transform: translateY(-2px);
+  }
+
+  .home-copy-reveal {
+    animation: home-copy-reveal 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .page-reveal {
+    animation: page-reveal-left 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .page-reveal-up {
+    animation-name: page-reveal-up;
+  }
+
+  .page-reveal-panel {
+    animation-name: page-reveal-panel;
+  }
+
+  .home-copy-reveal-2 {
+    animation-delay: 80ms;
+  }
+
+  .page-reveal-2 {
+    animation-delay: 80ms;
+  }
+
+  .home-copy-reveal-3 {
+    animation-delay: 140ms;
+  }
+
+  .page-reveal-3 {
+    animation-delay: 140ms;
+  }
+
+  .page-reveal-4 {
+    animation-delay: 200ms;
+  }
+
+  .page-reveal-5 {
+    animation-delay: 260ms;
+  }
+
+  .page-reveal-6 {
+    animation-delay: 320ms;
+  }
+
+  .page-reveal-7 {
+    animation-delay: 380ms;
+  }
+
+  .page-reveal-8 {
+    animation-delay: 440ms;
+  }
+
+  .home-copy-reveal-4 {
+    animation-delay: 200ms;
+  }
+
+  .home-copy-reveal-5 {
+    animation-delay: 260ms;
+  }
+}
+
+@keyframes home-copy-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes page-reveal-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes page-reveal-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes page-reveal-panel {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-copy-reveal,
+  .page-reveal {
+    animation: none;
   }
 }

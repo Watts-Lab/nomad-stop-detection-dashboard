@@ -11,8 +11,6 @@ export type DemoEditableParam = ParameterConstraint & {
   label?: string
 }
 
-export const GROUND_TRUTH_PLACEHOLDER_IMAGE = "/issue-images/ground-truth-placeholder.svg"
-
 export const SEQUENTIAL_CARD_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms_card.svg"
 export const SEQUENTIAL_EXPANDED_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms.svg"
 export const DENSITY_CARD_DIAGRAM = "/assets/diagram-svgs/density_based_card.svg"

@@ -857,8 +857,8 @@ function DemoSceneRenderer({
           </TooltipProvider>
         </div>
       )}
-      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" />
-      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`}>
+      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
+      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
           <span>Timeline</span>

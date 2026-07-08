@@ -14,6 +14,7 @@ import {
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
+import { useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
   DashboardView,
@@ -157,10 +158,6 @@ function NomadDashboard() {
     }
   }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode])
 
-  const handleVisualize = useCallback(() => {
-    void runCompareVisualization(compareSeed)
-  }, [runCompareVisualization, compareSeed])
-
   const handleNewTrajectory = useCallback(() => {
     const nextSeed = compareSeed + 1
     setCompareSeed(nextSeed)
@@ -256,6 +253,8 @@ function NomadDashboard() {
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
   const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
   const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
+  const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
+  const { startTour } = useProductTour(tourReady)
 
   useEffect(() => {
     const nextRoute = dashboardRouteState(searchParamString)
@@ -342,8 +341,8 @@ function NomadDashboard() {
           handleLeftAlgorithmChange={handleLeftAlgorithmChange}
           handleRightAlgorithmChange={handleRightAlgorithmChange}
           handleNewTrajectory={handleNewTrajectory}
-          handleVisualize={handleVisualize}
           openMetricsFromDemo={openMetricsFromDemo}
+          startTour={startTour}
         />
       )}
 

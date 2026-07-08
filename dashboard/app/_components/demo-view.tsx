@@ -1,4 +1,4 @@
-import { BarChart3, Columns2, Play, RefreshCw, Square } from "lucide-react"
+import { BarChart3, Columns2, HelpCircle, RefreshCw, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -38,8 +38,8 @@ export function DemoView({
   handleLeftAlgorithmChange,
   handleRightAlgorithmChange,
   handleNewTrajectory,
-  handleVisualize,
   openMetricsFromDemo,
+  startTour,
 }: {
   compareMode: boolean
   showGroundTruth: boolean
@@ -68,25 +68,19 @@ export function DemoView({
   handleLeftAlgorithmChange: (algorithmId: string) => void
   handleRightAlgorithmChange: (algorithmId: string) => void
   handleNewTrajectory: () => void
-  handleVisualize: () => void
   openMetricsFromDemo: () => void
+  startTour: () => void
 }) {
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
-      <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
-        <div className="max-w-3xl space-y-1">
+      <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+        <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
-          <p className="text-sm leading-snug text-muted-foreground">
-            {compareMode ? (
-              <>
-                Put two algorithms on the same trip and watch how their results differ. Pick Algorithm A and Algorithm B with their own parameters, then visualize the shared trajectory: both maps move on the same clock, with light-gray streets, buildings, pings, ground-truth destinations, and detected stops shown side by side so it is easy to spot when one method misses, splits, merges, or confirms a stop differently. The timelines underneath compress each run into time, making the stop spans and reveal moments easier to compare at a glance.
-              </>
-            ) : (
-              <>
-                Choose an algorithm, tune its parameters, then visualize a trajectory or try a new one; the map plays through one person&apos;s movement over light-gray streets and buildings, showing raw pings, the current ping, ground-truth destinations when enabled, and colored detected stops as they become clear. The timeline underneath is the same trip laid out over time, so you can see when pings arrive and when the algorithm turns them into confirmed stops.
-              </>
-            )}
-          </p>
+          {!compareMode && (
+            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
@@ -107,10 +101,10 @@ export function DemoView({
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
-          <Card className="min-h-0 overflow-hidden">
+          <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
             <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto">
               <div className="flex justify-start">
-                <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
+                <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2" data-tour="tour-compare-toggle">
                   <Columns2 className="h-4 w-4" />
                   Compare Algorithms
                 </Button>
@@ -131,17 +125,13 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
-                  <RefreshCw className="h-4 w-4" />
-                  New Trajectory
-                </Button>
-                <Button onClick={handleVisualize} size="lg" className="nomad-action w-full">
-                  <Play className="h-4 w-4 fill-current" />
-                  Visualize
-                </Button>
-                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full">
+                <Button variant="outline" onClick={openMetricsFromDemo} size="lg" className="w-full">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
+                </Button>
+                <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
+                  <RefreshCw className="h-4 w-4" />
+                  New Trajectory
                 </Button>
               </div>
             </CardContent>
@@ -196,17 +186,13 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
-                  <RefreshCw className="h-4 w-4" />
-                  New Trajectory
-                </Button>
-                <Button onClick={handleVisualize} size="lg" className="nomad-action w-full">
-                  <Play className="h-4 w-4 fill-current" />
-                  Visualize
-                </Button>
-                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full">
+                <Button variant="outline" onClick={openMetricsFromDemo} size="lg" className="w-full">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
+                </Button>
+                <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
+                  <RefreshCw className="h-4 w-4" />
+                  New Trajectory
                 </Button>
               </div>
             </CardContent>

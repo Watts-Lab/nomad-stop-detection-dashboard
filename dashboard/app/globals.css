@@ -249,6 +249,87 @@
   }
 }
 
+/*
+ * driver.js's own stylesheet (driver.js/dist/driver.css) is imported as plain,
+ * unlayered CSS. Per the CSS Cascade Layers spec, unlayered rules always beat
+ * layered rules for the same property regardless of specificity, so these
+ * overrides must also stay unlayered (outside @layer components) or they lose
+ * to driver.js's defaults no matter how specific the selector is.
+ */
+.driver-popover.nomad-tour-popover {
+  background-color: #171d2e;
+  color: #f2f4eb;
+  border: 1px solid #263449;
+  border-radius: var(--radius);
+  min-width: 280px;
+  max-width: 340px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-title {
+  color: #f2f4eb;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-description {
+  color: #94a1b7;
+  line-height: 1.5;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-progress-text {
+  color: #94a1b7;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-close-btn {
+  color: #94a1b7;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-close-btn:hover {
+  color: #f2f4eb;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-footer-btn {
+  background-color: #459ba4;
+  color: #08101c;
+  text-shadow: none;
+  font-weight: 600;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-footer-btn:hover {
+  background-color: #62b8bf;
+  color: #08101c;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-prev-btn {
+  background-color: transparent;
+  color: #f2f4eb;
+  border: 1px solid #3a465d;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-prev-btn:hover {
+  background-color: #242b3d;
+  color: #f2f4eb;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #171d2e;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #171d2e;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #171d2e;
+}
+
+.driver-popover.nomad-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #171d2e;
+}
+
 @keyframes home-copy-reveal {
   from {
     opacity: 0;

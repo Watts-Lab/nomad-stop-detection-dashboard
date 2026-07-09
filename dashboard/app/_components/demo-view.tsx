@@ -72,10 +72,11 @@ export function DemoView({
   return (
     <div className="flex-1 flex flex-col p-4 gap-3 overflow-y-auto lg:overflow-hidden">
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
+        <div className="max-w-3xl space-y-1">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo"}</h2>
-          <p className="text-sm text-muted-foreground">
-            Dashboard-style preview: choose two algorithms and their own parameters, run, and inspect side-by-side map and barcode outputs.
+          <p className="text-sm leading-snug text-muted-foreground">
+            Visualize one algorithm or compare two side by side with separate parameters.
+            The map shows the trajectory and detected stops; the timeline barcode displays the stops as you move through time.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">

@@ -66,7 +66,7 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
 }) {
-  const leftMetricsPrototypeSrc = prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${metricsCompareMode ? "&legend=false" : ""}`
   const rightMetricsPrototypeSrc = prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)
 
   return (
@@ -88,8 +88,8 @@ export function MetricsView({
         </Button>
       </div>
 
-      <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch">
-        <Card className="h-full min-h-0 overflow-hidden py-0">
+      <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+        <Card className="h-full min-h-0 overflow-hidden py-0 flex flex-col">
           {!metricsCompareMode && (
             <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
               <CardTitle className="text-sm font-semibold">
@@ -98,7 +98,7 @@ export function MetricsView({
             </CardHeader>
           )}
           <CardContent className="min-h-0 flex-1 p-2">
-            <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
+            <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : ""}`}>
               <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
                 <iframe
                   key={leftMetricsPrototypeSrc}

@@ -43,19 +43,22 @@ type ManifestEntry = {
   display_name: string
   parameter_columns: string[]
   labels: string
-  configs: string
-  label_column_prefix: string
 }
 
 type Manifest = {
   config_key: string
-  parameter_columns: Record<string, string>
+  algorithm_keys: string[]
+  algorithms: Record<string, ManifestEntry>
   users: string[]
-  files: Record<string, ManifestEntry>
+  shared_files: { configs: string }
 }
 
-// One config row from configs.parquet: swept params (by abbreviated column) mapped
-// to the wide labels.parquet column that stores this config's per-ping clusters.
+// One row of the shared configs.json: swept params (full names) plus the wide
+// labels.parquet column that stores this config's per-ping clusters.
+type ConfigsFile = {
+  configs: Array<Record<string, unknown> & { algorithm: string; key: string; label_column: string }>
+}
+
 type ConfigRow = {
   params: Record<string, number>
   label_column: string
@@ -73,7 +76,6 @@ type SceneCache = {
     rings: number[][][]
   }>
   pings: Array<{
-    ping_id: number
     user_id: string
     x: number
     y: number
@@ -114,7 +116,7 @@ type CompareSceneResponse = {
   user_id: string
   bounds: [number, number, number, number]
   buildings: SceneCache["buildings"]
-  pings: Array<Omit<SceneCache["pings"][number], "user_id" | "ping_id">>
+  pings: Array<Omit<SceneCache["pings"][number], "user_id">>
   truth: Array<Omit<SceneCache["truth"][number], "user_id">>
   routes?: RoutesCache | null
 }
@@ -137,21 +139,12 @@ const ALGO_DIR: Record<string, string> = {
   hdbscan: "hdbscan",
 }
 
-// Maps the parameter names the client sends to the abbreviated cache columns.
-const PARAM_ABBREV: Record<string, string> = {
-  cell_size: "cs",
-  dist_thresh: "dt",
-  delta_roam: "dr",
-  dt_max: "dmx",
-  dur_min: "dmn",
-  time_thresh: "tt",
-  min_pts: "mp",
-  min_time: "mt",
-  min_cluster_size: "mcs",
-  // Synonyms used by some demo definitions.
-  eps_spatial: "dt",
-  T_max: "tt",
-  minPts: "mp",
+// Synonyms used by some demo definitions; the cache columns are already the
+// canonical parameter names, so most client params pass through unchanged.
+const PARAM_ALIASES: Record<string, string> = {
+  eps_spatial: "dist_thresh",
+  T_max: "time_thresh",
+  minPts: "min_pts",
 }
 
 function readJsonIfExists<T>(filePath: string): T | null {
@@ -168,6 +161,14 @@ function loadManifest(): Manifest | null {
   return manifestCache
 }
 
+let configsFileCache: ConfigsFile["configs"] | null | undefined
+function loadConfigsFile(manifest: Manifest): ConfigsFile["configs"] | null {
+  if (configsFileCache === undefined) {
+    configsFileCache = readJsonIfExists<ConfigsFile>(path.join(STOP_CACHE_DIR, manifest.shared_files.configs))?.configs ?? null
+  }
+  return configsFileCache
+}
+
 async function readParquet(relPath: string): Promise<Record<string, unknown>[] | null> {
   const file = path.join(STOP_CACHE_DIR, relPath)
   if (!fs.existsSync(file)) return null
@@ -178,34 +179,36 @@ async function readParquet(relPath: string): Promise<Record<string, unknown>[] |
 // algoDir -> config rows (params are numeric; bigint columns from parquet coerced).
 const configCache = new Map<string, ConfigRow[]>()
 
-async function loadConfigs(algoDir: string, entry: ManifestEntry): Promise<ConfigRow[] | null> {
+function loadConfigs(algoDir: string, entry: ManifestEntry, manifest: Manifest): ConfigRow[] | null {
   const cached = configCache.get(algoDir)
   if (cached) return cached
-  const rows = await readParquet(entry.configs)
-  if (!rows) return null
-  const configs = rows.map((row) => ({
-    params: Object.fromEntries(
-      entry.parameter_columns
-        .map((col) => [col, Number(row[col])] as const)
-        .filter(([, value]) => Number.isFinite(value)),
-    ),
-    label_column: String(row.label_column),
-    key: String(row.key),
-  }))
+  const allConfigs = loadConfigsFile(manifest)
+  if (!allConfigs) return null
+  const configs = allConfigs
+    .filter((row) => row.algorithm === algoDir)
+    .map((row) => ({
+      params: Object.fromEntries(
+        entry.parameter_columns
+          .map((col) => [col, Number(row[col])] as const)
+          .filter(([, value]) => Number.isFinite(value)),
+      ),
+      label_column: String(row.label_column),
+      key: String(row.key),
+    }))
   configCache.set(algoDir, configs)
   return configs
 }
 
-// algoDir -> (ping_id -> wide labels row of `${prefix}NNN` cluster columns).
-const labelCache = new Map<string, Map<number, Record<string, unknown>>>()
+// algoDir -> (`${user_id}|${timestamp}` -> wide labels row of per-config cluster columns).
+const labelCache = new Map<string, Map<string, Record<string, unknown>>>()
 
-async function loadLabels(algoDir: string, entry: ManifestEntry): Promise<Map<number, Record<string, unknown>> | null> {
+async function loadLabels(algoDir: string, entry: ManifestEntry): Promise<Map<string, Record<string, unknown>> | null> {
   const cached = labelCache.get(algoDir)
   if (cached) return cached
   const rows = await readParquet(entry.labels)
   if (!rows) return null
-  const map = new Map<number, Record<string, unknown>>()
-  for (const row of rows) map.set(Number(row.ping_id), row)
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of rows) map.set(`${row.user_id}|${Number(row.timestamp)}`, row)
   labelCache.set(algoDir, map)
   return map
 }
@@ -215,9 +218,9 @@ function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Recor
   if (configs.length === 0) return null
   const requested: Record<string, number> = {}
   for (const [name, value] of Object.entries(params)) {
-    const abbrev = PARAM_ABBREV[name]
-    if (abbrev && entry.parameter_columns.includes(abbrev) && Number.isFinite(value)) {
-      requested[abbrev] = value
+    const column = PARAM_ALIASES[name] ?? name
+    if (entry.parameter_columns.includes(column) && Number.isFinite(value)) {
+      requested[column] = value
     }
   }
   let best = configs[0]
@@ -237,25 +240,26 @@ function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Recor
   return best
 }
 
-// Returns real per-ping cluster labels aligned to orderedPingIds for one config.
+// Returns real per-ping cluster labels aligned to orderedTimestamps for one config.
 async function labelsForUser(
   algo: string,
-  orderedPingIds: number[],
+  userId: string,
+  orderedTimestamps: number[],
   params: Record<string, number>,
 ): Promise<{ labels: number[]; configKey: string } | null> {
   const manifest = loadManifest()
   if (!manifest) return null
   const algoDir = ALGO_DIR[algo] ?? algo
-  const entry = manifest.files[algoDir]
+  const entry = manifest.algorithms[algoDir]
   if (!entry) return null
-  const configs = await loadConfigs(algoDir, entry)
+  const configs = loadConfigs(algoDir, entry, manifest)
   if (!configs) return null
   const config = resolveConfig(entry, configs, params)
   if (!config) return null
   const index = await loadLabels(algoDir, entry)
   if (!index) return null
-  const labels = orderedPingIds.map((pingId) => {
-    const row = index.get(pingId)
+  const labels = orderedTimestamps.map((timestamp) => {
+    const row = index.get(`${userId}|${timestamp}`)
     return row ? Number(row[config.label_column]) : -1
   })
   return { labels, configKey: config.key }
@@ -282,9 +286,9 @@ function prettyAlgoName(algo: string): string {
   return names[algo] ?? algo.toUpperCase()
 }
 
-// Ordered ping_ids are kept alongside the client scene so labels can be joined by
-// ping_id server-side; the client scene itself omits ping_id.
-type SeedScene = { response: CompareSceneResponse; orderedPingIds: number[] }
+// The selected user and its ordered ping timestamps are kept alongside the client
+// scene so labels can be joined by (user_id, timestamp) server-side.
+type SeedScene = { response: CompareSceneResponse; userId: string; orderedTimestamps: number[] }
 
 function sceneForSeed(seed: number): SeedScene | null {
   const scenePath = path.join(STOP_CACHE_DIR, "scene.json")
@@ -320,7 +324,8 @@ function sceneForSeed(seed: number): SeedScene | null {
       truth,
       routes,
     },
-    orderedPingIds: userPings.map((ping) => ping.ping_id),
+    userId: user,
+    orderedTimestamps: userPings.map((ping) => ping.timestamp),
   }
 }
 
@@ -332,7 +337,7 @@ async function buildPanel(
 ): Promise<ComparePanelResponse> {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
-  const cachedLabels = seed ? await labelsForUser(normalized, seed.orderedPingIds, params ?? {}) : null
+  const cachedLabels = seed ? await labelsForUser(normalized, seed.userId, seed.orderedTimestamps, params ?? {}) : null
 
   return {
     algo: normalized,

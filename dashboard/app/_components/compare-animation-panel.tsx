@@ -5,6 +5,7 @@ import * as echarts from "echarts"
 import { Pause, Play, RotateCcw } from "lucide-react"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
 import {
@@ -37,6 +38,8 @@ function DemoSceneRenderer({
   syncMaster,
   showGroundTruth,
   showStops,
+  variant = "full",
+  onPreviewComplete,
 }: {
   panel: ComparePanelResponse
   mode: "single" | "compare"
@@ -45,6 +48,8 @@ function DemoSceneRenderer({
   syncMaster: boolean
   showGroundTruth: boolean
   showStops: boolean
+  variant?: "full" | "preview"
+  onPreviewComplete?: () => void
 }) {
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -151,18 +156,41 @@ function DemoSceneRenderer({
         ...routeFor(previous.destination, current.destination),
       }
     }).filter((segment) => segment.end > segment.start && segment.points.length > 1)
+    const focusBuildings = [
+      ...truthStops.flatMap((stop) => buildingById.get(stop.location) ?? []),
+      ...stops.flatMap((stop) => stop.destination.id ? buildingById.get(stop.destination.id) ?? [] : []),
+    ]
+    const focusPoints = [
+      ...pings.map((ping) => [ping.x, ping.y]),
+      ...segments.flatMap((segment) => segment.points),
+    ]
+    const focusXs = [
+      ...focusPoints.map(([x]) => x),
+      ...focusBuildings.flatMap((building) => [building.minX, building.maxX]),
+    ]
+    const focusYs = [
+      ...focusPoints.map(([, y]) => y),
+      ...focusBuildings.flatMap((building) => [building.minY, building.maxY]),
+    ]
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
     for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
 
     return {
+      streets: scene.routes?.streets ?? [],
       buildings,
       pings,
       pingData,
       stops,
       truthStops,
       segments,
+      focusBounds: {
+        minX: Math.min(...focusXs),
+        minY: Math.min(...focusYs),
+        maxX: Math.max(...focusXs),
+        maxY: Math.max(...focusYs),
+      },
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
@@ -177,10 +205,10 @@ function DemoSceneRenderer({
     const mapEl = mapRef.current
     const mapChart = echarts.init(mapEl, null, { renderer: "canvas" })
     const timelineChart = echarts.init(timelineRef.current, null, { renderer: "canvas" })
-    const minX = Math.min(scene.bounds[0], ...chartData.buildings.map((building) => building.minX), ...scene.pings.map((ping) => ping.x))
-    const minY = Math.min(scene.bounds[1], ...chartData.buildings.map((building) => building.minY), ...scene.pings.map((ping) => ping.y))
-    const maxX = Math.max(scene.bounds[2], ...chartData.buildings.map((building) => building.maxX), ...scene.pings.map((ping) => ping.x))
-    const maxY = Math.max(scene.bounds[3], ...chartData.buildings.map((building) => building.maxY), ...scene.pings.map((ping) => ping.y))
+    const minX = chartData.focusBounds.minX
+    const minY = chartData.focusBounds.minY
+    const maxX = chartData.focusBounds.maxX
+    const maxY = chartData.focusBounds.maxY
     const xSpan = maxX - minX
     const ySpan = maxY - minY
     const xPad = Math.max(28, xSpan * 0.14)
@@ -432,6 +460,10 @@ function DemoSceneRenderer({
       const span = chartData.timeSequence[chartData.timeSequence.length - 1] - chartData.timeSequence[0]
       seekTo(Math.max(chartData.timeSequence[0], Math.min(chartData.timeSequence[chartData.timeSequence.length - 1], activeTime + Math.sign(event.deltaY) * Math.max(10, span / 360))))
     }
+    const frameDelay = variant === "preview" ? 30 : 60
+    const startDelay = variant === "preview" ? 150 : 300
+    const initialDelay = variant === "preview" ? 1000 : 300
+    const toggleDelay = variant === "preview" ? 80 : 160
     const advance = () => {
       if (paused || !syncMaster) return
       sequenceIndex = Math.min(sequenceIndex + 1, chartData.timeSequence.length - 1)
@@ -439,14 +471,15 @@ function DemoSceneRenderer({
       const previousStopCount = detectedCountFor(chartData.timeSequence[Math.max(0, sequenceIndex - 1)])
       onTimeChange(timestampSeconds)
       if (detectedCountFor(timestampSeconds) > previousStopCount) {
-        timer = window.setTimeout(advance, 60)
+        timer = window.setTimeout(advance, frameDelay)
         return
       }
       if (sequenceIndex < chartData.timeSequence.length - 1) {
-        timer = window.setTimeout(advance, 60)
+        timer = window.setTimeout(advance, frameDelay)
       } else {
         paused = true
         syncPlaybackState()
+        if (variant === "preview") onPreviewComplete?.()
       }
     }
     const replay = () => {
@@ -455,12 +488,12 @@ function DemoSceneRenderer({
       sequenceIndex = 0
       onTimeChange(chartData.timeSequence[0])
       setPlaybackState("playing")
-      if (syncMaster) timer = window.setTimeout(advance, 300)
+      if (syncMaster) timer = window.setTimeout(advance, startDelay)
     }
     const toggle = () => {
       paused = !paused
       syncPlaybackState()
-      if (!paused && syncMaster) timer = window.setTimeout(advance, 160)
+      if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
     const resize = () => {
       mapChart.resize()
@@ -495,11 +528,32 @@ function DemoSceneRenderer({
       },
       series: [
         {
-          id: "buildings",
+          id: "streets",
           type: "custom",
           coordinateSystem: "cartesian2d",
           silent: true,
           z: 0,
+          data: chartData.streets.map((_, index) => index),
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const street = chartData.streets[params.dataIndex]
+            return {
+              type: "polygon",
+              shape: { points: street.coords.map((coord) => api.coord(coord)) },
+              style: {
+                fill: "#e5e7eb",
+                stroke: "#d1d5db",
+                lineWidth: 0.8,
+                opacity: 0.7,
+              },
+            }
+          },
+        },
+        {
+          id: "buildings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 1,
           data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
@@ -716,7 +770,9 @@ function DemoSceneRenderer({
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
     }
-    const initialTimestamp = selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    const initialTimestamp = variant === "preview"
+      ? chartData.timeSequence[0]
+      : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
     sequenceIndex = chartData.timeSequence.findIndex((timestamp) => timestamp >= initialTimestamp)
     if (sequenceIndex < 0) sequenceIndex = chartData.timeSequence.length - 1
     paused = true
@@ -726,6 +782,7 @@ function DemoSceneRenderer({
     timelineEl.style.cursor = "ew-resize"
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
+    if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
     const flashTimer = window.setInterval(() => {
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
       // Stop blinking once playback has reached the end of the timeline.
@@ -748,12 +805,12 @@ function DemoSceneRenderer({
       mapChart.dispose()
       timelineChart.dispose()
     }
-  }, [chartData, onTimeChange, scene, showGroundTruth, showStops, syncMaster])
+  }, [chartData, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
 
   useEffect(() => {
     if (!chartData || currentTime !== null) return
-    onTimeChange(chartData.timeSequence[chartData.timeSequence.length - 1])
-  }, [chartData, currentTime, onTimeChange])
+    onTimeChange(variant === "preview" ? chartData.timeSequence[0] : chartData.timeSequence[chartData.timeSequence.length - 1])
+  }, [chartData, currentTime, onTimeChange, variant])
 
   useEffect(() => {
     if (!chartData || currentTime === null) return
@@ -765,7 +822,7 @@ function DemoSceneRenderer({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
-      {syncMaster && (
+      {syncMaster && variant === "full" && (
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
             <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-white/92 px-1 py-1 shadow-sm">
@@ -801,8 +858,8 @@ function DemoSceneRenderer({
           </TooltipProvider>
         </div>
       )}
-      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" />
-      <div className={`flex shrink-0 flex-col bg-white ${mode === "single" ? "h-28" : "h-24"}`}>
+      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
+      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
           <span>Timeline</span>
@@ -839,9 +896,9 @@ export function CompareAnimationPanel({
   const sceneMetadata = panel?.scene ? `Trajectory: ${panel.scene.user_id}` : null
 
   return (
-    <Card className="h-full min-h-[520px] overflow-hidden border-[#244367] bg-[#0A1526] py-0 lg:min-h-0">
-      <CardHeader className="py-3 px-4 bg-[#10213A]/90 shrink-0">
-        <CardTitle className="text-base font-semibold">{panel?.title ?? "No visualization"}</CardTitle>
+    <Card className="h-full min-h-[520px] overflow-hidden py-0 lg:min-h-0">
+      <CardHeader className="py-3 px-4 shrink-0">
+        <CardTitle className="text-base font-semibold">{panel?.title ?? "Preparing visualization"}</CardTitle>
         {sceneMetadata && (
           <p className="truncate text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
@@ -866,9 +923,50 @@ export function CompareAnimationPanel({
             <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} />
           </div>
         ) : (
-          <div className="min-h-0 w-full flex-1 rounded-md border border-dashed border-border bg-muted/40" />
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
+            <Skeleton className="flex-1 rounded-none bg-[#202738]" />
+            <div className="h-24 border-t border-[#263449] bg-[#151b2c] p-4">
+              <Skeleton className="h-4 w-full bg-[#202738]" />
+              <Skeleton className="mt-4 h-4 w-2/3 bg-[#202738]" />
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+export function StopRunPreview({
+  panel,
+  currentTime,
+  onTimeChange,
+  onComplete,
+}: {
+  panel: ComparePanelResponse | null | undefined
+  currentTime: number | null
+  onTimeChange: (timestamp: number) => void
+  onComplete?: () => void
+}) {
+  if (!panel?.scene) {
+    return (
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
+        <Skeleton className="flex-1 rounded-none bg-[#202738]" />
+        <Skeleton className="m-4 h-4 bg-[#202738]" />
+      </div>
+    )
+  }
+
+  return (
+    <DemoSceneRenderer
+      panel={panel}
+      mode="single"
+      currentTime={currentTime}
+      onTimeChange={onTimeChange}
+      syncMaster
+      showGroundTruth
+      showStops
+      variant="preview"
+      onPreviewComplete={onComplete}
+    />
   )
 }

@@ -1,7 +1,26 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
-import { METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS } from "./dashboard-data"
+import { DASHBOARD_VIEWS, METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
 import type { AlgorithmDefinition } from "./dashboard-data"
-import type { CompareScene } from "./types"
+import type { CompareScene, DashboardView } from "./types"
+
+export function dashboardRouteState(searchParamString: string) {
+  const params = new URLSearchParams(searchParamString)
+  const rawView = params.get("view")
+  const activeView: DashboardView = rawView && DASHBOARD_VIEWS.has(rawView as DashboardView)
+    ? (rawView as DashboardView)
+    : "home"
+  const rawAlgo = params.get("algo")
+  const expandedAlgorithm = activeView === "learn" && rawAlgo && algorithms.some((a) => a.id === rawAlgo) ? rawAlgo : null
+  const compareMode = activeView === "demo" && params.get("mode") === "compare"
+
+  return { activeView, expandedAlgorithm, compareMode }
+}
+
+export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1) {
+  const variantClass = variant === "up" ? "page-reveal-up" : variant === "panel" ? "page-reveal-panel" : ""
+  const delayClass = delay > 1 ? `page-reveal-${Math.min(delay, 8)}` : ""
+  return ["page-reveal", variantClass, delayClass].filter(Boolean).join(" ")
+}
 
 export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
   const field = sweepParameter || "delta_roam"

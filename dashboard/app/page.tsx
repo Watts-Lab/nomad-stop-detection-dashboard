@@ -7,14 +7,14 @@ import { HomeView } from "./_components/home-view"
 import { LearnView } from "./_components/learn-view"
 import { MetricsView } from "./_components/metrics-view"
 import {
-  DASHBOARD_VIEWS,
   DEMO_ALGORITHM_IDS,
   FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
   METRICS_SWEEP_PARAMETERS,
   algorithms,
 } from "./_lib/dashboard-data"
-import { validateAlgorithmParams } from "./_lib/dashboard-utils"
+import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
+import { useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
   DashboardView,
@@ -28,9 +28,11 @@ function NomadDashboard() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [activeView, setActiveView] = useState<DashboardView>("home")
-  const [expandedAlgorithm, setExpandedAlgorithm] = useState<string | null>(null)
-  const [compareMode, setCompareMode] = useState(false)
+  const searchParamString = searchParams.toString()
+  const initialRoute = dashboardRouteState(searchParamString)
+  const [activeView, setActiveView] = useState<DashboardView>(initialRoute.activeView)
+  const [expandedAlgorithm, setExpandedAlgorithm] = useState<string | null>(initialRoute.expandedAlgorithm)
+  const [compareMode, setCompareMode] = useState(initialRoute.compareMode)
   const [leftAlgorithm, setLeftAlgorithm] = useState("dbstop")
   const [rightAlgorithm, setRightAlgorithm] = useState("seqscan")
   const [leftParams, setLeftParams] = useState<Record<string, string>>({})
@@ -54,7 +56,7 @@ function NomadDashboard() {
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParamString)
     if (view === "home") {
       params.delete("view")
       params.delete("algo")
@@ -74,7 +76,7 @@ function NomadDashboard() {
     }
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-  }, [compareMode, pathname, router, searchParams])
+  }, [compareMode, pathname, router, searchParamString])
 
   const runCompareVisualization = useCallback(async (seed: number) => {
     const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
@@ -155,10 +157,6 @@ function NomadDashboard() {
       setCompareLoading(false)
     }
   }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode])
-
-  const handleVisualize = useCallback(() => {
-    void runCompareVisualization(compareSeed)
-  }, [runCompareVisualization, compareSeed])
 
   const handleNewTrajectory = useCallback(() => {
     const nextSeed = compareSeed + 1
@@ -255,22 +253,15 @@ function NomadDashboard() {
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
   const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
   const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
+  const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
+  const { startTour } = useProductTour(tourReady)
 
   useEffect(() => {
-    const rawView = searchParams.get("view")
-    const nextView: DashboardView = rawView && DASHBOARD_VIEWS.has(rawView as DashboardView)
-      ? (rawView as DashboardView)
-      : "home"
-    const rawAlgo = searchParams.get("algo")
-    const hasAlgo = Boolean(rawAlgo && algorithms.some((a) => a.id === rawAlgo))
-    const nextExpanded = nextView === "learn" && hasAlgo ? rawAlgo : null
-    const rawMode = searchParams.get("mode")
-    const nextCompareMode = nextView === "demo" && rawMode === "compare"
-
-    setActiveView(nextView)
-    setExpandedAlgorithm(nextExpanded)
-    setCompareMode(nextCompareMode)
-  }, [searchParams])
+    const nextRoute = dashboardRouteState(searchParamString)
+    setActiveView(nextRoute.activeView)
+    setExpandedAlgorithm(nextRoute.expandedAlgorithm)
+    setCompareMode(nextRoute.compareMode)
+  }, [searchParamString])
 
   useEffect(() => {
     if (activeView === "demo") {
@@ -304,7 +295,7 @@ function NomadDashboard() {
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
-      <NomadNav />
+      <NomadNav currentView={activeView} />
 
       {activeView === "home" && (
         <HomeView navigateTo={navigateTo} />
@@ -350,8 +341,8 @@ function NomadDashboard() {
           handleLeftAlgorithmChange={handleLeftAlgorithmChange}
           handleRightAlgorithmChange={handleRightAlgorithmChange}
           handleNewTrajectory={handleNewTrajectory}
-          handleVisualize={handleVisualize}
           openMetricsFromDemo={openMetricsFromDemo}
+          startTour={startTour}
         />
       )}
 

@@ -1,9 +1,13 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Columns2, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { prototypeChartSrc } from "../_lib/dashboard-utils"
+import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import type { MetricsParameterNote } from "../_lib/types"
 
 function MetricsParameterRows({
@@ -31,6 +35,39 @@ function MetricsParameterRows({
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function MetricsFrame({
+  src,
+  title,
+}: {
+  src: string
+  title: string
+}) {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+  }, [src])
+
+  return (
+    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30">
+      {loading && (
+        <div className="absolute inset-0 z-10 grid gap-3 bg-[#111625] p-4">
+          <Skeleton className="h-7 w-1/3 bg-[#202738]" />
+          <Skeleton className="h-full bg-[#202738]" />
+          <Skeleton className="h-5 w-2/3 bg-[#202738]" />
+        </div>
+      )}
+      <iframe
+        key={src}
+        src={src}
+        title={title}
+        onLoad={() => setLoading(false)}
+        className="h-full w-full border-0"
+      />
     </div>
   )
 }
@@ -70,8 +107,8 @@ export function MetricsView({
   const rightMetricsPrototypeSrc = prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)
 
   return (
-    <div className="flex-1 flex flex-col p-3 gap-3 min-h-0 overflow-hidden">
-      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
+      <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
           <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
           <p className="text-sm text-muted-foreground">
@@ -88,7 +125,7 @@ export function MetricsView({
         </Button>
       </div>
 
-      <div className="grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden">
+      <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
         <Card className="h-full min-h-0 overflow-hidden py-0 flex flex-col">
           {!metricsCompareMode && (
             <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
@@ -98,25 +135,11 @@ export function MetricsView({
             </CardHeader>
           )}
           <CardContent className="min-h-0 flex-1 p-2">
-            <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : ""}`}>
-              <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                <iframe
-                  key={leftMetricsPrototypeSrc}
-                  src={leftMetricsPrototypeSrc}
-                  title={`${metricsLeftAlgorithm} aggregated metrics`}
-                  className="h-full w-full border-0"
-                />
-              </div>
+            <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
+              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} />
 
               {metricsCompareMode && (
-                <div className="h-full min-h-0 rounded-md border border-border bg-muted/30 overflow-hidden">
-                  <iframe
-                    key={rightMetricsPrototypeSrc}
-                    src={rightMetricsPrototypeSrc}
-                    title={`${metricsRightAlgorithm} aggregated metrics`}
-                    className="h-full w-full border-0"
-                  />
-                </div>
+                <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} />
               )}
             </div>
           </CardContent>

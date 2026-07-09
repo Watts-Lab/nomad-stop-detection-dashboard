@@ -9,7 +9,7 @@ import type { CompareApiResponse, DashboardView } from "../_lib/types"
 
 const HOME_PREVIEW_RUNS = [
   { label: "DBSTOP · dist_thresh 10", algo: "dbstop", params: { dist_thresh: 10, time_thresh: 60, min_pts: 3, dur_min: 5 } },
-  { label: "Lachesis · delta_roam 25", algo: "lachesis", params: { dt_max: 60, delta_roam: 25, dur_min: 5 } },
+  { label: "Lachesis · Δroam 25", algo: "lachesis", params: { dt_max: 60, delta_roam: 25, dur_min: 5 } },
   { label: "SeqScan · dist_thresh 20", algo: "seqscan", params: { dist_thresh: 20, time_thresh: 60, min_pts: 2, dur_min: 5 } },
   { label: "ST-DBSCAN · eps 15", algo: "dbscan", params: { eps_spatial: 15, T_max: 60, minPts: 3 } },
   { label: "Grid-based · cell 100", algo: "gridbased", params: { cell_size: 100, min_time: 5 } },

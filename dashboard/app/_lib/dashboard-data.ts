@@ -159,11 +159,11 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   Lachesis: [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "delta_roam", label: "Δroam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   Sequential: [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "delta_roam", label: "Δroam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   SeqScan: [

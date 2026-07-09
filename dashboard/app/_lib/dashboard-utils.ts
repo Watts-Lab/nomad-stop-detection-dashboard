@@ -22,10 +22,14 @@ export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1
   return ["page-reveal", variantClass, delayClass].filter(Boolean).join(" ")
 }
 
+export function parameterDisplayName(name: string) {
+  return name === "delta_roam" ? "Δroam" : name
+}
+
 export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
   const params = new URLSearchParams({
     title: `${algorithm} aggregated metrics (prototype)`,
-    x: sweepParameter || "delta_roam",
+    x: parameterDisplayName(sweepParameter || "delta_roam"),
     field: "delta_roam",
   })
   return `/echarts-prototype/index.html?${params.toString()}`

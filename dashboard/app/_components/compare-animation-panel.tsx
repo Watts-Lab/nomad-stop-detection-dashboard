@@ -7,10 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
-import {
-  assignDemoClusters,
-  darkenHex,
-} from "../_lib/dashboard-utils"
+import { assignDemoClusters } from "../_lib/dashboard-utils"
 import type {
   ComparePanelResponse,
   EChartsApi,
@@ -18,16 +15,6 @@ import type {
 } from "../_lib/types"
 
 const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
-const DEMO_BUILDING_COLORS: Record<string, string> = {
-  home: "#d3d7d0",
-  workplace: "#c8d8dd",
-  work: "#c8d8dd",
-  park: "#c6dcc1",
-  school: "#d7d0df",
-  retail: "#ded3c5",
-  shop: "#ded3c5",
-  building: "#d4d5d1",
-}
 
 function DemoSceneRenderer({
   panel,
@@ -129,7 +116,6 @@ function DemoSceneRenderer({
         isFallback: !cached,
       }
     }
-    const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
     const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
       ...stop,
       destination: destinationFor(stop.x, stop.y),
@@ -193,7 +179,6 @@ function DemoSceneRenderer({
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
-      durMinSec: revealDelay,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
   }, [labels, panel.params, scene])
@@ -239,6 +224,7 @@ function DemoSceneRenderer({
     const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
     const noisePings = chartData.pingData.filter((point) => point[2] < 0)
     const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
+    const blockSide = Math.abs(chartData.streets[0].coords[1][1] - chartData.streets[0].coords[0][1])
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -254,13 +240,19 @@ function DemoSceneRenderer({
     let sequenceIndex = 0
     let paused = true
     let timer = 0
-    let flashOn = false
+    let pulsePhase = 0
+    let pulseStrength = 0
     const syncPlaybackState = () => {
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
       setPlaybackState(atEnd && paused ? "complete" : paused ? "paused" : "playing")
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
+    const pingCircle = (api: EChartsApi) => {
+      const center = api.coord([api.value(0), api.value(1)])
+      const edge = api.coord([api.value(0) + blockSide / 8, api.value(1)])
+      return { center, radius: Math.abs(edge[0] - center[0]) }
+    }
     const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
       const target = segment.length * Math.max(0, progress)
       const drawn = [segment.points[0]]
@@ -315,13 +307,6 @@ function DemoSceneRenderer({
       while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
       return count
     }
-    const durMinLinesAt = (timestampSeconds: number) =>
-      chartData.stops.flatMap((stop) => {
-        const members = chartData.pings.filter((ping) => ping.cluster === stop.cluster && ping.t <= timestampSeconds)
-        if (members.length === 0) return []
-        const firstPing = members[0]
-        return [[firstPing.t * 1000, (firstPing.t + chartData.durMinSec) * 1000, stop.cluster, stop.index]]
-      })
     const groundTruthAt = (timestampSeconds: number) => {
       const current = chartData.truthStops.find((truth) =>
         timestampSeconds >= truth.timestamp && timestampSeconds <= truth.timestamp + truth.duration * 60
@@ -333,8 +318,8 @@ function DemoSceneRenderer({
       const truth = groundTruthAt(timestampSeconds)
       return chartData.buildings.map((building, index) => [
         index,
-        showGroundTruth && building.id === truth.current?.location && flashOn
-          ? 1
+        showGroundTruth && building.id === truth.current?.location
+          ? 1 + pulseStrength
           : showGroundTruth && building.id === truth.next?.location
             ? 2
             : 0,
@@ -404,7 +389,6 @@ function DemoSceneRenderer({
       }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
-          { id: "dur-min-lines", data: durMinLinesAt(timestampSeconds) },
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
@@ -504,6 +488,7 @@ function DemoSceneRenderer({
     mapChart.setOption({
       animation: true,
       animationDurationUpdate: 120,
+      backgroundColor: "#d2d2d2",
       grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
       xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
       yAxis: { type: "value", min: bounds.yMin, max: bounds.yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
@@ -539,10 +524,9 @@ function DemoSceneRenderer({
               type: "polygon",
               shape: { points: street.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: "#e5e7eb",
-                stroke: "#d1d5db",
-                lineWidth: 0.8,
-                opacity: 0.7,
+                fill: "#d2d2d2",
+                stroke: "#d2d2d2",
+                lineWidth: 1,
               },
             }
           },
@@ -556,17 +540,18 @@ function DemoSceneRenderer({
           data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
-            const fill = DEMO_BUILDING_COLORS[building.type] ?? DEMO_BUILDING_COLORS.building
             const state = Number(api.value(1))
+            const isCurrent = state > 0 && state < 2
+            const currentPulse = isCurrent ? state - 1 : 0
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: state === 2 ? "#b7dcd8" : fill,
-                stroke: state === 1 ? darkenHex(fill, 0.48) : state === 2 ? "#65a9a4" : "#ffffff",
-                lineWidth: state === 1 ? 3 : state === 2 ? 1.5 : 1,
-                shadowBlur: state === 1 ? 8 : 0,
-                shadowColor: state === 1 ? darkenHex(fill, 0.55) : "transparent",
+                fill: "#8b8b8b",
+                stroke: isCurrent ? `rgba(15, 118, 110, ${0.55 + currentPulse * 0.4})` : "#ffffff",
+                lineWidth: isCurrent ? 2.2 + currentPulse * 1.2 : 2,
+                shadowBlur: isCurrent ? 5 + currentPulse * 9 : 0,
+                shadowColor: isCurrent ? `rgba(15, 118, 110, ${0.18 + currentPulse * 0.32})` : "transparent",
               },
             }
           },
@@ -649,11 +634,38 @@ function DemoSceneRenderer({
           },
         },
         { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: chartData.pingData, symbolSize: 5, itemStyle: { color: "rgba(31, 35, 38, 0.13)" } },
-        { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 7, itemStyle: { color: "rgba(31, 35, 38, 0.72)" } },
-        { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
-        { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
-        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
-        { id: "ground-truth-marker", name: "Ground truth position", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 9, data: [], symbolSize: 11, itemStyle: { color: "#0f766e", borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(15, 118, 110, 0.35)" } },
+        { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
+        {
+          id: "cluster-pings",
+          name: "Cluster pings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          z: 6,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const circle = pingCircle(api)
+            return {
+              type: "group",
+              children: [
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius }, style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6, opacity: 0.75 } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: 3.6 }, style: { fill: "#000000" } },
+              ],
+            }
+          },
+        },
+        {
+          id: "detected-stops",
+          name: "Detected stops",
+          type: "scatter",
+          coordinateSystem: "cartesian2d",
+          z: 7,
+          data: [],
+          symbol: "diamond",
+          symbolSize: 20,
+          itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" },
+        },
+        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 9, data: [], symbolSize: 9, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.5, brushType: "stroke" }, itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.4, opacity: 0.95 } },
+        { id: "ground-truth-marker", name: "Ground truth position", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 8, data: [], symbolSize: 8, itemStyle: { color: "#0f766e", borderColor: "#ffffff", borderWidth: 1.5, shadowBlur: 5, shadowColor: "rgba(15, 118, 110, 0.28)" } },
         {
           id: "direction-arrows",
           name: "Travel direction",
@@ -718,28 +730,7 @@ function DemoSceneRenderer({
             const ping = chartData.pings[params.dataIndex]
             const top = api.coord([ping.t * 1000, 0.72])
             const bottom = api.coord([ping.t * 1000, 0.28])
-            return { type: "line", shape: { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }, style: { stroke: "rgba(32, 33, 36, 0.18)", lineWidth: 1 } }
-          },
-        },
-        {
-          id: "dur-min-lines",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 3,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const lineStart = api.coord([api.value(0), 0.77])
-            const lineEnd = api.coord([api.value(1), 0.77])
-            const tickTop = api.coord([api.value(1), 0.8])
-            const color = clusterColor(Number(api.value(2)))
-            return {
-              type: "group",
-              children: [
-                { type: "line", shape: { x1: lineStart[0], y1: lineStart[1], x2: lineEnd[0], y2: lineEnd[1] }, style: { stroke: color, lineWidth: 3, opacity: 0.9 } },
-                { type: "line", shape: { x1: lineEnd[0], y1: tickTop[1], x2: lineEnd[0], y2: lineStart[1] }, style: { stroke: color, lineWidth: 2, opacity: 0.85 } },
-              ],
-            }
+            return { type: "line", shape: { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }, style: { stroke: clusterColor(ping.cluster), lineWidth: 2.5, opacity: 0.85 } }
           },
         },
         {
@@ -755,7 +746,7 @@ function DemoSceneRenderer({
               { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
               { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
             )
-            return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.44 } } : null
+            return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.4 } } : null
           },
         },
         { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 5, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
@@ -782,17 +773,17 @@ function DemoSceneRenderer({
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
-    const flashTimer = window.setInterval(() => {
+    const pulseTimer = window.setInterval(() => {
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
-      // Stop blinking once playback has reached the end of the timeline.
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
-      flashOn = ended ? false : !flashOn
+      pulsePhase = ended ? 0 : pulsePhase + 0.24
+      pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({ series: [{ id: "buildings", data: buildingsSeriesData(timestampSeconds) }] })
-    }, 500)
+    }, 80)
 
     return () => {
       window.clearTimeout(timer)
-      window.clearInterval(flashTimer)
+      window.clearInterval(pulseTimer)
       window.removeEventListener("resize", resize)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)

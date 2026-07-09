@@ -1,7 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { DEMO_EDITABLE_PARAMS } from "../_lib/dashboard-data"
-import { paramInputValue } from "../_lib/dashboard-utils"
+import { paramInputValue, parameterDisplayName } from "../_lib/dashboard-utils"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 
 export type ParamStateSetter = (value: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void
@@ -30,7 +30,11 @@ export function DemoParameterControls({
       {algo.parameters.map((param) => {
         const rule = editableRules[param.name]
         const value = Number(paramInputValue(values, param.name, param.defaultValue))
-        const label = rule?.label ?? param.name
+        const label = rule?.label ?? (
+          param.name === "delta_roam"
+            ? <span className="inline-flex items-baseline gap-0.5 font-sans">Δ<sub className="text-[0.7em] leading-none">roam</sub></span>
+            : param.name
+        )
         const optionCount = rule ? Math.floor((rule.max - rule.min) / rule.step) + 1 : 0
         const discreteOptions = rule?.allowedValues ?? (
           rule && optionCount > 0 && optionCount <= 5
@@ -42,7 +46,7 @@ export function DemoParameterControls({
           return (
             <div key={param.name} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-mono text-muted-foreground">{param.name}</span>
+                <span className="text-xs font-mono text-muted-foreground">{label}</span>
                 <span className="text-xs font-mono text-foreground">{param.defaultValue}</span>
               </div>
             </div>
@@ -104,7 +108,7 @@ export function DemoParameterControls({
       })}
       {Object.keys(errors).length > 0 && (
         <p className="text-xs text-red-500">
-          {Object.entries(errors).map(([key, value]) => `${key}: ${value}`).join(" · ")}
+          {Object.entries(errors).map(([key, value]) => `${parameterDisplayName(key)}: ${value}`).join(" · ")}
         </p>
       )}
     </div>

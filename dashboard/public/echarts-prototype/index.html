@@ -29,7 +29,7 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const chartTitle = params.get("title") || "Lachesis aggregated metrics prototype";
-    const xLabel = params.get("x") || "delta_roam";
+    const xLabel = params.get("x") || "Δroam";
     const xField = params.get("field") || "delta_roam";
     const DATA_URL = "./lachesis_results.json";
 

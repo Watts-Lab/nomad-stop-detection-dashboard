@@ -50,7 +50,7 @@ function NomadDashboard() {
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
-  const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential")
+  const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
   const [metricsError, setMetricsError] = useState<string | null>(null)
@@ -175,7 +175,7 @@ function NomadDashboard() {
       const data = (await res.json()) as MetricsOptionsResponse
       setMetricsOptions(data)
       setMetricsLeftAlgorithm(data.defaults.left_algorithm ?? "Lachesis")
-      setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential")
+      setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential (Centroid)")
     } catch (err) {
       setMetricsError(err instanceof Error ? err.message : "Failed to load metrics options")
     }
@@ -247,7 +247,7 @@ function NomadDashboard() {
   const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
   const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
-  const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential"]
+  const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential (Centroid)"]
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]

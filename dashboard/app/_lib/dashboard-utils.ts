@@ -1,5 +1,5 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
-import { DASHBOARD_VIEWS, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
+import { DASHBOARD_VIEWS, METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { CompareScene, DashboardView } from "./types"
 
@@ -23,10 +23,11 @@ export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1
 }
 
 export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
+  const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
-    title: `${algorithm} aggregated metrics (prototype)`,
-    x: sweepParameter || "delta_roam",
-    field: "delta_roam",
+    x: field,
+    field,
+    data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
   })
   return `/echarts-prototype/index.html?${params.toString()}`
 }

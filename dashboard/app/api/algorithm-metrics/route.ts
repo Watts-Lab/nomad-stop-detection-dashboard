@@ -34,7 +34,16 @@ const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
   : path.resolve(process.cwd(), "..", "cached_results")
 
 const DEFAULT_OPTIONS: MetricsOptionsResponse = {
-  algorithms: ["Lachesis", "Sequential", "SeqScan", "ST-DBSCAN", "DBSTOP"],
+  algorithms: [
+    "Lachesis",
+    "Sequential (Centroid)",
+    "Sequential (First)",
+    "SeqScan",
+    "ST-DBSCAN",
+    "DBSTOP",
+    "HDBSCAN",
+    "Grid-Based",
+  ],
   trajectories: [
     { user_id: "cached-user-001", label: "Cached trajectory 001" },
     { user_id: "cached-user-002", label: "Cached trajectory 002" },
@@ -47,10 +56,15 @@ const DEFAULT_OPTIONS: MetricsOptionsResponse = {
       sweep_note: "UI sweep is scaled as 1.7 x value for Lachesis.",
       fixed_parameters: ["dt_max=60", "dur_min=5"],
     },
-    Sequential: {
+    "Sequential (Centroid)": {
       source: "delta_roam_vs_acc_exp.ipynb",
       sweep_parameter: "delta_roam",
       fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
+    },
+    "Sequential (First)": {
+      source: "delta_roam_vs_acc_exp.ipynb",
+      sweep_parameter: "delta_roam",
+      fixed_parameters: ["dt_max=60", "method='sliding'", "dur_min=5"],
     },
     SeqScan: {
       source: "dist_thresh_vs_acc_exp.ipynb",
@@ -67,11 +81,21 @@ const DEFAULT_OPTIONS: MetricsOptionsResponse = {
       sweep_parameter: "dist_thresh",
       fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "back_merge=False"],
     },
+    HDBSCAN: {
+      source: "cached_results/stop-detection-cache/hdbscan",
+      sweep_parameter: "dist_thresh",
+      fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "min_cluster_size=1"],
+    },
+    "Grid-Based": {
+      source: "cached_results/stop-detection-cache/gridbased",
+      sweep_parameter: "cell_size",
+      fixed_parameters: ["min_time=5", "min_cluster_size=2"],
+    },
   },
   defaults: {
     mode: "compare",
     left_algorithm: "Lachesis",
-    right_algorithm: "Sequential",
+    right_algorithm: "Sequential (Centroid)",
     iterations: 100,
     sweep_min: 5,
     sweep_max: 50,
@@ -80,10 +104,13 @@ const DEFAULT_OPTIONS: MetricsOptionsResponse = {
   },
   sweep_limits: {
     Lachesis: { min: 5, max: 50 },
-    Sequential: { min: 5, max: 50 },
+    "Sequential (Centroid)": { min: 5, max: 50 },
+    "Sequential (First)": { min: 5, max: 50 },
     SeqScan: { min: 1, max: 50 },
     "ST-DBSCAN": { min: 1, max: 50 },
     DBSTOP: { min: 1, max: 50 },
+    HDBSCAN: { min: 1, max: 50 },
+    "Grid-Based": { min: 25, max: 500 },
   },
   max_iterations: 500,
 }

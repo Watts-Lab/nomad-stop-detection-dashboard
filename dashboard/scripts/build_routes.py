@@ -9,15 +9,14 @@ Run from the repository root:
     python dashboard/scripts/build_routes.py
 
 The output JSON is consumed by app/api/algorithm-compare/route.ts (RoutesCache) and
-keyed by "<from_id>-><to_id>". Building pairs are taken from the cached diary so we
-only compute routes the demo can actually use.
+keyed by "<from_id>-><to_id>". Building pairs are taken from the cached scene truth
+so we only compute routes the demo can actually use.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +25,7 @@ from nomad.city_gen import City
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CITY = Path(data_folder.__file__).parent / "garden-city.gpkg"
-DEFAULT_DIARY = REPO_ROOT / "stop-detection-cache" / "diary.csv"
+DEFAULT_SCENE = REPO_ROOT / "cached_results" / "stop-detection-cache" / "scene.json"
 DEFAULT_OUT = REPO_ROOT / "cached_results" / "stop-detection-cache" / "routes.json"
 
 
@@ -66,14 +65,14 @@ def _street_records(city):
     )
 
 
-def build_routes(city_path, diary_path, out_path):
+def build_routes(city_path, scene_path, out_path):
     city = City.from_geopackage(str(city_path))
-    city.compute_shortest_paths()
+    city.compute_shortest_paths(callable_only=True)
     buildings = city.buildings_gdf.set_index("id")
 
-    diary = pd.read_csv(diary_path)
+    scene = json.loads(Path(scene_path).read_text(encoding="utf-8"))
     building_ids = sorted(
-        {loc for loc in diary["location"].dropna().astype(str) if loc.strip()}
+        {str(stop["location"]) for stop in scene["truth"] if stop.get("location")}
     )
     building_ids = [bid for bid in building_ids if bid in buildings.index]
 
@@ -123,7 +122,10 @@ def build_routes(city_path, diary_path, out_path):
             # The first and last blocks are the door cells themselves; represent those
             # ends with the real door points and only convert the intervening street
             # cells, so the polyline runs door -> streets -> door without backtracking.
-            middle = _to_mercator(city, blocks[1:-1]) if len(blocks) > 2 else []
+            # Street cells are centered (+0.5) so the line runs mid-street between
+            # buildings rather than along cell corners.
+            centers = [(cx + 0.5, cy + 0.5) for cx, cy in blocks[1:-1]]
+            middle = _to_mercator(city, centers) if centers else []
             path = _dedupe([door_xy[from_id], *middle, door_xy[to_id]])
             routes.append(
                 {
@@ -149,11 +151,11 @@ def build_routes(city_path, diary_path, out_path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--city", type=Path, default=DEFAULT_CITY)
-    parser.add_argument("--diary", type=Path, default=DEFAULT_DIARY)
+    parser.add_argument("--scene", type=Path, default=DEFAULT_SCENE)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
 
-    building_ids, route_count = build_routes(args.city, args.diary, args.out)
+    building_ids, route_count = build_routes(args.city, args.scene, args.out)
     print(f"Buildings: {building_ids}")
     print(f"Wrote {route_count} routes to {args.out}")
     return 0

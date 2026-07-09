@@ -82,22 +82,13 @@ export function DemoView({
             </Button>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
-            Ground Truth
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
-            Detected Stops
-          </label>
-        </div>
       </div>
 
+
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-none min-h-0 gap-3 items-stretch overflow-visible lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
-            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
@@ -138,11 +129,11 @@ export function DemoView({
           </Card>
         </div>
       ) : (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-none min-h-0 gap-3 items-stretch overflow-visible lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
-            <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <div className="grid min-h-0 flex-none items-stretch gap-3 lg:flex-1 lg:grid-cols-2">
+              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
+              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} setShowGroundTruth={setShowGroundTruth} setShowStops={setShowStops} />
             </div>
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}

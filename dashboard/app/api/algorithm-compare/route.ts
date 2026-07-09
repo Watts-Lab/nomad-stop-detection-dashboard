@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import fs from "node:fs"
 import path from "node:path"
+import { asyncBufferFromFile, parquetReadObjects } from "hyparquet"
+import { compressors } from "hyparquet-compressors"
 
 export const runtime = "nodejs"
 
@@ -37,25 +39,30 @@ type ComparePanelResponse = {
   configKey?: string | null
 }
 
-type ManifestConfig = {
-  key: string
-  params: Record<string, number | string | boolean>
-}
-
 type ManifestEntry = {
   display_name: string
   parameter_columns: string[]
   labels: string
-  stops: string
-  metrics: string
-  configs: ManifestConfig[]
 }
 
 type Manifest = {
   config_key: string
-  parameter_columns: Record<string, string>
+  algorithm_keys: string[]
+  algorithms: Record<string, ManifestEntry>
   users: string[]
-  files: Record<string, ManifestEntry>
+  shared_files: { configs: string }
+}
+
+// One row of the shared configs.json: swept params (full names) plus the wide
+// labels.parquet column that stores this config's per-ping clusters.
+type ConfigsFile = {
+  configs: Array<Record<string, unknown> & { algorithm: string; key: string; label_column: string }>
+}
+
+type ConfigRow = {
+  params: Record<string, number>
+  label_column: string
+  key: string
 }
 
 type SceneCache = {
@@ -136,21 +143,12 @@ const ALGO_DIR: Record<string, string> = {
   hdbscan: "hdbscan",
 }
 
-// Maps the parameter names the client sends to the abbreviated cache columns.
-const PARAM_ABBREV: Record<string, string> = {
-  cell_size: "cs",
-  dist_thresh: "dt",
-  delta_roam: "dr",
-  dt_max: "dmx",
-  dur_min: "dmn",
-  time_thresh: "tt",
-  min_pts: "mp",
-  min_time: "mt",
-  min_cluster_size: "mcs",
-  // Synonyms used by some demo definitions.
-  eps_spatial: "dt",
-  T_max: "tt",
-  minPts: "mp",
+// Synonyms used by some demo definitions; the cache columns are already the
+// canonical parameter names, so most client params pass through unchanged.
+const PARAM_ALIASES: Record<string, string> = {
+  eps_spatial: "dist_thresh",
+  T_max: "time_thresh",
+  minPts: "min_pts",
 }
 
 function readJsonIfExists<T>(filePath: string): T | null {
@@ -167,19 +165,71 @@ function loadManifest(): Manifest | null {
   return manifestCache
 }
 
-// Picks the cached config whose swept parameters are closest to the requested values.
-function resolveConfigKey(entry: ManifestEntry, params: Record<string, number>): string | null {
-  if (entry.configs.length === 0) return null
+let configsFileCache: ConfigsFile["configs"] | null | undefined
+function loadConfigsFile(manifest: Manifest): ConfigsFile["configs"] | null {
+  if (configsFileCache === undefined) {
+    configsFileCache = readJsonIfExists<ConfigsFile>(path.join(STOP_CACHE_DIR, manifest.shared_files.configs))?.configs ?? null
+  }
+  return configsFileCache
+}
+
+async function readParquet(relPath: string): Promise<Record<string, unknown>[] | null> {
+  const file = path.join(STOP_CACHE_DIR, relPath)
+  if (!fs.existsSync(file)) return null
+  const buffer = await asyncBufferFromFile(file)
+  return parquetReadObjects({ file: buffer, compressors })
+}
+
+// algoDir -> config rows (params are numeric; bigint columns from parquet coerced).
+const configCache = new Map<string, ConfigRow[]>()
+
+function loadConfigs(algoDir: string, entry: ManifestEntry, manifest: Manifest): ConfigRow[] | null {
+  const cached = configCache.get(algoDir)
+  if (cached) return cached
+  const allConfigs = loadConfigsFile(manifest)
+  if (!allConfigs) return null
+  const configs = allConfigs
+    .filter((row) => row.algorithm === algoDir)
+    .map((row) => ({
+      params: Object.fromEntries(
+        entry.parameter_columns
+          .map((col) => [col, Number(row[col])] as const)
+          .filter(([, value]) => Number.isFinite(value)),
+      ),
+      label_column: String(row.label_column),
+      key: String(row.key),
+    }))
+  configCache.set(algoDir, configs)
+  return configs
+}
+
+// algoDir -> (`${user_id}|${timestamp}` -> wide labels row of per-config cluster columns).
+const labelCache = new Map<string, Map<string, Record<string, unknown>>>()
+
+async function loadLabels(algoDir: string, entry: ManifestEntry): Promise<Map<string, Record<string, unknown>> | null> {
+  const cached = labelCache.get(algoDir)
+  if (cached) return cached
+  const rows = await readParquet(entry.labels)
+  if (!rows) return null
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of rows) map.set(`${row.user_id}|${Number(row.timestamp)}`, row)
+  labelCache.set(algoDir, map)
+  return map
+}
+
+// Picks the config whose swept parameters are closest to the requested values.
+function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Record<string, number>): ConfigRow | null {
+  if (configs.length === 0) return null
   const requested: Record<string, number> = {}
   for (const [name, value] of Object.entries(params)) {
-    const abbrev = PARAM_ABBREV[name]
-    if (abbrev && entry.parameter_columns.includes(abbrev) && Number.isFinite(value)) {
-      requested[abbrev] = value
+    const column = PARAM_ALIASES[name] ?? name
+    if (entry.parameter_columns.includes(column) && Number.isFinite(value)) {
+      requested[column] = value
     }
   }
-  let best = entry.configs[0]
+  let best = configs[0]
   let bestDist = Infinity
-  for (const config of entry.configs) {
+  for (const config of configs) {
     let dist = 0
     for (const col of entry.parameter_columns) {
       if (!(col in requested)) continue
@@ -191,65 +241,32 @@ function resolveConfigKey(entry: ManifestEntry, params: Record<string, number>):
       best = config
     }
   }
-  return best.key
+  return best
 }
 
-// algoDir -> (`${user}|${key}` -> rows sorted by timestamp as [timestamp, cluster])
-const labelIndexCache = new Map<string, Map<string, Array<[number, number]>>>()
-
-function loadLabelIndex(algoDir: string, relPath: string): Map<string, Array<[number, number]>> | null {
-  const cached = labelIndexCache.get(algoDir)
-  if (cached) return cached
-  const file = path.join(STOP_CACHE_DIR, relPath)
-  if (!fs.existsSync(file)) return null
-  const raw = fs.readFileSync(file, "utf-8")
-  const lines = raw.split("\n")
-  if (lines.length < 2) return null
-  const header = lines[0].split(",")
-  const tIdx = header.indexOf("timestamp")
-  const uIdx = header.indexOf("user_id")
-  const kIdx = header.indexOf("key")
-  const cIdx = header.indexOf("cluster")
-  if (tIdx < 0 || uIdx < 0 || kIdx < 0 || cIdx < 0) return null
-  const map = new Map<string, Array<[number, number]>>()
-  for (let i = 1; i < lines.length; i += 1) {
-    const line = lines[i]
-    if (!line) continue
-    const cols = line.split(",")
-    const mapKey = `${cols[uIdx]}|${cols[kIdx]}`
-    let arr = map.get(mapKey)
-    if (!arr) {
-      arr = []
-      map.set(mapKey, arr)
-    }
-    arr.push([Number(cols[tIdx]), Number(cols[cIdx])])
-  }
-  labelIndexCache.set(algoDir, map)
-  return map
-}
-
-// Returns real per-ping cluster labels (ordered by timestamp) for one user + config.
-function labelsForUser(
+// Returns real per-ping cluster labels aligned to orderedTimestamps for one config.
+async function labelsForUser(
   algo: string,
-  user: string,
+  userId: string,
+  orderedTimestamps: number[],
   params: Record<string, number>,
-): { labels: number[]; configKey: string } | null {
+): Promise<{ labels: number[]; configKey: string } | null> {
   const manifest = loadManifest()
   if (!manifest) return null
   const algoDir = ALGO_DIR[algo] ?? algo
-  const entry = manifest.files[algoDir]
+  const entry = manifest.algorithms[algoDir]
   if (!entry) return null
-  const configKey = resolveConfigKey(entry, params)
-  if (!configKey) return null
-  const index = loadLabelIndex(algoDir, entry.labels)
+  const configs = loadConfigs(algoDir, entry, manifest)
+  if (!configs) return null
+  const config = resolveConfig(entry, configs, params)
+  if (!config) return null
+  const index = await loadLabels(algoDir, entry)
   if (!index) return null
-  const rows = index.get(`${user}|${configKey}`)
-  if (!rows || rows.length === 0) return null
-  const labels = rows
-    .slice()
-    .sort((a, b) => a[0] - b[0])
-    .map((row) => row[1])
-  return { labels, configKey }
+  const labels = orderedTimestamps.map((timestamp) => {
+    const row = index.get(`${userId}|${timestamp}`)
+    return row ? Number(row[config.label_column]) : -1
+  })
+  return { labels, configKey: config.key }
 }
 
 function normalizeAlgo(input: string | undefined): string {
@@ -273,7 +290,11 @@ function prettyAlgoName(algo: string): string {
   return names[algo] ?? algo.toUpperCase()
 }
 
-function sceneForSeed(seed: number): CompareSceneResponse | null {
+// The selected user and its ordered ping timestamps are kept alongside the client
+// scene so labels can be joined by (user_id, timestamp) server-side.
+type SeedScene = { response: CompareSceneResponse; userId: string; orderedTimestamps: number[] }
+
+function sceneForSeed(seed: number): SeedScene | null {
   const scenePath = path.join(STOP_CACHE_DIR, "scene.json")
   const routesPath = path.join(STOP_CACHE_DIR, "routes.json")
   const scene = readJsonIfExists<SceneCache>(scenePath)
@@ -281,9 +302,8 @@ function sceneForSeed(seed: number): CompareSceneResponse | null {
   if (!scene || scene.users.length === 0) return null
 
   const user = scene.users[Math.abs(seed) % scene.users.length]
-  const pings = scene.pings
+  const userPings = scene.pings
     .filter((ping) => ping.user_id === user)
-    .map((ping) => ({ x: ping.x, y: ping.y, timestamp: ping.timestamp }))
     .sort((a, b) => a.timestamp - b.timestamp)
   const truth = scene.truth
     .filter((row) => row.user_id === user)
@@ -296,34 +316,38 @@ function sceneForSeed(seed: number): CompareSceneResponse | null {
     }))
     .sort((a, b) => a.timestamp - b.timestamp)
 
-  if (pings.length === 0) return null
+  if (userPings.length === 0) return null
   return {
-    crs: scene.crs,
-    source: scene.source,
-    user_id: user,
-    bounds: scene.bounds,
-    buildings: scene.buildings,
-    pings,
-    truth,
-    routes,
+    response: {
+      crs: scene.crs,
+      source: scene.source,
+      user_id: user,
+      bounds: scene.bounds,
+      buildings: scene.buildings,
+      pings: userPings.map((ping) => ({ x: ping.x, y: ping.y, timestamp: ping.timestamp })),
+      truth,
+      routes,
+    },
+    userId: user,
+    orderedTimestamps: userPings.map((ping) => ping.timestamp),
   }
 }
 
-function buildPanel(
+async function buildPanel(
   algo: string,
   params: Record<string, number> | undefined,
   cache: CompareCache | null,
-  scene: CompareSceneResponse | null,
-): ComparePanelResponse {
+  seed: SeedScene | null,
+): Promise<ComparePanelResponse> {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
-  const cachedLabels = scene ? labelsForUser(normalized, scene.user_id, params ?? {}) : null
+  const cachedLabels = seed ? await labelsForUser(normalized, seed.userId, seed.orderedTimestamps, params ?? {}) : null
 
   return {
     algo: normalized,
     title: fromCache?.title ?? prettyAlgoName(normalized),
-    available: Boolean(scene),
-    scene,
+    available: Boolean(seed),
+    scene: seed?.response ?? null,
     params: params ?? {},
     labels: cachedLabels?.labels,
     configKey: cachedLabels?.configKey ?? null,
@@ -350,11 +374,11 @@ export async function POST(req: NextRequest) {
     } = {
       seed,
       mode,
-      left: buildPanel(leftAlgo, payload.left?.params, cache, scene),
+      left: await buildPanel(leftAlgo, payload.left?.params, cache, scene),
     }
 
     if (mode === "compare") {
-      body.right = buildPanel(rightAlgo, payload.right?.params, cache, scene)
+      body.right = await buildPanel(rightAlgo, payload.right?.params, cache, scene)
     }
 
     return NextResponse.json(body)

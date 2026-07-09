@@ -2,20 +2,29 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Aggregated metrics prototype</title>
+  <title>Aggregated metrics</title>
   <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
   <style>
+    html, body {
+      height: 100%;
+    }
+
     body {
       margin: 0;
       padding: 12px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-family: Arial, Helvetica, sans-serif;
       background: #f2f3f5;
     }
 
     #chart {
       width: 100%;
-      height: min(72vh, 680px);
-      min-height: 360px;
+      height: 100%;
+      max-height: 680px;
+      min-height: 0;
       background: #f7f8fb;
       border: 1px solid #d7dce5;
       border-radius: 8px;
@@ -26,18 +35,22 @@
 <body>
   <div id="chart"></div>
 
-  <script>
+  <script type="module">
+    import { parquetReadObjects } from "https://cdn.jsdelivr.net/npm/hyparquet@1.26.2/+esm";
+    import { compressors } from "https://cdn.jsdelivr.net/npm/hyparquet-compressors@1.1.1/+esm";
+
     const params = new URLSearchParams(window.location.search);
-    const chartTitle = params.get("title") || "Lachesis aggregated metrics prototype";
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
-    const DATA_URL = "./lachesis_results.json";
+    const showLegend = params.get("legend") !== "false";
+    const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
+    const parameterLabel = (value) => value === "delta_roam" ? "{delta|Δ}{sub|roam}" : value;
 
-    fetch(DATA_URL)
-      .then((res) => res.json())
-      .then((data) => {
+    (async () => {
+      const buffer = await (await fetch(DATA_URL)).arrayBuffer();
+      const data = await parquetReadObjects({ file: buffer, compressors });
         const rows = data
           .map((d) => ({
             user_id: d.user_id,
@@ -71,74 +84,46 @@
           .map((userRows) => userRows.reduce((best, d) => (d.recall > best.recall ? d : best)))
           .map((d) => [d.x, d.recall, d.user_id]);
 
-        const maxMean = Math.max(...meanLine.map((point) => point[1]));
+        const xs = Array.from(grouped.keys()).map(Number).sort((a, b) => a - b);
+        const meanPerUserMaxLine = xs.map((x) => [
+          x,
+          Array.from(byUser.values())
+            .map((userRows) => Math.max(...userRows.filter((d) => d.x <= x).map((d) => d.recall)))
+            .reduce((sum, value) => sum + value, 0) / byUser.size,
+        ]);
         const xValues = rows.map((d) => d.x);
         const minX = Math.min(...xValues);
         const maxX = Math.max(...xValues);
         const xPadding = (maxX - minX) * 0.025;
-        const maxMeanLine = [[minX, maxMean], [maxX, maxMean]];
-        const maxMeanLabel = `Max mean (${maxMean.toFixed(3)})`;
+        const meanPerUserMaxLabel = "Mean per-user max";
+        const emptyHighlight = [];
 
         chart.setOption({
-          title: {
-            text: chartTitle,
+          animationDurationUpdate: 0,
+          legend: showLegend ? {
+            bottom: 4,
             left: "center",
-            top: 8,
-            textStyle: {
-              fontSize: 22,
-              fontWeight: "normal",
-            },
-          },
-          legend: {
-            right: 18,
-            bottom: 14,
-            data: ["Individual results", "Mean", "Per-user max", maxMeanLabel],
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            borderColor: "#ddd",
-            borderWidth: 1,
-            padding: 10,
+            data: ["Individual results", "Mean", "Per-user max", meanPerUserMaxLabel, "Hovered user spread"],
+            itemGap: 24,
             textStyle: {
               fontSize: 13,
             },
-          },
+          } : { show: false },
           grid: {
-            left: 68,
-            right: 22,
-            top: 54,
-            bottom: 70,
+            left: 56,
+            right: 56,
+            top: 38,
+            bottom: 72,
             containLabel: true,
           },
           tooltip: {
-            trigger: "item",
-            formatter: (params) => {
-              if (params.seriesType === "scatter") {
-                return `${xLabel}: ${params.value[0]}<br/>recall: ${params.value[1]}<br/>user_id: ${params.value[2]}`;
-              }
-              if (params.seriesName === "Per-user trajectories") {
-                return `user_id: ${params.value[2]}<br/>${xLabel}: ${params.value[0]}<br/>recall: ${params.value[1].toFixed(3)}`;
-              }
-              if (params.seriesName === maxMeanLabel) {
-                return `max mean recall: ${params.value[1].toFixed(3)}`;
-              }
-              return `${xLabel}: ${params.value[0]}<br/>mean recall: ${params.value[1].toFixed(3)}`;
-            },
-          },
-          toolbox: {
-            feature: {
-              brush: {},
-              dataZoom: {},
-              saveAsImage: {},
-            },
-          },
-          brush: {
-            toolbox: ["rect", "polygon", "clear"],
-            xAxisIndex: 0,
+            show: false,
           },
           xAxis: {
             type: "value",
-            name: xLabel,
+            name: `Parameter: ${parameterLabel(xLabel)}`,
             nameLocation: "center",
-            nameGap: 36,
+            nameGap: 30,
             min: minX - xPadding,
             max: maxX + xPadding,
             splitLine: {
@@ -152,15 +137,25 @@
             },
             nameTextStyle: {
               fontSize: 14,
+              rich: {
+                delta: {
+                  fontSize: 18,
+                  fontWeight: 500,
+                },
+                sub: {
+                  fontSize: 11,
+                  padding: [10, 0, 0, 1],
+                },
+              },
             },
           },
           yAxis: {
             type: "value",
-            name: "Recall",
+            name: "min-by-min accuracy",
             nameLocation: "center",
             nameGap: 42,
             min: 0,
-            max: 1,
+            max: 1.05,
             splitLine: {
               lineStyle: {
                 color: "#ddd",
@@ -196,6 +191,11 @@
                 borderColor: "rgba(31, 119, 180, 0.14)",
                 borderWidth: 1,
               },
+              blur: {
+                itemStyle: {
+                  opacity: 0.025,
+                },
+              },
               z: 3,
             },
             {
@@ -208,6 +208,9 @@
                 color: "rgba(255, 26, 26, 0.85)",
                 borderColor: "rgba(255, 26, 26, 0.85)",
                 borderWidth: 1,
+              },
+              emphasis: {
+                scale: 1.8,
               },
               z: 6,
             },
@@ -227,27 +230,104 @@
               z: 5,
             },
             {
-              name: maxMeanLabel,
+              name: meanPerUserMaxLabel,
               type: "line",
-              data: maxMeanLine,
+              data: meanPerUserMaxLine,
               symbol: "none",
               lineStyle: {
-                color: "#000",
-                width: 2,
-                type: "dashed",
+                color: "#d62728",
+                width: 3,
+                type: "solid",
               },
               itemStyle: {
-                color: "#000",
+                color: "#d62728",
               },
               emphasis: {
                 disabled: true,
               },
             },
+            {
+              name: "Hovered user spread",
+              id: "highlighted-user-line",
+              type: "line",
+              data: emptyHighlight,
+              animation: false,
+              symbol: "none",
+              lineStyle: {
+                color: "#2ca02c",
+                width: 2,
+              },
+              itemStyle: {
+                color: "#2ca02c",
+              },
+              z: 10,
+            },
+            {
+              name: "Per-user max hit area",
+              type: "scatter",
+              data: perUserMaxData,
+              animation: false,
+              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbolSize: 22,
+              showInLegend: false,
+              itemStyle: {
+                color: "rgba(255, 26, 26, 0)",
+              },
+              emphasis: {
+                disabled: true,
+              },
+              z: 11,
+            },
+            {
+              name: "Hovered per-user max",
+              id: "hovered-per-user-max",
+              type: "scatter",
+              data: emptyHighlight,
+              animation: false,
+              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbolSize: 18,
+              silent: true,
+              showInLegend: false,
+              itemStyle: {
+                color: "rgba(255, 26, 26, 0.95)",
+                borderColor: "rgba(255, 255, 255, 0.95)",
+                borderWidth: 1.5,
+              },
+              z: 12,
+            },
           ],
         });
 
+        const highlightUser = (point) => {
+          const userId = point[2];
+          const userRows = byUser.get(userId) || [];
+          const userLine = userRows.map((d) => [d.x, d.recall, d.user_id]);
+          chart.setOption({
+            series: [
+              { id: "highlighted-user-line", data: userLine },
+              { id: "hovered-per-user-max", data: [point] },
+            ],
+          });
+        };
+
+        const clearHighlight = () => {
+          chart.setOption({
+            series: [
+              { id: "highlighted-user-line", data: emptyHighlight },
+              { id: "hovered-per-user-max", data: emptyHighlight },
+            ],
+          });
+        };
+
+        chart.on("mouseover", (event) => {
+          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") highlightUser(event.value);
+        });
+        chart.on("mouseout", (event) => {
+          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") clearHighlight();
+        });
+        chart.on("globalout", clearHighlight);
         window.addEventListener("resize", () => chart.resize());
-      });
+    })();
   </script>
 </body>
 </html>

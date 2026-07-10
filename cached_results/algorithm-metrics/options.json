@@ -1,10 +1,13 @@
 {
   "algorithms": [
     "Lachesis",
-    "Sequential",
+    "Sequential (Centroid)",
+    "Sequential (First)",
     "SeqScan",
     "ST-DBSCAN",
-    "DBSTOP"
+    "DBSTOP",
+    "HDBSCAN",
+    "Grid-Based"
   ],
   "trajectories": [
     {
@@ -30,12 +33,21 @@
         "dur_min=5"
       ]
     },
-    "Sequential": {
+    "Sequential (Centroid)": {
       "source": "delta_roam_vs_acc_exp.ipynb",
       "sweep_parameter": "delta_roam",
       "fixed_parameters": [
         "dt_max=60",
         "method='centroid'",
+        "dur_min=5"
+      ]
+    },
+    "Sequential (First)": {
+      "source": "delta_roam_vs_acc_exp.ipynb",
+      "sweep_parameter": "delta_roam",
+      "fixed_parameters": [
+        "dt_max=60",
+        "method='sliding'",
         "dur_min=5"
       ]
     },
@@ -67,12 +79,30 @@
         "dur_min=5",
         "back_merge=False"
       ]
+    },
+    "HDBSCAN": {
+      "source": "cached_results/stop-detection-cache/hdbscan",
+      "sweep_parameter": "dist_thresh",
+      "fixed_parameters": [
+        "time_thresh=60",
+        "min_pts=2",
+        "dur_min=5",
+        "min_cluster_size=1"
+      ]
+    },
+    "Grid-Based": {
+      "source": "cached_results/stop-detection-cache/gridbased",
+      "sweep_parameter": "cell_size",
+      "fixed_parameters": [
+        "min_time=5",
+        "min_cluster_size=2"
+      ]
     }
   },
   "defaults": {
     "mode": "compare",
     "left_algorithm": "Lachesis",
-    "right_algorithm": "Sequential",
+    "right_algorithm": "Sequential (Centroid)",
     "iterations": 100,
     "sweep_min": 5,
     "sweep_max": 50,
@@ -84,7 +114,11 @@
       "min": 5,
       "max": 50
     },
-    "Sequential": {
+    "Sequential (Centroid)": {
+      "min": 5,
+      "max": 50
+    },
+    "Sequential (First)": {
       "min": 5,
       "max": 50
     },
@@ -99,6 +133,14 @@
     "DBSTOP": {
       "min": 1,
       "max": 50
+    },
+    "HDBSCAN": {
+      "min": 1,
+      "max": 50
+    },
+    "Grid-Based": {
+      "min": 25,
+      "max": 500
     }
   },
   "max_iterations": 500

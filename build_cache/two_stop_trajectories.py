@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.17.1
+#       jupytext_version: 1.19.3
 #   kernelspec:
 #     display_name: csslabnomad
 #     language: python
@@ -26,20 +26,20 @@ from nomad.traj_gen import Population
 keys = ["2_stops", "beta_5", "beta_8_5"]
 
 # Large-scale comparisons (2,000 users per parameter).
-keys = [
-    "ha13_beta5",
-    "ha13_beta6",
-    "ha13_beta7",
-    "ha13_beta8",
-    "ha15_beta5",
-    "ha15_beta6",
-    "ha15_beta7",
-    "ha15_beta8",
-    "ha17_beta5",
-    "ha17_beta6",
-    "ha17_beta7",
-    "ha17_beta8",
-]
+# keys = [
+#     "ha13_beta5",
+#     "ha13_beta6",
+#     "ha13_beta7",
+#     "ha13_beta8",
+#     "ha15_beta5",
+#     "ha15_beta6",
+#     "ha15_beta7",
+#     "ha15_beta8",
+#     "ha17_beta5",
+#     "ha17_beta6",
+#     "ha17_beta7",
+#     "ha17_beta8",
+# ]
 
 for key in keys:
     config_file = f"config_{key}.json"

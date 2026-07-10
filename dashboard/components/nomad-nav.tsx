@@ -2,8 +2,10 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
+import { Menu, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import type { DashboardView } from "@/app/_lib/types"
 
 const navItems = [
   { label: "Home", href: "/", view: "home" },
@@ -13,14 +15,10 @@ const navItems = [
   { label: "About", href: "/about", view: "about" },
 ]
 
-export function NomadNav() {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const currentView = pathname === "/about" ? "about" : searchParams.get("view") ?? "home"
-
+export function NomadNav({ currentView }: { currentView: DashboardView | "about" }) {
   return (
     <header className="sticky top-0 z-20 border-b border-[#263449] bg-[#111625]/92 backdrop-blur">
-      <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between gap-4 px-5">
+      <div className="nomad-page-frame flex h-[74px] items-center justify-between gap-4">
         <Link
           href="/"
           aria-label="Go to home"
@@ -52,9 +50,42 @@ export function NomadNav() {
             </span>
           ))}
         </nav>
-        <Button asChild size="lg" className="h-11 bg-[#459ba4] px-6 text-[#08101c] hover:bg-[#62b8bf]">
-          <Link href="/?view=demo">Run Demo</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild size="lg" className="nomad-action h-11 px-4 text-base sm:px-6">
+            <Link href="/?view=demo">
+              <Play className="h-5 w-5 fill-current" />
+              <span className="hidden sm:inline">Run Demo</span>
+            </Link>
+          </Button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon-lg" className="border-[#3a465d] bg-[#111625]/45 text-[#f2f4eb] hover:bg-[#242b3d] lg:hidden" aria-label="Open navigation">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="border-[#263449] bg-[#111625]">
+              <SheetHeader>
+                <SheetTitle>Navigate</SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-2 px-4">
+                {navItems.map((item) => (
+                  <SheetClose asChild key={item.view}>
+                    <Link
+                      href={item.href}
+                      className={`rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                        currentView === item.view
+                          ? "border-[#8acac8] bg-[#202738] text-[#f2f4eb]"
+                          : "border-[#263449] text-[#94a1b7] hover:border-[#8acac8] hover:text-[#f2f4eb]"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  </SheetClose>
+                ))}
+              </nav>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   )

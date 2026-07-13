@@ -43,8 +43,12 @@
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
     const showLegend = params.get("legend") !== "false";
+<<<<<<< Updated upstream
     const xMinParam = params.get("xmin");
     const xMaxParam = params.get("xmax");
+=======
+    const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
+>>>>>>> Stashed changes
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -54,6 +58,7 @@
       const buffer = await (await fetch(DATA_URL)).arrayBuffer();
       const data = await parquetReadObjects({ file: buffer, compressors });
         const rows = data
+          .filter((d) => Object.entries(fixedParameters).every(([field, value]) => String(d[field]).toLowerCase() === value))
           .map((d) => ({
             user_id: d.user_id,
             x: Number(d[xField]),
@@ -187,6 +192,7 @@
             },
             {
               name: "Individual results",
+              id: "individual-results",
               type: "scatter",
               data: scatterData,
               symbolSize: 7,
@@ -256,7 +262,8 @@
               type: "line",
               data: emptyHighlight,
               animation: false,
-              symbol: "none",
+              symbol: "circle",
+              symbolSize: 7,
               lineStyle: {
                 color: "#2ca02c",
                 width: 2,
@@ -308,6 +315,7 @@
           const userLine = userRows.map((d) => [d.x, d.recall, d.user_id]);
           chart.setOption({
             series: [
+              { id: "individual-results", itemStyle: { opacity: 0.08 } },
               { id: "highlighted-user-line", data: userLine },
               { id: "hovered-per-user-max", data: [point] },
             ],
@@ -317,6 +325,7 @@
         const clearHighlight = () => {
           chart.setOption({
             series: [
+              { id: "individual-results", itemStyle: { opacity: 1 } },
               { id: "highlighted-user-line", data: emptyHighlight },
               { id: "hovered-per-user-max", data: emptyHighlight },
             ],

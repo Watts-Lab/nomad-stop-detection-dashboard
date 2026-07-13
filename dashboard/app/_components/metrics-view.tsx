@@ -103,6 +103,7 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
 }) {
+<<<<<<< Updated upstream
   const leftSweep = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm]?.find((param) => param.value === metricsLeftParameter)
   const rightSweep = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm]?.find((param) => param.value === metricsRightParameter)
   const xMin = Math.min(leftSweep?.min ?? 0, metricsCompareMode ? rightSweep?.min ?? 0 : leftSweep?.min ?? 0)
@@ -110,6 +111,12 @@ export function MetricsView({
   const axisQuery = `&xmin=${xMin}&xmax=${xMax}`
   const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${axisQuery}${metricsCompareMode ? "&legend=false" : ""}`
   const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}${axisQuery}`
+=======
+  const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
+  const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}&${leftFixedParameters}${metricsCompareMode ? "&legend=false" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}&${rightFixedParameters}`
+>>>>>>> Stashed changes
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">

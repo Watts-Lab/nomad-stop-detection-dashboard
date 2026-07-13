@@ -103,8 +103,13 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
 }) {
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${metricsCompareMode ? "&legend=false" : ""}`
-  const rightMetricsPrototypeSrc = prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)
+  const leftSweep = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm]?.find((param) => param.value === metricsLeftParameter)
+  const rightSweep = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm]?.find((param) => param.value === metricsRightParameter)
+  const xMin = Math.min(leftSweep?.min ?? 0, metricsCompareMode ? rightSweep?.min ?? 0 : leftSweep?.min ?? 0)
+  const xMax = Math.max(leftSweep?.max ?? 0, metricsCompareMode ? rightSweep?.max ?? 0 : leftSweep?.max ?? 0)
+  const axisQuery = `&xmin=${xMin}&xmax=${xMax}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${axisQuery}${metricsCompareMode ? "&legend=false" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}${axisQuery}`
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
@@ -134,8 +139,8 @@ export function MetricsView({
               </CardTitle>
             </CardHeader>
           )}
-          <CardContent className="min-h-0 flex-1 p-2">
-            <div className={`grid h-full min-h-0 gap-3 ${metricsCompareMode ? "lg:grid-cols-2" : ""}`}>
+          <CardContent className={`min-h-0 flex-1 p-2 ${metricsCompareMode ? "overflow-y-auto" : ""}`}>
+            <div className={`grid gap-3 ${metricsCompareMode ? "min-h-full grid-rows-[minmax(320px,1fr)_minmax(380px,1fr)]" : "h-full min-h-0"}`}>
               <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} />
 
               {metricsCompareMode && (

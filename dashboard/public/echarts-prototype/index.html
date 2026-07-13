@@ -43,6 +43,8 @@
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
     const showLegend = params.get("legend") !== "false";
+    const xMinParam = params.get("xmin");
+    const xMaxParam = params.get("xmax");
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -95,25 +97,27 @@
         const minX = Math.min(...xValues);
         const maxX = Math.max(...xValues);
         const xPadding = (maxX - minX) * 0.025;
+        const axisMinX = xMinParam === null ? minX - xPadding : Number(xMinParam);
+        const axisMaxX = xMaxParam === null ? maxX + xPadding : Number(xMaxParam);
         const meanPerUserMaxLabel = "Mean per-user max";
         const emptyHighlight = [];
 
         chart.setOption({
           animationDurationUpdate: 0,
           legend: showLegend ? {
-            bottom: 4,
+            bottom: 8,
             left: "center",
             data: ["Individual results", "Mean", "Per-user max", meanPerUserMaxLabel, "Hovered user spread"],
-            itemGap: 24,
+            itemGap: 20,
             textStyle: {
-              fontSize: 13,
+              fontSize: 12,
             },
           } : { show: false },
           grid: {
             left: 56,
             right: 56,
             top: 38,
-            bottom: 72,
+            bottom: showLegend ? 92 : 48,
             containLabel: true,
           },
           tooltip: {
@@ -123,9 +127,9 @@
             type: "value",
             name: `Parameter: ${parameterLabel(xLabel)}`,
             nameLocation: "center",
-            nameGap: 30,
-            min: minX - xPadding,
-            max: maxX + xPadding,
+            nameGap: 26,
+            min: axisMinX,
+            max: axisMaxX,
             splitLine: {
               lineStyle: {
                 color: "#ddd",

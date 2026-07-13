@@ -43,12 +43,9 @@
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
     const showLegend = params.get("legend") !== "false";
-<<<<<<< Updated upstream
     const xMinParam = params.get("xmin");
     const xMaxParam = params.get("xmax");
-=======
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
->>>>>>> Stashed changes
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));

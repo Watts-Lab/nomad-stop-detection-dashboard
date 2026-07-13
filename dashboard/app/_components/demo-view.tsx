@@ -10,6 +10,10 @@ import type { ParamStateSetter } from "./demo-parameter-controls"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
 
+const demoTrajectoryOptions = [
+  { id: "two-building", name: "2-building trajectory" },
+]
+
 export function DemoView({
   compareMode,
   showGroundTruth,
@@ -23,6 +27,7 @@ export function DemoView({
   rightParams,
   leftParamErrors,
   rightParamErrors,
+  demoTrajectory,
   compareApiData,
   compareLoading,
   compareError,
@@ -34,6 +39,7 @@ export function DemoView({
   setRightParams,
   setLeftParamErrors,
   setRightParamErrors,
+  setDemoTrajectory,
   handleCompareModeToggle,
   handleLeftAlgorithmChange,
   handleRightAlgorithmChange,
@@ -53,6 +59,7 @@ export function DemoView({
   rightParams: Record<string, string>
   leftParamErrors: Record<string, string>
   rightParamErrors: Record<string, string>
+  demoTrajectory: string
   compareApiData: CompareApiResponse | null
   compareLoading: boolean
   compareError: string | null
@@ -64,6 +71,7 @@ export function DemoView({
   setRightParams: ParamStateSetter
   setLeftParamErrors: ParamStateSetter
   setRightParamErrors: ParamStateSetter
+  setDemoTrajectory: (trajectoryId: string) => void
   handleCompareModeToggle: () => void
   handleLeftAlgorithmChange: (algorithmId: string) => void
   handleRightAlgorithmChange: (algorithmId: string) => void
@@ -109,10 +117,20 @@ export function DemoView({
                   Compare Algorithms
                 </Button>
               </div>
-              <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Trajectory</h4>
+                <Select value={demoTrajectory} onValueChange={setDemoTrajectory}>
+                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                  <SelectContent>{demoTrajectoryOptions.map((trajectory) => <SelectItem key={trajectory.id} value={trajectory.id}>{trajectory.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Algorithm</h4>
+                <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
+                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                  <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
                 <DemoParameterControls
@@ -131,7 +149,7 @@ export function DemoView({
                 </Button>
                 <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
                   <RefreshCw className="h-4 w-4" />
-                  New Trajectory
+                  New Agent
                 </Button>
               </div>
             </CardContent>
@@ -154,6 +172,13 @@ export function DemoView({
                 <Square className="h-4 w-4" />
                 Single
               </Button>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Trajectory</h4>
+                <Select value={demoTrajectory} onValueChange={setDemoTrajectory}>
+                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                  <SelectContent>{demoTrajectoryOptions.map((trajectory) => <SelectItem key={trajectory.id} value={trajectory.id}>{trajectory.name}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Algorithm A</h4>
@@ -192,7 +217,7 @@ export function DemoView({
                 </Button>
                 <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
                   <RefreshCw className="h-4 w-4" />
-                  New Trajectory
+                  New Agent
                 </Button>
               </div>
             </CardContent>

@@ -43,6 +43,7 @@ function NomadDashboard() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
+  const [demoTrajectory, setDemoTrajectory] = useState("two-building")
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
@@ -326,6 +327,7 @@ function NomadDashboard() {
           rightParams={rightParams}
           leftParamErrors={leftParamErrors}
           rightParamErrors={rightParamErrors}
+          demoTrajectory={demoTrajectory}
           compareApiData={compareApiData}
           compareLoading={compareLoading}
           compareError={compareError}
@@ -337,6 +339,7 @@ function NomadDashboard() {
           setRightParams={setRightParams}
           setLeftParamErrors={setLeftParamErrors}
           setRightParamErrors={setRightParamErrors}
+          setDemoTrajectory={setDemoTrajectory}
           handleCompareModeToggle={handleCompareModeToggle}
           handleLeftAlgorithmChange={handleLeftAlgorithmChange}
           handleRightAlgorithmChange={handleRightAlgorithmChange}

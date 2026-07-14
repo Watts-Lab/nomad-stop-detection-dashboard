@@ -157,7 +157,7 @@ function DemoSceneRenderer({
       }
     }).filter((segment) => segment.end > segment.start && segment.points.length > 1)
     const focusBuildings = [
-      ...truthStops.flatMap((stop) => buildingById.get(stop.location) ?? []),
+      ...truthStops.flatMap((stop) => stop.location ? buildingById.get(stop.location) ?? [] : []),
       ...stops.flatMap((stop) => stop.destination.id ? buildingById.get(stop.destination.id) ?? [] : []),
     ]
     const focusPoints = [

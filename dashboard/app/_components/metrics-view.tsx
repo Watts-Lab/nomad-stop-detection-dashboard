@@ -166,8 +166,8 @@ export function MetricsView({
               </CardTitle>
             </CardHeader>
           )}
-          <CardContent className={`min-h-0 flex-1 p-2 ${metricsCompareMode ? "overflow-y-auto" : ""}`}>
-            <div className={`grid gap-3 ${metricsCompareMode ? "min-h-full grid-rows-[minmax(320px,1fr)_minmax(380px,1fr)]" : "h-full min-h-0"}`}>
+          <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
+            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
               <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} showTourTargets />
 
               {metricsCompareMode && (

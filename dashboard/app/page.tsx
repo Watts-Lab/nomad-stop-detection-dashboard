@@ -14,7 +14,7 @@ import {
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
-import { useProductTour } from "@/hooks/use-product-tour"
+import { METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY, useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
   DashboardView,
@@ -254,7 +254,9 @@ function NomadDashboard() {
   const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
   const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
+  const metricsTourReady = activeView === "metrics"
   const { startTour } = useProductTour(tourReady)
+  const { startTour: startMetricsTour } = useProductTour(metricsTourReady, METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY)
 
   useEffect(() => {
     const nextRoute = dashboardRouteState(searchParamString)
@@ -362,6 +364,7 @@ function NomadDashboard() {
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
+          startTour={startMetricsTour}
         />
       )}
     </div>

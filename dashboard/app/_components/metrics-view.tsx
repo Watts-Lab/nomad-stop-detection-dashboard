@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Columns2, Square } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Columns2, HelpCircle, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
 import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import type { MetricsParameterNote } from "../_lib/types"
 
 function MetricsParameterRows({
@@ -42,18 +43,37 @@ function MetricsParameterRows({
 function MetricsFrame({
   src,
   title,
+  showTourTargets = false,
 }: {
   src: string
   title: string
+  showTourTargets?: boolean
 }) {
   const [loading, setLoading] = useState(true)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const tourFocusRef = useRef<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
   }, [src])
 
+  useEffect(() => {
+    if (!showTourTargets) return
+
+    const postTourFocus = (mode: string | null) => {
+      tourFocusRef.current = mode
+      iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode }, window.location.origin)
+    }
+    const handleTourFocus = (event: Event) => {
+      postTourFocus(event instanceof CustomEvent ? event.detail : null)
+    }
+
+    window.addEventListener(METRICS_TOUR_FOCUS_EVENT, handleTourFocus)
+    return () => window.removeEventListener(METRICS_TOUR_FOCUS_EVENT, handleTourFocus)
+  }, [showTourTargets])
+
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30">
+    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
       {loading && (
         <div className="absolute inset-0 z-10 grid gap-3 bg-[#111625] p-4">
           <Skeleton className="h-7 w-1/3 bg-[#202738]" />
@@ -62,10 +82,16 @@ function MetricsFrame({
         </div>
       )}
       <iframe
+        ref={iframeRef}
         key={src}
         src={src}
         title={title}
-        onLoad={() => setLoading(false)}
+        onLoad={() => {
+          setLoading(false)
+          if (showTourTargets) {
+            iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode: tourFocusRef.current }, window.location.origin)
+          }
+        }}
         className="h-full w-full border-0"
       />
     </div>
@@ -87,6 +113,7 @@ export function MetricsView({
   setMetricsRightAlgorithm,
   setMetricsLeftParameter,
   setMetricsRightParameter,
+  startTour,
 }: {
   metricsCompareMode: boolean
   metricsAlgorithms: string[]
@@ -102,6 +129,7 @@ export function MetricsView({
   setMetricsRightAlgorithm: (algorithm: string) => void
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
+  startTour: () => void
 }) {
   const leftSweep = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm]?.find((param) => param.value === metricsLeftParameter)
   const rightSweep = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm]?.find((param) => param.value === metricsRightParameter)
@@ -117,19 +145,16 @@ export function MetricsView({
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Sweep one scale parameter for the selected algorithm{metricsCompareMode ? "s" : ""}; fixed notebook parameters are shown in the control panel.
           </p>
         </div>
-        <Button
-          variant={metricsCompareMode ? "default" : "outline"}
-          size="lg"
-          onClick={() => setMetricsCompareMode(!metricsCompareMode)}
-          className="gap-2"
-        >
-          {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
-        </Button>
       </div>
 
       <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
@@ -143,7 +168,7 @@ export function MetricsView({
           )}
           <CardContent className={`min-h-0 flex-1 p-2 ${metricsCompareMode ? "overflow-y-auto" : ""}`}>
             <div className={`grid gap-3 ${metricsCompareMode ? "min-h-full grid-rows-[minmax(320px,1fr)_minmax(380px,1fr)]" : "h-full min-h-0"}`}>
-              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} />
+              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} showTourTargets />
 
               {metricsCompareMode && (
                 <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} />
@@ -152,13 +177,21 @@ export function MetricsView({
           </CardContent>
         </Card>
 
-        <Card className="min-h-0 overflow-hidden py-0">
+        <Card className="min-h-0 overflow-hidden py-0" data-tour="metrics-controls">
           <CardHeader className="shrink-0 px-5 py-3">
             <CardTitle className="text-lg font-semibold">
               {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
             </CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
+            <Button
+              variant={metricsCompareMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMetricsCompareMode(!metricsCompareMode)}
+              className="gap-2"
+            >
+              {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
+            </Button>
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">
                 {metricsCompareMode ? "Algorithm A" : "Algorithm"}

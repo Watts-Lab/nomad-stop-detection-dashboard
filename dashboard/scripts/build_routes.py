@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-"""Generate real street shortest paths between Garden City buildings and cache them.
+"""Generate centerline street routes between Garden City buildings and cache them.
 
-Uses nomad's City street graph (City.get_shortest_path) so the dashboard demo can
-draw true street-following routes between stops instead of synthetic L-shaped paths.
+Uses nomad's City street graph (City.get_shortest_path) for the street-cell
+sequence, then draws straight segments through each street cell center.
 
 Run from the repository root:
 
     python dashboard/scripts/build_routes.py
 
 The output JSON is consumed by app/api/algorithm-compare/route.ts (RoutesCache) and
-keyed by "<from_id>-><to_id>". Building pairs are taken from the cached diary so we
-only compute routes the demo can actually use.
+keyed by "<from_id>-><to_id>". Building pairs are taken from the cached trajectory
+scenes so the shared route file covers the dashboard demo trajectories.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +25,11 @@ from nomad.city_gen import City
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CITY = Path(data_folder.__file__).parent / "garden-city.gpkg"
-DEFAULT_DIARY = REPO_ROOT / "stop-detection-cache" / "diary.csv"
+DEFAULT_SCENES = [
+    REPO_ROOT / "cached_results" / "stop-detection-cache" / "two-stop" / "scene.json",
+    REPO_ROOT / "cached_results" / "stop-detection-cache" / "four-stop-high-ha" / "scene.json",
+    REPO_ROOT / "cached_results" / "stop-detection-cache" / "four-stop-low-ha" / "scene.json",
+]
 DEFAULT_OUT = REPO_ROOT / "cached_results" / "stop-detection-cache" / "routes.json"
 
 
@@ -50,6 +53,25 @@ def _to_mercator(city, cells):
     return [_round_point(row.x, row.y) for row in merc.itertuples(index=False)]
 
 
+def _street_center_lookup(city):
+    centers = city.streets_gdf.loc[:, ["id", "geometry"]].copy()
+    centers["point"] = centers.geometry.centroid
+    frame = pd.DataFrame({
+        "id": centers["id"],
+        "x": centers["point"].map(lambda point: point.x),
+        "y": centers["point"].map(lambda point: point.y),
+    })
+    merc = city.to_mercator(frame.copy())
+    return {
+        row.id: _round_point(row.x, row.y)
+        for row in merc.itertuples(index=False)
+    }
+
+
+def _street_centers(cells, centers):
+    return [centers[f"s-x{cx}-y{cy}"] for cx, cy in cells]
+
+
 def _street_records(city):
     """city: City. Returns street polygon records in Web Mercator."""
     street_coords = city.streets_gdf.loc[:, ["id", "geometry"]].copy()
@@ -66,15 +88,41 @@ def _street_records(city):
     )
 
 
-def build_routes(city_path, diary_path, out_path):
+def _scene_payload(scene_paths):
+    location_ids = set()
+    buildings = None
+    for scene_path in scene_paths:
+        scene = json.loads(Path(scene_path).read_text(encoding="utf-8"))
+        location_ids.update(
+            row["location"]
+            for row in scene["truth"]
+            if row.get("location")
+        )
+        if buildings is None:
+            buildings = scene["buildings"]
+
+    points = [
+        point
+        for building in buildings
+        for ring in building["rings"]
+        for point in ring
+    ]
+    bounds = [
+        min(point[0] for point in points),
+        min(point[1] for point in points),
+        max(point[0] for point in points),
+        max(point[1] for point in points),
+    ]
+    return sorted(location_ids), buildings, bounds
+
+
+def build_routes(city_path, scene_paths, out_path):
     city = City.from_geopackage(str(city_path))
     city.compute_shortest_paths()
     buildings = city.buildings_gdf.set_index("id")
+    street_centers = _street_center_lookup(city)
 
-    diary = pd.read_csv(diary_path)
-    building_ids = sorted(
-        {loc for loc in diary["location"].dropna().astype(str) if loc.strip()}
-    )
+    building_ids, scene_buildings, bounds = _scene_payload(scene_paths)
     building_ids = [bid for bid in building_ids if bid in buildings.index]
 
     # Door metadata + a quick mercator lookup for each building's door point.
@@ -120,15 +168,15 @@ def build_routes(city_path, diary_path, out_path):
                 int(buildings.loc[to_id, "door_cell_y"]),
             )
             blocks = [(int(cx), int(cy)) for cx, cy in city.get_shortest_path(start, end)]
-            # The first and last blocks are the door cells themselves; represent those
-            # ends with the real door points and only convert the intervening street
-            # cells, so the polyline runs door -> streets -> door without backtracking.
-            middle = _to_mercator(city, blocks[1:-1]) if len(blocks) > 2 else []
-            path = _dedupe([door_xy[from_id], *middle, door_xy[to_id]])
+            centerline = _street_centers(blocks, street_centers)
+            path = _dedupe([door_xy[from_id], *centerline, door_xy[to_id]])
             routes.append(
                 {
+                    "id": f"{from_id}->{to_id}",
                     "from": from_id,
                     "to": to_id,
+                    "from_type": str(buildings.loc[from_id, "building_type"]),
+                    "to_type": str(buildings.loc[to_id, "building_type"]),
                     "blocks": [[cx, cy] for cx, cy in blocks],
                     "path": path,
                 }
@@ -136,8 +184,10 @@ def build_routes(city_path, diary_path, out_path):
 
     payload = {
         "crs": "EPSG:3857",
-        "source": "Garden City shortest paths via nomad City.get_shortest_path",
+        "source": "Garden City street-center routes via nomad City.get_shortest_path",
+        "bounds": bounds,
         "streets": _street_records(city),
+        "buildings": scene_buildings,
         "doors": doors,
         "routes": routes,
     }
@@ -149,11 +199,11 @@ def build_routes(city_path, diary_path, out_path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--city", type=Path, default=DEFAULT_CITY)
-    parser.add_argument("--diary", type=Path, default=DEFAULT_DIARY)
+    parser.add_argument("--scene", dest="scenes", action="append", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
 
-    building_ids, route_count = build_routes(args.city, args.diary, args.out)
+    building_ids, route_count = build_routes(args.city, args.scenes or DEFAULT_SCENES, args.out)
     print(f"Buildings: {building_ids}")
     print(f"Wrote {route_count} routes to {args.out}")
     return 0

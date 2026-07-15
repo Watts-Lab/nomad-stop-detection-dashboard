@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { BarChart3, Columns2, HelpCircle, RefreshCw, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,7 +12,9 @@ import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
 
 const demoTrajectoryOptions = [
-  { id: "two-building", name: "2-building trajectory" },
+  { id: "two-stop", name: "Two-stop trajectory" },
+  { id: "four-stop-high-ha", name: "Four-stop high HA" },
+  { id: "four-stop-low-ha", name: "Four-stop low HA" },
 ]
 
 export function DemoView({
@@ -79,6 +82,9 @@ export function DemoView({
   openMetricsFromDemo: () => void
   startTour: () => void
 }) {
+  const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
+  const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
@@ -159,8 +165,8 @@ export function DemoView({
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
+              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>
             {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}

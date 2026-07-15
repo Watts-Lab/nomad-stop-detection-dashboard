@@ -43,7 +43,7 @@ function NomadDashboard() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
-  const [demoTrajectory, setDemoTrajectory] = useState("two-building")
+  const [demoTrajectory, setDemoTrajectory] = useState("two-stop")
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
@@ -129,6 +129,7 @@ function NomadDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           seed,
+          trajectory: demoTrajectory,
           mode: compareMode ? "compare" : "single",
           left: {
             algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
@@ -157,7 +158,7 @@ function NomadDashboard() {
       if (requestId !== compareRequestIdRef.current) return
       setCompareLoading(false)
     }
-  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode])
+  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, demoTrajectory])
 
   const handleNewTrajectory = useCallback(() => {
     const nextSeed = compareSeed + 1

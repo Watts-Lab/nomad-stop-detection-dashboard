@@ -8,6 +8,7 @@ export const runtime = "nodejs"
 
 type ComparePayload = {
   seed?: number
+  trajectory?: string
   mode?: "single" | "compare"
   left?: {
     algo?: string
@@ -130,6 +131,8 @@ const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
   : path.resolve(process.cwd(), "..", "cached_results")
 
 const STOP_CACHE_DIR = path.join(CACHE_ROOT, "stop-detection-cache")
+const DEFAULT_TRAJECTORY = "two-stop"
+const TRAJECTORY_DIRS = new Set([DEFAULT_TRAJECTORY, "four-stop-high-ha", "four-stop-low-ha"])
 
 // Maps the normalized demo algorithm id to its directory key inside the cache.
 const ALGO_DIR: Record<string, string> = {
@@ -157,36 +160,39 @@ function readJsonIfExists<T>(filePath: string): T | null {
   return JSON.parse(raw) as T
 }
 
-let manifestCache: Manifest | null | undefined
-function loadManifest(): Manifest | null {
-  if (manifestCache === undefined) {
-    manifestCache = readJsonIfExists<Manifest>(path.join(STOP_CACHE_DIR, "manifest.json"))
-  }
-  return manifestCache
+const manifestCaches = new Map<string, Manifest | null>()
+function loadManifest(cacheDir: string): Manifest | null {
+  const cached = manifestCaches.get(cacheDir)
+  if (cached !== undefined) return cached
+  const manifest = readJsonIfExists<Manifest>(path.join(cacheDir, "manifest.json"))
+  manifestCaches.set(cacheDir, manifest)
+  return manifest
 }
 
-let configsFileCache: ConfigsFile["configs"] | null | undefined
-function loadConfigsFile(manifest: Manifest): ConfigsFile["configs"] | null {
-  if (configsFileCache === undefined) {
-    configsFileCache = readJsonIfExists<ConfigsFile>(path.join(STOP_CACHE_DIR, manifest.shared_files.configs))?.configs ?? null
-  }
-  return configsFileCache
+const configsFileCaches = new Map<string, ConfigsFile["configs"] | null>()
+function loadConfigsFile(cacheDir: string, manifest: Manifest): ConfigsFile["configs"] | null {
+  const cached = configsFileCaches.get(cacheDir)
+  if (cached !== undefined) return cached
+  const configs = readJsonIfExists<ConfigsFile>(path.join(cacheDir, manifest.shared_files.configs))?.configs ?? null
+  configsFileCaches.set(cacheDir, configs)
+  return configs
 }
 
-async function readParquet(relPath: string): Promise<Record<string, unknown>[] | null> {
-  const file = path.join(STOP_CACHE_DIR, relPath)
+async function readParquet(cacheDir: string, relPath: string): Promise<Record<string, unknown>[] | null> {
+  const file = path.join(cacheDir, relPath)
   if (!fs.existsSync(file)) return null
   const buffer = await asyncBufferFromFile(file)
   return parquetReadObjects({ file: buffer, compressors })
 }
 
-// algoDir -> config rows (params are numeric; bigint columns from parquet coerced).
+// `${cacheDir}|${algoDir}` -> config rows (params are numeric; bigint columns from parquet coerced).
 const configCache = new Map<string, ConfigRow[]>()
 
-function loadConfigs(algoDir: string, entry: ManifestEntry, manifest: Manifest): ConfigRow[] | null {
-  const cached = configCache.get(algoDir)
+function loadConfigs(cacheDir: string, algoDir: string, entry: ManifestEntry, manifest: Manifest): ConfigRow[] | null {
+  const cacheKey = `${cacheDir}|${algoDir}`
+  const cached = configCache.get(cacheKey)
   if (cached) return cached
-  const allConfigs = loadConfigsFile(manifest)
+  const allConfigs = loadConfigsFile(cacheDir, manifest)
   if (!allConfigs) return null
   const configs = allConfigs
     .filter((row) => row.algorithm === algoDir)
@@ -199,21 +205,22 @@ function loadConfigs(algoDir: string, entry: ManifestEntry, manifest: Manifest):
       label_column: String(row.label_column),
       key: String(row.key),
     }))
-  configCache.set(algoDir, configs)
+  configCache.set(cacheKey, configs)
   return configs
 }
 
-// algoDir -> (`${user_id}|${timestamp}` -> wide labels row of per-config cluster columns).
+// `${cacheDir}|${algoDir}` -> (`${user_id}|${timestamp}` -> wide labels row of per-config cluster columns).
 const labelCache = new Map<string, Map<string, Record<string, unknown>>>()
 
-async function loadLabels(algoDir: string, entry: ManifestEntry): Promise<Map<string, Record<string, unknown>> | null> {
-  const cached = labelCache.get(algoDir)
+async function loadLabels(cacheDir: string, algoDir: string, entry: ManifestEntry): Promise<Map<string, Record<string, unknown>> | null> {
+  const cacheKey = `${cacheDir}|${algoDir}`
+  const cached = labelCache.get(cacheKey)
   if (cached) return cached
-  const rows = await readParquet(entry.labels)
+  const rows = await readParquet(cacheDir, entry.labels)
   if (!rows) return null
   const map = new Map<string, Record<string, unknown>>()
   for (const row of rows) map.set(`${row.user_id}|${Number(row.timestamp)}`, row)
-  labelCache.set(algoDir, map)
+  labelCache.set(cacheKey, map)
   return map
 }
 
@@ -246,21 +253,22 @@ function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Recor
 
 // Returns real per-ping cluster labels aligned to orderedTimestamps for one config.
 async function labelsForUser(
+  cacheDir: string,
   algo: string,
   userId: string,
   orderedTimestamps: number[],
   params: Record<string, number>,
 ): Promise<{ labels: number[]; configKey: string } | null> {
-  const manifest = loadManifest()
+  const manifest = loadManifest(cacheDir)
   if (!manifest) return null
   const algoDir = ALGO_DIR[algo] ?? algo
   const entry = manifest.algorithms[algoDir]
   if (!entry) return null
-  const configs = loadConfigs(algoDir, entry, manifest)
+  const configs = loadConfigs(cacheDir, algoDir, entry, manifest)
   if (!configs) return null
   const config = resolveConfig(entry, configs, params)
   if (!config) return null
-  const index = await loadLabels(algoDir, entry)
+  const index = await loadLabels(cacheDir, algoDir, entry)
   if (!index) return null
   const labels = orderedTimestamps.map((timestamp) => {
     const row = index.get(`${userId}|${timestamp}`)
@@ -290,15 +298,19 @@ function prettyAlgoName(algo: string): string {
   return names[algo] ?? algo.toUpperCase()
 }
 
+function cacheDirForTrajectory(trajectory: string | undefined): string {
+  const trajectoryDir = trajectory && TRAJECTORY_DIRS.has(trajectory) ? trajectory : DEFAULT_TRAJECTORY
+  return path.join(STOP_CACHE_DIR, trajectoryDir)
+}
+
 // The selected user and its ordered ping timestamps are kept alongside the client
 // scene so labels can be joined by (user_id, timestamp) server-side.
 type SeedScene = { response: CompareSceneResponse; userId: string; orderedTimestamps: number[] }
 
-function sceneForSeed(seed: number): SeedScene | null {
-  const scenePath = path.join(STOP_CACHE_DIR, "scene.json")
-  const routesPath = path.join(STOP_CACHE_DIR, "routes.json")
+function sceneForSeed(cacheDir: string, seed: number): SeedScene | null {
+  const scenePath = path.join(cacheDir, "scene.json")
   const scene = readJsonIfExists<SceneCache>(scenePath)
-  const routes = readJsonIfExists<RoutesCache>(routesPath)
+  const routes = readJsonIfExists<RoutesCache>(path.join(STOP_CACHE_DIR, "routes.json"))
   if (!scene || scene.users.length === 0) return null
 
   const user = scene.users[Math.abs(seed) % scene.users.length]
@@ -334,6 +346,7 @@ function sceneForSeed(seed: number): SeedScene | null {
 }
 
 async function buildPanel(
+  cacheDir: string,
   algo: string,
   params: Record<string, number> | undefined,
   cache: CompareCache | null,
@@ -341,7 +354,7 @@ async function buildPanel(
 ): Promise<ComparePanelResponse> {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
-  const cachedLabels = seed ? await labelsForUser(normalized, seed.userId, seed.orderedTimestamps, params ?? {}) : null
+  const cachedLabels = seed ? await labelsForUser(cacheDir, normalized, seed.userId, seed.orderedTimestamps, params ?? {}) : null
 
   return {
     algo: normalized,
@@ -362,9 +375,10 @@ export async function POST(req: NextRequest) {
 
     const mode = payload.mode === "single" ? "single" : "compare"
     const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
+    const cacheDir = cacheDirForTrajectory(payload.trajectory)
     const leftAlgo = normalizeAlgo(payload.left?.algo)
     const rightAlgo = normalizeAlgo(payload.right?.algo)
-    const scene = sceneForSeed(seed)
+    const scene = sceneForSeed(cacheDir, seed)
 
     const body: {
       seed: number
@@ -374,11 +388,11 @@ export async function POST(req: NextRequest) {
     } = {
       seed,
       mode,
-      left: await buildPanel(leftAlgo, payload.left?.params, cache, scene),
+      left: await buildPanel(cacheDir, leftAlgo, payload.left?.params, cache, scene),
     }
 
     if (mode === "compare") {
-      body.right = await buildPanel(rightAlgo, payload.right?.params, cache, scene)
+      body.right = await buildPanel(cacheDir, rightAlgo, payload.right?.params, cache, scene)
     }
 
     return NextResponse.json(body)

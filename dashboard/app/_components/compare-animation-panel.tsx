@@ -15,6 +15,7 @@ import type {
 } from "../_lib/types"
 
 const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
+type PlaybackState = "playing" | "paused" | "complete"
 
 function DemoSceneRenderer({
   panel,
@@ -26,6 +27,10 @@ function DemoSceneRenderer({
   showStops,
   variant = "full",
   onPreviewComplete,
+  previewRunId = 0,
+  onReplayStart,
+  sharedPlaybackState = "complete",
+  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse
   mode: "single" | "compare"
@@ -36,15 +41,23 @@ function DemoSceneRenderer({
   showStops: boolean
   variant?: "full" | "preview"
   onPreviewComplete?: () => void
+  previewRunId?: number
+  onReplayStart?: () => void
+  sharedPlaybackState?: PlaybackState
+  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => {})
   const replayRef = useRef<() => void>(() => {})
+  const previewRef = useRef<() => void>(() => {})
+  const onReplayStartRef = useRef(onReplayStart)
+  const sharedPlaybackStateRef = useRef(sharedPlaybackState)
+  const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
-  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+  const [playbackState, setPlaybackState] = useState<PlaybackState>("complete")
   const labels = useMemo(() => {
     if (!scene) return []
     // Prefer the real cached labels from the stop-detection cache; fall back to the
@@ -280,12 +293,16 @@ function DemoSceneRenderer({
     let sequenceIndex = 0
     let paused = true
     let timer = 0
+    let routeGlowFrame = 0
+    let routeGlowStartedAt = 0
     let pulsePhase = 0
     let pulseStrength = 0
     let hoverPingIndex: number | null = null
     const syncPlaybackState = () => {
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
-      setPlaybackState(atEnd && paused ? "complete" : paused ? "paused" : "playing")
+      const nextState = atEnd && paused ? "complete" : paused ? "paused" : "playing"
+      setPlaybackState(nextState)
+      onPlaybackStateChangeRef.current?.(nextState)
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
@@ -397,42 +414,87 @@ function DemoSceneRenderer({
             : 0,
       ]).sort((a, b) => a[1] - b[1])
     }
-    // Places a direction arrow at the arc-length midpoint of a route polyline,
-    // pointing toward the next vertex so it reads as the agent's travel direction.
-    const arrowItemFor = (points: number[][], isFallback: boolean): number[] | null => {
-      if (!points || points.length < 2) return null
-      const segmentLengths: number[] = []
-      let total = 0
-      for (let index = 1; index < points.length; index += 1) {
-        const length = Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1])
-        segmentLengths.push(length)
-        total += length
-      }
-      if (total === 0) return null
-      const half = total / 2
-      let accumulated = 0
-      let segmentIndex = segmentLengths.length - 1
-      for (let index = 0; index < segmentLengths.length; index += 1) {
-        if (accumulated + segmentLengths[index] >= half) {
-          segmentIndex = index
-          break
-        }
-        accumulated += segmentLengths[index]
-      }
-      const start = points[segmentIndex]
-      const end = points[segmentIndex + 1]
-      const fraction = (half - accumulated) / (segmentLengths[segmentIndex] || 1)
-      const midX = start[0] + (end[0] - start[0]) * fraction
-      const midY = start[1] + (end[1] - start[1]) * fraction
-      return [midX, midY, end[0], end[1], isFallback ? 1 : 0]
-    }
-    const directionArrowsFor = (route: ReturnType<typeof routeProgressAt>) =>
+    const buildingGlowData = (timestampSeconds: number) =>
+      buildingsSeriesData(timestampSeconds).filter(([, state]) => state > 0 && state < 2)
+    const routeGlowPoints = (route: ReturnType<typeof routeProgressAt>) =>
       [
-        ...route.completedCached.map((points) => arrowItemFor(points, false)),
-        ...route.completedFallback.map((points) => arrowItemFor(points, true)),
-        arrowItemFor(route.activeCached, false),
-        arrowItemFor(route.activeFallback, true),
-      ].filter((item): item is number[] => item !== null)
+        ...route.completedCached,
+        ...route.completedFallback,
+        route.activeCached,
+        route.activeFallback,
+      ].filter((points) => points.length > 1).flatMap((points, index) => index === 0 ? points : points.slice(1))
+    const routeLength = (points: number[][]) =>
+      points.slice(1).reduce((total, point, index) => {
+        const previous = points[index]
+        return total + Math.hypot(point[0] - previous[0], point[1] - previous[1])
+      }, 0)
+    const routeMarkerAt = (points: number[][], distance: number): number[] | null => {
+      if (points.length < 2) return null
+      if (distance <= 0) return [points[0][0], points[0][1], points[1][0], points[1][1]]
+      let walked = 0
+      for (let index = 1; index < points.length; index += 1) {
+        const previous = points[index - 1]
+        const next = points[index]
+        const segmentLength = Math.hypot(next[0] - previous[0], next[1] - previous[1])
+        if (walked + segmentLength > distance) {
+          const local = segmentLength === 0 ? 1 : (distance - walked) / segmentLength
+          return [
+            previous[0] + (next[0] - previous[0]) * local,
+            previous[1] + (next[1] - previous[1]) * local,
+            next[0],
+            next[1],
+          ]
+        }
+        walked += segmentLength
+      }
+      const previous = points[points.length - 2]
+      const last = points[points.length - 1]
+      return [last[0], last[1], last[0] + last[0] - previous[0], last[1] + last[1] - previous[1]]
+    }
+    const stopRouteGlow = () => {
+      if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
+      routeGlowFrame = 0
+      mapChart.setOption({ series: [{ id: "route-glow", data: [] }] }, { lazyUpdate: true })
+    }
+    const routeGlowAllowed = () =>
+      showGroundTruth && paused && (syncMaster || (mode === "compare" && sharedPlaybackStateRef.current !== "playing"))
+    const startRouteGlow = () => {
+      if (routeGlowFrame || !routeGlowAllowed()) return
+      routeGlowStartedAt = performance.now()
+      const routeGlowSpeed = 30
+      const routeGlowStartDelay = 1
+      const routeGlowFadeInSeconds = 0.5
+      const routeGlowEndHoldSeconds = 1
+      const routeGlowFadeOutSeconds = 0.5
+      const step = (now: number) => {
+        if (!routeGlowAllowed()) {
+          stopRouteGlow()
+          return
+        }
+        const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
+        const points = routeGlowPoints(routeProgressAt(timestampSeconds))
+        const length = routeLength(points)
+        const travelSeconds = length / routeGlowSpeed
+        const endHoldStarts = routeGlowStartDelay + travelSeconds
+        const fadeOutStarts = endHoldStarts + routeGlowEndHoldSeconds
+        const cycleSeconds = fadeOutStarts + routeGlowFadeOutSeconds
+        const cycleElapsed = ((now - routeGlowStartedAt) / 1000) % cycleSeconds
+        const distance = Math.min(length, Math.max(0, cycleElapsed - routeGlowStartDelay) * routeGlowSpeed)
+        const marker = length > 0 ? routeMarkerAt(points, distance) : null
+        const opacity = cycleElapsed < routeGlowFadeInSeconds
+          ? cycleElapsed / routeGlowFadeInSeconds * 0.98
+          : cycleElapsed > fadeOutStarts
+            ? (cycleSeconds - cycleElapsed) / routeGlowFadeOutSeconds * 0.98
+            : 0.98
+        mapChart.setOption({ series: [{ id: "route-glow", data: marker ? [[...marker, opacity]] : [] }] }, { lazyUpdate: true })
+        routeGlowFrame = window.requestAnimationFrame(step)
+      }
+      routeGlowFrame = window.requestAnimationFrame(step)
+    }
+    const syncRouteGlow = () => {
+      if (routeGlowAllowed()) startRouteGlow()
+      else stopRouteGlow()
+    }
     const renderScene = (timestampSeconds: number) => {
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
@@ -446,11 +508,13 @@ function DemoSceneRenderer({
       mapChart.setOption({
         series: [
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
+          { id: "building-glow", data: buildingGlowData(timestampSeconds) },
           { id: "completed-paths", data: showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
           { id: "completed-fallback-paths", data: showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
           { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
           { id: "next-path", data: showGroundTruth && route.next.length > 0 ? [{ coords: route.next }] : [] },
+          { id: "route-glow", data: [] },
           { id: "ghost-pings", data: chartData.pingData },
           { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
           { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3], point[2])]) : [] },
@@ -458,9 +522,9 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[2], edge.value[0]) } })) : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
           { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, chartData.pingData[latestPingIndex][2]) } }] },
-          { id: "direction-arrows", data: showGroundTruth ? directionArrowsFor(route) : [] },
         ],
       }, { lazyUpdate: true })
+      syncRouteGlow()
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: chartData.pingData.map((_, index) => index) },
@@ -478,6 +542,7 @@ function DemoSceneRenderer({
           { id: "active-path", data: [] },
           { id: "active-fallback-path", data: [] },
           { id: "next-path", data: [] },
+          { id: "route-glow", data: [] },
           { id: "ghost-pings", data: previewPings },
           { id: "noise-pings", data: [] },
           { id: "cluster-pings", data: [] },
@@ -485,7 +550,6 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
-          { id: "direction-arrows", data: [] },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -600,22 +664,36 @@ function DemoSceneRenderer({
       } else {
         paused = true
         syncPlaybackState()
+        renderScene(timestampSeconds)
         if (variant === "preview") onPreviewComplete?.()
       }
     }
     const replay = () => {
       window.clearTimeout(timer)
       paused = false
+      stopRouteGlow()
       sequenceIndex = 0
       setPlaybackState("playing")
+      onPlaybackStateChangeRef.current?.("playing")
+      onReplayStartRef.current?.()
       playTrajectoryPreview(() => {
         onTimeChange(chartData.timeSequence[0])
         if (syncMaster) timer = window.setTimeout(advance, startDelay)
       })
     }
+    const playLocalPreview = () => {
+      window.clearTimeout(timer)
+      stopRouteGlow()
+      playTrajectoryPreview(() => {
+        paused = true
+        syncPlaybackState()
+        renderScene(activeTimestamp())
+      })
+    }
     const toggle = () => {
       paused = !paused
       syncPlaybackState()
+      renderScene(activeTimestamp())
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
     const resize = () => {
@@ -706,18 +784,36 @@ function DemoSceneRenderer({
           data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
-            const state = Number(api.value(1))
-            const isCurrent = state > 0 && state < 2
-            const currentPulse = isCurrent ? state - 1 : 0
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
                 fill: "#8b8b8b",
-                stroke: isCurrent ? `rgba(15, 118, 110, ${0.55 + currentPulse * 0.4})` : "#ffffff",
-                lineWidth: isCurrent ? 2.2 + currentPulse * 1.2 : 2,
-                shadowBlur: isCurrent ? 5 + currentPulse * 9 : 0,
-                shadowColor: isCurrent ? `rgba(15, 118, 110, ${0.18 + currentPulse * 0.32})` : "transparent",
+                stroke: "#ffffff",
+                lineWidth: 2,
+              },
+            }
+          },
+        },
+        {
+          id: "building-glow",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 2,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const building = chartData.buildings[Number(api.value(0))]
+            const currentPulse = Number(api.value(1)) - 1
+            return {
+              type: "polygon",
+              shape: { points: building.coords.map((coord) => api.coord(coord)) },
+              style: {
+                fill: "transparent",
+                stroke: `rgba(15, 118, 110, ${0.62 + currentPulse * 0.35})`,
+                lineWidth: 2.4 + currentPulse * 1.2,
+                shadowBlur: 6 + currentPulse * 10,
+                shadowColor: `rgba(15, 118, 110, ${0.2 + currentPulse * 0.32})`,
               },
             }
           },
@@ -799,6 +895,44 @@ function DemoSceneRenderer({
             shadowColor: "rgba(217, 75, 69, 0.26)",
           },
         },
+        {
+          id: "route-glow",
+          name: "Route glow",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 6,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const mid = api.coord([api.value(0), api.value(1)])
+            const ahead = api.coord([api.value(2), api.value(3)])
+            const opacity = Number(api.value(4))
+            let dx = ahead[0] - mid[0]
+            let dy = ahead[1] - mid[1]
+            const length = Math.hypot(dx, dy) || 1
+            dx /= length
+            dy /= length
+            const perpX = -dy
+            const perpY = dx
+            const reach = 8
+            const halfWidth = 5.5
+            const tip = [mid[0] + dx * reach, mid[1] + dy * reach]
+            const left = [mid[0] - dx * reach + perpX * halfWidth, mid[1] - dy * reach + perpY * halfWidth]
+            const right = [mid[0] - dx * reach - perpX * halfWidth, mid[1] - dy * reach - perpY * halfWidth]
+            return {
+              type: "polygon",
+              shape: { points: [tip, left, right] },
+              style: {
+                fill: "#0f766e",
+                stroke: "#ffffff",
+                lineWidth: 1,
+                shadowBlur: 10,
+                shadowColor: `rgba(15, 118, 110, ${opacity * 0.43})`,
+                opacity,
+              },
+            }
+          },
+        },
         { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: [], symbolSize: 5, itemStyle: { color: "#000000" } },
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
         {
@@ -855,39 +989,6 @@ function DemoSceneRenderer({
           itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
         },
         { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 9, data: [], symbolSize: 9, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.5, brushType: "stroke" }, itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.4, opacity: 0.95 } },
-        {
-          id: "direction-arrows",
-          name: "Travel direction",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 6,
-          data: [],
-          // Each datum is [midX, midY, aheadX, aheadY, isFallback]; the arrow is drawn
-          // in pixel space at the segment midpoint, pointing toward the "ahead" point.
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const mid = api.coord([api.value(0), api.value(1)])
-            const ahead = api.coord([api.value(2), api.value(3)])
-            let dx = ahead[0] - mid[0]
-            let dy = ahead[1] - mid[1]
-            const length = Math.hypot(dx, dy) || 1
-            dx /= length
-            dy /= length
-            const perpX = -dy
-            const perpY = dx
-            const reach = 8
-            const halfWidth = 5.5
-            const tip = [mid[0] + dx * reach, mid[1] + dy * reach]
-            const left = [mid[0] - dx * reach + perpX * halfWidth, mid[1] - dy * reach + perpY * halfWidth]
-            const right = [mid[0] - dx * reach - perpX * halfWidth, mid[1] - dy * reach - perpY * halfWidth]
-            const color = api.value(4) ? "#d94b45" : "#0f766e"
-            return {
-              type: "polygon",
-              shape: { points: [tip, left, right] },
-              style: { fill: color, stroke: "#ffffff", lineWidth: 1, opacity: 0.96 },
-            }
-          },
-        },
       ],
     })
 
@@ -945,6 +1046,7 @@ function DemoSceneRenderer({
     const timelineEl = timelineRef.current
     toggleRef.current = toggle
     replayRef.current = replay
+    previewRef.current = playLocalPreview
     renderSceneRef.current = (timestampSeconds) => {
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
@@ -970,17 +1072,24 @@ function DemoSceneRenderer({
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
       pulsePhase = ended ? 0 : pulsePhase + 0.24
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
-      mapChart.setOption({ series: [{ id: "buildings", data: buildingsSeriesData(timestampSeconds) }] })
+      mapChart.setOption({
+        series: [
+          { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
+          { id: "building-glow", data: buildingGlowData(timestampSeconds) },
+        ],
+      })
     }, 80)
 
     return () => {
       window.clearTimeout(timer)
       window.clearInterval(pulseTimer)
+      if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       window.removeEventListener("resize", resize)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
       toggleRef.current = () => {}
       replayRef.current = () => {}
+      previewRef.current = () => {}
       mapChart.off("mouseover", onMapMouseOver)
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
@@ -991,7 +1100,26 @@ function DemoSceneRenderer({
       mapChart.dispose()
       timelineChart.dispose()
     }
-  }, [chartData, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
+  }, [chartData, mode, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
+
+  useEffect(() => {
+    onReplayStartRef.current = onReplayStart
+  }, [onReplayStart])
+
+  useEffect(() => {
+    onPlaybackStateChangeRef.current = onPlaybackStateChange
+  }, [onPlaybackStateChange])
+
+  useEffect(() => {
+    sharedPlaybackStateRef.current = sharedPlaybackState
+    if (syncMaster) return
+    renderSceneRef.current?.(selectedTimestampRef.current ?? currentTime ?? 0)
+  }, [currentTime, sharedPlaybackState, syncMaster])
+
+  useEffect(() => {
+    if (!previewRunId || syncMaster) return
+    previewRef.current()
+  }, [previewRunId, syncMaster])
 
   useEffect(() => {
     if (!chartData || currentTime !== null) return
@@ -1066,6 +1194,10 @@ export function CompareAnimationPanel({
   syncMaster = true,
   showGroundTruth,
   showStops,
+  previewRunId,
+  onReplayStart,
+  sharedPlaybackState,
+  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1074,6 +1206,10 @@ export function CompareAnimationPanel({
   syncMaster?: boolean
   showGroundTruth: boolean
   showStops: boolean
+  previewRunId?: number
+  onReplayStart?: () => void
+  sharedPlaybackState?: PlaybackState
+  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const sceneMetadata = panel?.scene ? `Agent: ${panel.scene.user_id}` : null
 
@@ -1088,7 +1224,7 @@ export function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} sharedPlaybackState={sharedPlaybackState} onPlaybackStateChange={onPlaybackStateChange} />
           </div>
         ) : (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">

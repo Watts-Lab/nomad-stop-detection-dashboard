@@ -9,8 +9,8 @@ Run from the repository root:
     python dashboard/scripts/build_routes.py
 
 The output JSON is consumed by app/api/algorithm-compare/route.ts (RoutesCache) and
-keyed by "<from_id>-><to_id>". Building pairs are taken from the cached trajectory
-scenes so the shared route file covers the dashboard demo trajectories.
+keyed by "<from_id>-><to_id>". By default this rebuilds the two-stop route cache;
+pass --scene and --out for the four-stop cache roots.
 """
 
 from __future__ import annotations
@@ -26,9 +26,7 @@ from nomad.city_gen import City
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CITY = Path(data_folder.__file__).parent / "garden-city.gpkg"
 DEFAULT_SCENES = [
-    REPO_ROOT / "cached_results" / "stop-detection-cache" / "two-stop" / "scene.json",
-    REPO_ROOT / "cached_results" / "stop-detection-cache" / "four-stop-high-ha" / "scene.json",
-    REPO_ROOT / "cached_results" / "stop-detection-cache" / "four-stop-low-ha" / "scene.json",
+    REPO_ROOT / "cached_results" / "stop-detection-cache" / "scene.json",
 ]
 DEFAULT_OUT = REPO_ROOT / "cached_results" / "stop-detection-cache" / "routes.json"
 

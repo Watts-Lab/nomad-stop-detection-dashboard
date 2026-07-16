@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
-import { assignDemoClusters } from "../_lib/dashboard-utils"
 import type {
   ComparePanelResponse,
   EChartsApi,
@@ -60,13 +59,12 @@ function DemoSceneRenderer({
   const [playbackState, setPlaybackState] = useState<PlaybackState>("complete")
   const labels = useMemo(() => {
     if (!scene) return []
-    // Prefer the real cached labels from the stop-detection cache; fall back to the
-    // client-side approximation only if the cache has no matching rows for this user/config.
     if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
-    return assignDemoClusters(panel.algo, scene.pings, panel.params)
-  }, [panel.labels, panel.algo, panel.params, scene])
+    return []
+  }, [panel.labels, scene])
   const chartData = useMemo(() => {
     if (!scene || scene.pings.length === 0) return null
+    if (labels.length !== scene.pings.length) return null
 
     const pings = scene.pings.map((ping, index) => ({
       i: index,
@@ -76,6 +74,7 @@ function DemoSceneRenderer({
       time: new Date(ping.timestamp * 1000).toISOString().slice(11, 19) + " UTC",
       cluster: labels[index],
     }))
+    const pingIndexByTimestamp = new Map(pings.map((ping) => [ping.t, ping.i]))
     const pingData = pings.map((ping) => [ping.x, ping.y, ping.cluster, ping.i, ping.t])
     const buildings = scene.buildings.flatMap((building) =>
       building.rings.map((ring) => {
@@ -98,6 +97,10 @@ function DemoSceneRenderer({
       }),
     )
     const buildingById = new Map(buildings.map((building) => [building.id, building]))
+    const blockSide = Math.min(...buildings.flatMap((building) => [
+      building.maxX - building.minX,
+      building.maxY - building.minY,
+    ]).filter((span) => span > 0))
     const destinationFor = (x: number, y: number) => {
       const containing = buildings.find((building) =>
         x >= building.minX && x <= building.maxX && y >= building.minY && y <= building.maxY
@@ -172,8 +175,54 @@ function DemoSceneRenderer({
         }
       })
     }) : []
-    const anchorPointData = firstAnchorData
-    const anchorEdgeData = firstAnchorEdges
+    const lachesisDiameterFrames = panel.algo === "lachesis" ? stops.flatMap((stop, stopIndex) => {
+      const members = pings.filter((ping) => ping.cluster === stop.cluster)
+      if (members.length < 2) return []
+      let bestStart = members[0]
+      let bestEnd = members[1]
+      let bestDistance = bestStart && bestEnd ? Math.hypot(bestEnd.x - bestStart.x, bestEnd.y - bestStart.y) : 0
+      return members.slice(1).map((ping, index) => {
+        for (const previous of members.slice(0, index + 1)) {
+          const distance = Math.hypot(ping.x - previous.x, ping.y - previous.y)
+          if (distance > bestDistance) {
+            bestStart = previous
+            bestEnd = ping
+            bestDistance = distance
+          }
+        }
+        return {
+          stopIndex,
+          t: ping.t,
+          edge: {
+            coords: [[bestStart.x, bestStart.y], [bestEnd.x, bestEnd.y]],
+            value: [stop.cluster, bestStart.i, bestEnd.i, stopIndex, ping.t],
+          },
+        }
+      })
+    }) : []
+    const cachedCorePointKeys = new Set<string>()
+    const cachedCorePointData = (panel.corePoints ?? []).flatMap((point) => {
+      const pingIndex = pingIndexByTimestamp.get(point.timestamp)
+      const roleIsCore = point.role === "core" || point.role === "anchor" || point.role.endsWith("_core")
+      if (pingIndex === undefined || !roleIsCore) return []
+      const key = `${point.timestamp}|${point.cluster}|${point.role}`
+      if (cachedCorePointKeys.has(key)) return []
+      cachedCorePointKeys.add(key)
+      return [[point.x, point.y, point.cluster, pingIndex, point.cluster, point.timestamp]]
+    })
+    const cachedCoreEdges = (panel.corePoints ?? []).flatMap((point) => {
+      const pingIndex = pingIndexByTimestamp.get(point.timestamp)
+      const sourceIndex = pingIndexByTimestamp.get(point.sourceTimestamp)
+      if (pingIndex === undefined || sourceIndex === undefined || point.timestamp === point.sourceTimestamp) return []
+      return [{
+        coords: [[point.sourceX, point.sourceY], [point.x, point.y]],
+        value: [point.cluster, sourceIndex, pingIndex, point.cluster, point.timestamp],
+      }]
+    })
+    const useCachedCorePoints = Boolean(panel.corePoints?.length) && panel.algo !== "sequential-centroid"
+    const anchorPointData = useCachedCorePoints ? cachedCorePointData : firstAnchorData
+    const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
+    const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
       const building = row.location ? buildingById.get(row.location) : null
       return building ? [{ ...row, destination: { id: row.location, center: building.center } }] : []
@@ -212,12 +261,14 @@ function DemoSceneRenderer({
     return {
       streets: scene.routes?.streets ?? [],
       buildings,
+      blockSide,
       pings,
       pingData,
       stops,
       anchorPointData,
       anchorEdgeData,
-      centroidAnchorFrames,
+      centroidAnchorFrames: visibleCentroidAnchorFrames,
+      lachesisDiameterFrames,
       anchorPointMode: panel.algo,
       truthStops,
       segments,
@@ -232,7 +283,7 @@ function DemoSceneRenderer({
       stopEndTimes: stops.map((stop) => stop.end),
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
-  }, [labels, panel.algo, panel.params, scene])
+  }, [labels, panel.algo, panel.corePoints, panel.params, scene])
 
   useEffect(() => {
     if (!scene || !chartData || !mapRef.current || !timelineRef.current) return
@@ -277,7 +328,6 @@ function DemoSceneRenderer({
     const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
     const noisePings = chartData.pingData.filter((point) => point[2] < 0)
     const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
-    const blockSide = Math.abs(chartData.streets[0].coords[1][1] - chartData.streets[0].coords[0][1])
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -316,7 +366,7 @@ function DemoSceneRenderer({
     const edgeOpacity = (pingIndex: number, cluster: number) => associatedWithHover(pingIndex, cluster) ? 0.7 : 0.08
     const pingCircle = (api: EChartsApi) => {
       const center = api.coord([api.value(0), api.value(1)])
-      const edge = api.coord([api.value(0) + blockSide / 8, api.value(1)])
+      const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
       return { center, radius: Math.abs(edge[0] - center[0]) }
     }
     const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
@@ -379,6 +429,13 @@ function DemoSceneRenderer({
     const centroidAnchorFramesAt = (timestampSeconds: number) => {
       const framesByStop = new Map<number, (typeof chartData.centroidAnchorFrames)[number]>()
       chartData.centroidAnchorFrames.forEach((frame) => {
+        if (frame.t <= timestampSeconds) framesByStop.set(frame.stopIndex, frame)
+      })
+      return Array.from(framesByStop.values())
+    }
+    const lachesisDiameterFramesAt = (timestampSeconds: number) => {
+      const framesByStop = new Map<number, (typeof chartData.lachesisDiameterFrames)[number]>()
+      chartData.lachesisDiameterFrames.forEach((frame) => {
         if (frame.t <= timestampSeconds) framesByStop.set(frame.stopIndex, frame)
       })
       return Array.from(framesByStop.values())
@@ -500,9 +557,11 @@ function DemoSceneRenderer({
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
       const centroidAnchorFrames = centroidAnchorFramesAt(timestampSeconds)
+      const lachesisDiameterFrames = lachesisDiameterFramesAt(timestampSeconds)
       const anchorEdges = [
         ...chartData.anchorEdgeData.filter((edge) => edge.value[4] <= timestampSeconds),
         ...centroidAnchorFrames.flatMap((frame) => frame.edges),
+        ...lachesisDiameterFrames.map((frame) => frame.edge),
       ]
 
       mapChart.setOption({
@@ -518,7 +577,7 @@ function DemoSceneRenderer({
           { id: "ghost-pings", data: chartData.pingData },
           { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
           { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3], point[2])]) : [] },
-          { id: "detected-stops", data: showStops && !chartData.anchorPointMode.startsWith("sequential-") ? chartData.stopData.slice(0, detectedStopCount) : [] },
+          { id: "detected-stops", data: [] },
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[2], edge.value[0]) } })) : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
           { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, chartData.pingData[latestPingIndex][2]) } }] },
@@ -743,7 +802,11 @@ function DemoSceneRenderer({
           }
           if (params.seriesId === "anchor-points") {
             const ping = chartData.pings[value[3]]
-            const label = chartData.anchorPointMode === "sequential-centroid" ? "Centroid anchor for" : "Anchor for"
+            const label = chartData.anchorPointMode === "sequential-centroid"
+              ? "Centroid anchor for"
+              : chartData.anchorPointMode.startsWith("sequential-")
+                ? "Anchor for"
+                : "Core point for"
             return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
           }
           if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping") {

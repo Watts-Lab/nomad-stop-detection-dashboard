@@ -8,11 +8,22 @@ export type ComparePanelResponse = {
   scene?: CompareScene | null
   params?: Record<string, number>
   labels?: number[]
+  corePoints?: Array<{
+    timestamp: number
+    role: string
+    sourceTimestamp: number
+    cluster: number
+    x: number
+    y: number
+    sourceX: number
+    sourceY: number
+  }>
   configKey?: string | null
 }
 
 export type CompareApiResponse = {
   seed: number
+  trajectory: string
   mode?: "single" | "compare"
   left: ComparePanelResponse
   right?: ComparePanelResponse

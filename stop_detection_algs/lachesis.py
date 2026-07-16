@@ -12,7 +12,6 @@ import nomad.io.base as loader
 from nomad.stop_detection import utils
 from nomad.stop_detection.sequential import applyParallel
 from nomad.filters import to_timestamp
-from stop_detection_algs.core_points import finish_result, records_to_core_points, _empty_core_points
 
 ##########################################
 ########        Lachesis          ########
@@ -46,7 +45,7 @@ def lachesis_labels(data, dt_max, delta_roam, dur_min=5, core_plotting=False, co
          raise TypeError("Input 'data' must be a pandas DataFrame or GeoDataFrame.")
     if data.empty:
         result = pd.Series(dtype='int64', name='cluster')
-        return finish_result(result, _empty_core_points(), core_plotting, core_plotting_path)
+        return result
 
     t_key, coord_key1, coord_key2, use_datetime, use_lon_lat = utils._fallback_st_cols(data.columns, traj_cols, kwargs)        
     traj_cols = loader._parse_traj_cols(data.columns, traj_cols, kwargs)
@@ -67,8 +66,6 @@ def lachesis_labels(data, dt_max, delta_roam, dur_min=5, core_plotting=False, co
     # all cluster labels initialized as noise
     labels = np.full(n, -1, dtype=int)
     cluster_id = 0
-    records = []
-    uid_values = data[traj_cols['user_id']].to_numpy() if 'user_id' in traj_cols and traj_cols['user_id'] in data.columns else np.full(n, None, dtype=object)
     while i < n - 1:
         t_i = time_series.iloc[i]
         j_star = next((j for j in range(i, n) if (time_series.iloc[j] - t_i) >= dur_min * 60), -1)
@@ -95,45 +92,12 @@ def lachesis_labels(data, dt_max, delta_roam, dur_min=5, core_plotting=False, co
         duration = (time_series.iloc[j_final] - time_series.iloc[i]) // 60
         if duration >= dur_min:
             labels[i : j_final + 1] = cluster_id
-            if core_plotting or core_plotting_path is not None:
-                stop_coords = coords[i : j_final + 1]
-                stop_times = time_series.iloc[i : j_final + 1].to_numpy()
-                stop_users = uid_values[i : j_final + 1]
-                anchor = stop_coords[0]
-                distances = np.linalg.norm(stop_coords - anchor, axis=1)
-                anchor_row = pd.DataFrame({
-                    "user_id": stop_users[:1],
-                    "timestamp": stop_times[:1],
-                    "config_key": config_key,
-                    "role": "anchor",
-                    "source_timestamp": stop_times[:1],
-                    "cluster": cluster_id,
-                    "x": stop_coords[:1, 0],
-                    "y": stop_coords[:1, 1],
-                    "value": distances[:1],
-                    "value_name": "distance_to_anchor",
-                })
-                accepted_rows = pd.DataFrame({
-                    "user_id": stop_users[1:],
-                    "timestamp": stop_times[1:],
-                    "config_key": config_key,
-                    "role": "accepted",
-                    "source_timestamp": stop_times[0],
-                    "cluster": cluster_id,
-                    "x": stop_coords[1:, 0],
-                    "y": stop_coords[1:, 1],
-                    "value": distances[1:],
-                    "value_name": "distance_to_anchor",
-                })
-                records.extend(anchor_row.to_dict("records"))
-                records.extend(accepted_rows.to_dict("records"))
             cluster_id += 1
 
         i = j_final + 1
 
     result = pd.Series(labels, index=data.index, name='cluster')
-    core_points = records_to_core_points(records)
-    return finish_result(result, core_points, core_plotting, core_plotting_path)
+    return result
 
 def lachesis(
     data,
@@ -345,10 +309,5 @@ def lachesis_labels_per_user(
         n_jobs=n_jobs,
         print_progress=print_progress,
     )
-
-    if core_plotting or core_plotting_path is not None:
-        labels = pd.concat([result[0] for result in results]).reindex(data.index)
-        core_points = pd.concat([result[1] for result in results], ignore_index=True)
-        return finish_result(labels, core_points, core_plotting, core_plotting_path)
 
     return pd.concat(results).reindex(data.index)

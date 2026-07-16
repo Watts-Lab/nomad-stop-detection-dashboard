@@ -37,6 +37,7 @@ type ComparePanelResponse = {
   scene?: CompareSceneResponse | null
   params?: Record<string, number>
   labels?: number[]
+  corePoints?: CorePointResponse[]
   configKey?: string | null
 }
 
@@ -44,6 +45,7 @@ type ManifestEntry = {
   display_name: string
   parameter_columns: string[]
   labels: string
+  core_points?: string
 }
 
 type Manifest = {
@@ -51,19 +53,35 @@ type Manifest = {
   algorithm_keys: string[]
   algorithms: Record<string, ManifestEntry>
   users: string[]
-  shared_files: { configs: string }
+  shared_files: {
+    scene: string
+    routes: string
+    configs: string
+  }
 }
 
 // One row of the shared configs.json: swept params (full names) plus the wide
 // labels.parquet column that stores this config's per-ping clusters.
 type ConfigsFile = {
-  configs: Array<Record<string, unknown> & { algorithm: string; key: string; label_column: string }>
+  configs: Array<Record<string, unknown> & { algorithm: string; key: string; label_column: string; config_id: number }>
 }
 
 type ConfigRow = {
   params: Record<string, number>
+  config_id: number
   label_column: string
   key: string
+}
+
+type CorePointResponse = {
+  timestamp: number
+  role: string
+  sourceTimestamp: number
+  cluster: number
+  x: number
+  y: number
+  sourceX: number
+  sourceY: number
 }
 
 type SceneCache = {
@@ -131,8 +149,13 @@ const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
   : path.resolve(process.cwd(), "..", "cached_results")
 
 const STOP_CACHE_DIR = path.join(CACHE_ROOT, "stop-detection-cache")
+const FOUR_STOP_CACHE_DIR = path.join(CACHE_ROOT, "four-stop-cache")
 const DEFAULT_TRAJECTORY = "two-stop"
-const TRAJECTORY_DIRS = new Set([DEFAULT_TRAJECTORY, "four-stop-high-ha", "four-stop-low-ha"])
+const TRAJECTORY_CACHE_DIRS: Record<string, string> = {
+  [DEFAULT_TRAJECTORY]: STOP_CACHE_DIR,
+  "four-stop-low-ha": path.join(FOUR_STOP_CACHE_DIR, "low_ha"),
+  "four-stop-high-ha": path.join(FOUR_STOP_CACHE_DIR, "high_ha"),
+}
 
 // Maps the normalized demo algorithm id to its directory key inside the cache.
 const ALGO_DIR: Record<string, string> = {
@@ -202,6 +225,7 @@ function loadConfigs(cacheDir: string, algoDir: string, entry: ManifestEntry, ma
           .map((col) => [col, Number(row[col])] as const)
           .filter(([, value]) => Number.isFinite(value)),
       ),
+      config_id: Number(row.config_id),
       label_column: String(row.label_column),
       key: String(row.key),
     }))
@@ -221,6 +245,27 @@ async function loadLabels(cacheDir: string, algoDir: string, entry: ManifestEntr
   const map = new Map<string, Record<string, unknown>>()
   for (const row of rows) map.set(`${row.user_id}|${Number(row.timestamp)}`, row)
   labelCache.set(cacheKey, map)
+  return map
+}
+
+// `${cacheDir}|${algoDir}` -> (`${config_id}|${user_id}` -> compact core plotting rows).
+const corePointCache = new Map<string, Map<string, Record<string, unknown>[]>>()
+
+async function loadCorePoints(cacheDir: string, algoDir: string, entry: ManifestEntry): Promise<Map<string, Record<string, unknown>[]> | null> {
+  if (!entry.core_points) return null
+  const cacheKey = `${cacheDir}|${algoDir}`
+  const cached = corePointCache.get(cacheKey)
+  if (cached) return cached
+  const rows = await readParquet(cacheDir, entry.core_points)
+  if (!rows) return null
+  const map = new Map<string, Record<string, unknown>[]>()
+  for (const row of rows) {
+    const key = `${Number(row.config_id)}|${row.user_id}`
+    const existing = map.get(key)
+    if (existing) existing.push(row)
+    else map.set(key, [row])
+  }
+  corePointCache.set(cacheKey, map)
   return map
 }
 
@@ -256,9 +301,10 @@ async function labelsForUser(
   cacheDir: string,
   algo: string,
   userId: string,
+  seedPings: CompareSceneResponse["pings"],
   orderedTimestamps: number[],
   params: Record<string, number>,
-): Promise<{ labels: number[]; configKey: string } | null> {
+): Promise<{ labels: number[]; corePoints: CorePointResponse[]; configKey: string } | null> {
   const manifest = loadManifest(cacheDir)
   if (!manifest) return null
   const algoDir = ALGO_DIR[algo] ?? algo
@@ -274,7 +320,27 @@ async function labelsForUser(
     const row = index.get(`${userId}|${timestamp}`)
     return row ? Number(row[config.label_column]) : -1
   })
-  return { labels, configKey: config.key }
+  const corePointIndex = algoDir === "lachesis" ? null : await loadCorePoints(cacheDir, algoDir, entry)
+  const coreRows = corePointIndex?.get(`${config.config_id}|${userId}`) ?? []
+  const pingByTimestamp = new Map(seedPings.map((ping) => [ping.timestamp, ping]))
+  const corePoints = coreRows.flatMap((row) => {
+    const timestamp = Number(row.timestamp)
+    const sourceTimestamp = Number(row.source_timestamp)
+    const point = pingByTimestamp.get(timestamp)
+    const sourcePoint = pingByTimestamp.get(sourceTimestamp)
+    if (!point || !sourcePoint) return []
+    return [{
+      timestamp,
+      role: String(row.role),
+      sourceTimestamp,
+      cluster: Number(row.cluster),
+      x: point.x,
+      y: point.y,
+      sourceX: sourcePoint.x,
+      sourceY: sourcePoint.y,
+    }]
+  })
+  return { labels, corePoints, configKey: config.key }
 }
 
 function normalizeAlgo(input: string | undefined): string {
@@ -298,19 +364,21 @@ function prettyAlgoName(algo: string): string {
   return names[algo] ?? algo.toUpperCase()
 }
 
-function cacheDirForTrajectory(trajectory: string | undefined): string {
-  const trajectoryDir = trajectory && TRAJECTORY_DIRS.has(trajectory) ? trajectory : DEFAULT_TRAJECTORY
-  return path.join(STOP_CACHE_DIR, trajectoryDir)
+function cacheDirForTrajectory(trajectory: string | undefined): { id: string; cacheDir: string } {
+  const id = trajectory ?? DEFAULT_TRAJECTORY
+  const cacheDir = TRAJECTORY_CACHE_DIRS[id]
+  if (!cacheDir) throw new Error(`Unknown trajectory cache: ${id}`)
+  return { id, cacheDir }
 }
 
 // The selected user and its ordered ping timestamps are kept alongside the client
 // scene so labels can be joined by (user_id, timestamp) server-side.
 type SeedScene = { response: CompareSceneResponse; userId: string; orderedTimestamps: number[] }
 
-function sceneForSeed(cacheDir: string, seed: number): SeedScene | null {
-  const scenePath = path.join(cacheDir, "scene.json")
+function sceneForSeed(cacheDir: string, manifest: Manifest, seed: number): SeedScene | null {
+  const scenePath = path.join(cacheDir, manifest.shared_files.scene)
   const scene = readJsonIfExists<SceneCache>(scenePath)
-  const routes = readJsonIfExists<RoutesCache>(path.join(STOP_CACHE_DIR, "routes.json"))
+  const routes = readJsonIfExists<RoutesCache>(path.join(cacheDir, manifest.shared_files.routes))
   if (!scene || scene.users.length === 0) return null
 
   const user = scene.users[Math.abs(seed) % scene.users.length]
@@ -354,7 +422,9 @@ async function buildPanel(
 ): Promise<ComparePanelResponse> {
   const normalized = normalizeAlgo(algo)
   const fromCache = cache?.panels?.[normalized]
-  const cachedLabels = seed ? await labelsForUser(cacheDir, normalized, seed.userId, seed.orderedTimestamps, params ?? {}) : null
+  const cachedLabels = seed ? await labelsForUser(cacheDir, normalized, seed.userId, seed.response.pings, seed.orderedTimestamps, params ?? {}) : null
+  if (!seed) throw new Error(`Missing scene cache in ${cacheDir}`)
+  if (!cachedLabels) throw new Error(`Missing labels cache for ${normalized} in ${cacheDir}`)
 
   return {
     algo: normalized,
@@ -363,6 +433,7 @@ async function buildPanel(
     scene: seed?.response ?? null,
     params: params ?? {},
     labels: cachedLabels?.labels,
+    corePoints: cachedLabels?.corePoints,
     configKey: cachedLabels?.configKey ?? null,
   }
 }
@@ -375,18 +446,22 @@ export async function POST(req: NextRequest) {
 
     const mode = payload.mode === "single" ? "single" : "compare"
     const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
-    const cacheDir = cacheDirForTrajectory(payload.trajectory)
+    const { id: trajectory, cacheDir } = cacheDirForTrajectory(payload.trajectory)
+    const manifest = loadManifest(cacheDir)
+    if (!manifest) throw new Error(`Missing manifest cache in ${cacheDir}`)
     const leftAlgo = normalizeAlgo(payload.left?.algo)
     const rightAlgo = normalizeAlgo(payload.right?.algo)
-    const scene = sceneForSeed(cacheDir, seed)
+    const scene = sceneForSeed(cacheDir, manifest, seed)
 
     const body: {
       seed: number
+      trajectory: string
       mode: "single" | "compare"
       left: ComparePanelResponse
       right?: ComparePanelResponse
     } = {
       seed,
+      trajectory,
       mode,
       left: await buildPanel(cacheDir, leftAlgo, payload.left?.params, cache, scene),
     }

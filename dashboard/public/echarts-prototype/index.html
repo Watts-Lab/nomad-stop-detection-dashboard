@@ -11,7 +11,7 @@
 
     body {
       margin: 0;
-      padding: 12px;
+      padding: 6px 8px;
       box-sizing: border-box;
       display: flex;
       align-items: center;
@@ -42,7 +42,9 @@
     const params = new URLSearchParams(window.location.search);
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
-    const showLegend = params.get("legend") !== "false";
+    const legendMode = params.get("legend");
+    const showLegend = legendMode !== "false" && legendMode !== "space";
+    const reserveLegendSpace = legendMode !== "false";
     const xMinParam = params.get("xmin");
     const xMaxParam = params.get("xmax");
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
@@ -96,6 +98,9 @@
           .map((userRows) => userRows.reduce((best, d) => (d.recall > best.recall ? d : best)))
           .map((d) => [d.x, d.recall, d.user_id]);
 
+        const highestMeanPoint = meanLine.reduce((best, point) => (point[1] > best[1] ? point : best));
+        const averageUserMax = perUserMaxData.reduce((sum, point) => sum + point[1], 0) / perUserMaxData.length;
+
         const xs = Array.from(grouped.keys()).map(Number).sort((a, b) => a - b);
         const meanPerUserMaxLine = xs.map((x) => [
           x,
@@ -109,7 +114,11 @@
         const xPadding = (maxX - minX) * 0.025;
         const axisMinX = xMinParam === null ? minX - xPadding : Number(xMinParam);
         const axisMaxX = xMaxParam === null ? maxX + xPadding : Number(xMaxParam);
-        const meanPerUserMaxLabel = "Mean per-user max";
+        const meanPerUserMaxLabel = "Mean user max";
+        const highestAverageLabel = "Best mean";
+        const averageUserMaxLabel = "Avg user max";
+        const highestAverageLine = [[axisMinX, highestMeanPoint[1]], [axisMaxX, highestMeanPoint[1]]];
+        const averageUserMaxLine = [[axisMinX, averageUserMax], [axisMaxX, averageUserMax]];
         const emptyHighlight = [];
         const tourFocusSeries = (mode) => {
           if (mode === "points") {
@@ -134,7 +143,7 @@
             return [
               { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.012)", width: 1 } },
               { id: "individual-results", symbolSize: 7, itemStyle: { color: "rgba(31, 119, 180, 0.014)", borderColor: "rgba(31, 119, 180, 0.035)", borderWidth: 1, opacity: 1 } },
-              { id: "per-user-max", symbolSize: 13, itemStyle: { color: "rgba(255, 26, 26, 0.95)", borderColor: "rgba(255, 26, 26, 0.95)", borderWidth: 1.2, opacity: 1 } },
+              { id: "per-user-max", symbolSize: 10, itemStyle: { color: "rgba(185, 28, 28, 0.58)", borderColor: "rgba(185, 28, 28, 0.58)", borderWidth: 1.1, opacity: 1 } },
               { id: "mean-line", lineStyle: { color: "rgba(31, 119, 180, 0.10)", width: 2 } },
               { id: "mean-per-user-max", lineStyle: { color: "#d62728", width: 4 }, itemStyle: { color: "#d62728", opacity: 1 } },
             ];
@@ -142,7 +151,7 @@
           return [
             { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.08)", width: 1 } },
             { id: "individual-results", symbolSize: 7, itemStyle: { color: "rgba(31, 119, 180, 0.055)", borderColor: "rgba(31, 119, 180, 0.14)", borderWidth: 1, opacity: 1 } },
-            { id: "per-user-max", symbolSize: 10, itemStyle: { color: "rgba(255, 26, 26, 0.85)", borderColor: "rgba(255, 26, 26, 0.85)", borderWidth: 1, opacity: 1 } },
+            { id: "per-user-max", symbolSize: 8, itemStyle: { color: "rgba(185, 28, 28, 0.46)", borderColor: "rgba(185, 28, 28, 0.46)", borderWidth: 1, opacity: 1 } },
             { id: "mean-line", lineStyle: { color: "#1f77b4", width: 3 } },
             { id: "mean-per-user-max", lineStyle: { color: "#d62728", width: 3 }, itemStyle: { color: "#d62728", opacity: 1 } },
             { id: "per-user-max-hit-area", itemStyle: { color: "rgba(255, 26, 26, 0)" } },
@@ -158,19 +167,21 @@
         chart.setOption({
           animationDurationUpdate: 0,
           legend: showLegend ? {
-            bottom: 8,
+            bottom: 4,
             left: "center",
-            data: ["Individual results", "Mean", "Per-user max", meanPerUserMaxLabel, "Hovered user spread"],
-            itemGap: 20,
+            data: ["Individual", "Mean", "User max", meanPerUserMaxLabel, highestAverageLabel, averageUserMaxLabel],
+            itemGap: 10,
+            itemWidth: 14,
+            itemHeight: 8,
             textStyle: {
-              fontSize: 12,
+              fontSize: 11,
             },
           } : { show: false },
           grid: {
             left: 56,
             right: 56,
-            top: 38,
-            bottom: showLegend ? 92 : 48,
+            top: 30,
+            bottom: reserveLegendSpace ? 60 : 36,
             containLabel: true,
           },
           tooltip: {
@@ -240,7 +251,7 @@
               z: 2,
             },
             {
-              name: "Individual results",
+              name: "Individual",
               id: "individual-results",
               type: "scatter",
               data: scatterData,
@@ -258,19 +269,19 @@
               z: 3,
             },
             {
-              name: "Per-user max",
+              name: "User max",
               id: "per-user-max",
               type: "scatter",
               data: perUserMaxData,
               symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
-              symbolSize: 10,
+              symbolSize: 8,
               itemStyle: {
-                color: "rgba(255, 26, 26, 0.85)",
-                borderColor: "rgba(255, 26, 26, 0.85)",
+                color: "rgba(185, 28, 28, 0.46)",
+                borderColor: "rgba(185, 28, 28, 0.46)",
                 borderWidth: 1,
               },
               emphasis: {
-                scale: 1.8,
+                scale: 1.6,
               },
               z: 6,
             },
@@ -309,6 +320,44 @@
               },
             },
             {
+              name: highestAverageLabel,
+              id: "highest-average-retention",
+              type: "line",
+              data: highestAverageLine,
+              symbol: "none",
+              lineStyle: {
+                color: "#0b2f6b",
+                width: 2.5,
+                type: "dotted",
+              },
+              itemStyle: {
+                color: "#0b2f6b",
+              },
+              emphasis: {
+                disabled: true,
+              },
+              z: 7,
+            },
+            {
+              name: averageUserMaxLabel,
+              id: "average-user-max",
+              type: "line",
+              data: averageUserMaxLine,
+              symbol: "none",
+              lineStyle: {
+                color: "#b91c1c",
+                width: 2.5,
+                type: "dotted",
+              },
+              itemStyle: {
+                color: "#b91c1c",
+              },
+              emphasis: {
+                disabled: true,
+              },
+              z: 7,
+            },
+            {
               name: "Hovered user spread",
               id: "highlighted-user-line",
               type: "line",
@@ -326,7 +375,7 @@
               z: 10,
             },
             {
-              name: "Per-user max hit area",
+              name: "User max hit area",
               id: "per-user-max-hit-area",
               type: "scatter",
               data: perUserMaxData,
@@ -349,11 +398,11 @@
               data: emptyHighlight,
               animation: false,
               symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
-              symbolSize: 18,
+              symbolSize: 22,
               silent: true,
               showInLegend: false,
               itemStyle: {
-                color: "rgba(255, 26, 26, 0.95)",
+                color: "#2ca02c",
                 borderColor: "rgba(255, 255, 255, 0.95)",
                 borderWidth: 1.5,
               },
@@ -387,10 +436,10 @@
         };
 
         chart.on("mouseover", (event) => {
-          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") highlightUser(event.value);
+          if (event.seriesName === "User max" || event.seriesName === "User max hit area") highlightUser(event.value);
         });
         chart.on("mouseout", (event) => {
-          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") clearHighlight();
+          if (event.seriesName === "User max" || event.seriesName === "User max hit area") clearHighlight();
         });
         chart.on("globalout", clearHighlight);
         window.addEventListener("resize", () => chart.resize());

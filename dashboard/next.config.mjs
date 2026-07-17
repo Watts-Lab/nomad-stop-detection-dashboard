@@ -14,6 +14,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  devIndicators: false,
   allowedDevOrigins: ["10.123.3.226", "10.103.113.171"],
 }
 

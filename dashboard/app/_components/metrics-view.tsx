@@ -43,10 +43,12 @@ function MetricsParameterRows({
 function MetricsFrame({
   src,
   title,
+  label,
   showTourTargets = false,
 }: {
   src: string
   title: string
+  label?: string
   showTourTargets?: boolean
 }) {
   const [loading, setLoading] = useState(true)
@@ -74,6 +76,11 @@ function MetricsFrame({
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
+      {label && (
+        <div className="absolute left-3 top-3 z-20 max-w-[45%] truncate rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-semibold shadow-sm">
+          {label}
+        </div>
+      )}
       {loading && (
         <div className="absolute inset-0 z-10 grid gap-3 bg-[#111625] p-4">
           <Skeleton className="h-7 w-1/3 bg-[#202738]" />
@@ -138,7 +145,7 @@ export function MetricsView({
   const axisQuery = `&xmin=${xMin}&xmax=${xMax}`
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${axisQuery}&${leftFixedParameters}${metricsCompareMode ? "&legend=false" : ""}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${axisQuery}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
   const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}${axisQuery}&${rightFixedParameters}`
 
   return (
@@ -168,10 +175,10 @@ export function MetricsView({
           )}
           <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
             <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
-              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} showTourTargets />
+              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} label={metricsCompareMode ? metricsLeftAlgorithm : undefined} showTourTargets />
 
               {metricsCompareMode && (
-                <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} />
+                <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} label={metricsRightAlgorithm} />
               )}
             </div>
           </CardContent>

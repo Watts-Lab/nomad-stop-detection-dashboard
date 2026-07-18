@@ -1,8 +1,8 @@
-import { Suspense } from "react"
 import Image from "next/image"
 import { publicPath } from "@/app/_lib/public-path"
 import { NomadNav } from "@/components/nomad-nav"
 import { Card, CardContent } from "@/components/ui/card"
+import { revealClass } from "../_lib/dashboard-utils"
 
 const people = [
   {
@@ -28,11 +28,9 @@ const people = [
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background text-foreground nomad-shell">
-      <Suspense fallback={null}>
-        <NomadNav />
-      </Suspense>
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-10">
-        <section className="space-y-3">
+      <NomadNav currentView="about" />
+      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10 sm:px-5">
+        <section className={`${revealClass()} space-y-3`}>
           <h1 className="text-3xl font-bold">About</h1>
           <p className="max-w-3xl text-base leading-relaxed text-[#b6c9dc]">
             This was a project by the Network for Open Mobility Analysis and Datasets (NOMAD), in the CSSLab.
@@ -47,8 +45,8 @@ export default function AboutPage() {
         </section>
 
         <section className="grid gap-3 md:grid-cols-3">
-          {people.map((person) => (
-            <Card key={person.name} className="overflow-hidden">
+          {people.map((person, personIndex) => (
+            <Card key={person.name} className={`${revealClass("up", personIndex + 2)} nomad-interactive-card overflow-hidden`}>
               <CardContent className="space-y-3 p-3">
                 <div className="relative mx-auto aspect-square w-40 overflow-hidden rounded-md border border-border bg-muted/40">
                   <Image

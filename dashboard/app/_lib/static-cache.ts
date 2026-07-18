@@ -20,15 +20,21 @@ type ManifestEntry = {
   display_name: string
   parameter_columns: string[]
   labels: string
-  configs: string
-  label_column_prefix: string
 }
 
 type Manifest = {
-  config_key: string
-  parameter_columns: Record<string, string>
+  algorithm_keys: string[]
+  algorithms: Record<string, ManifestEntry>
   users: string[]
-  files: Record<string, ManifestEntry>
+  shared_files: { configs: string }
+}
+
+type ConfigsFile = {
+  configs: Array<Record<string, unknown> & {
+    algorithm: string
+    key: string
+    label_column: string
+  }>
 }
 
 type ConfigRow = {
@@ -44,7 +50,6 @@ type SceneCache = {
   users: string[]
   buildings: CompareScene["buildings"]
   pings: Array<{
-    ping_id: number
     user_id: string
     x: number
     y: number
@@ -62,7 +67,8 @@ type SceneCache = {
 
 type SeedScene = {
   response: CompareScene
-  orderedPingIds: number[]
+  userId: string
+  orderedTimestamps: number[]
 }
 
 const cacheRoot = publicPath("/cached-results/stop-detection-cache")
@@ -78,36 +84,28 @@ const algorithmDirectories: Record<string, string> = {
   hdbscan: "hdbscan",
 }
 
-const parameterAbbreviations: Record<string, string> = {
-  cell_size: "cs",
-  dist_thresh: "dt",
-  delta_roam: "dr",
-  dt_max: "dmx",
-  dur_min: "dmn",
-  time_thresh: "tt",
-  min_pts: "mp",
-  min_time: "mt",
-  min_cluster_size: "mcs",
-  eps_spatial: "dt",
-  T_max: "tt",
-  minPts: "mp",
+const parameterAliases: Record<string, string> = {
+  eps_spatial: "dist_thresh",
+  T_max: "time_thresh",
+  minPts: "min_pts",
 }
 
 let manifestPromise: Promise<Manifest> | null = null
+let configsPromise: Promise<ConfigsFile["configs"]> | null = null
 let scenePromise: Promise<SceneCache> | null = null
 let routesPromise: Promise<NonNullable<CompareScene["routes"]>> | null = null
 const configCache = new Map<string, Promise<ConfigRow[]>>()
-const labelCache = new Map<string, Promise<Map<number, Record<string, unknown>>>>()
+const labelCache = new Map<string, Promise<Map<string, Record<string, unknown>>>>()
 
 async function fetchJson<T>(relativePath: string) {
-  const response = await fetch(`${cacheRoot}/${relativePath}`)
-  if (!response.ok) throw new Error(`Failed to load ${relativePath}`)
+  const response = await fetch(cacheRoot + "/" + relativePath)
+  if (!response.ok) throw new Error("Failed to load " + relativePath)
   return response.json() as Promise<T>
 }
 
 async function readParquet(relativePath: string) {
-  const response = await fetch(`${cacheRoot}/${relativePath}`)
-  if (!response.ok) throw new Error(`Failed to load ${relativePath}`)
+  const response = await fetch(cacheRoot + "/" + relativePath)
+  if (!response.ok) throw new Error("Failed to load " + relativePath)
   const buffer = await response.arrayBuffer()
   return parquetReadObjects({ file: buffer, compressors }) as Promise<Record<string, unknown>[]>
 }
@@ -115,6 +113,11 @@ async function readParquet(relativePath: string) {
 function loadManifest() {
   manifestPromise ??= fetchJson<Manifest>("manifest.json")
   return manifestPromise
+}
+
+function loadConfigsFile(manifest: Manifest) {
+  configsPromise ??= fetchJson<ConfigsFile>(manifest.shared_files.configs).then((file) => file.configs)
+  return configsPromise
 }
 
 function loadScene() {
@@ -127,19 +130,21 @@ function loadRoutes() {
   return routesPromise
 }
 
-function loadConfigs(algorithmDirectory: string, entry: ManifestEntry) {
+function loadConfigs(algorithmDirectory: string, entry: ManifestEntry, manifest: Manifest) {
   const cached = configCache.get(algorithmDirectory)
   if (cached) return cached
 
-  const configs = readParquet(entry.configs).then((rows) => rows.map((row) => ({
-    params: Object.fromEntries(
-      entry.parameter_columns
-        .map((column) => [column, Number(row[column])] as const)
-        .filter(([, value]) => Number.isFinite(value)),
-    ),
-    label_column: String(row.label_column),
-    key: String(row.key),
-  })))
+  const configs = loadConfigsFile(manifest).then((rows) => rows
+    .filter((row) => row.algorithm === algorithmDirectory)
+    .map((row) => ({
+      params: Object.fromEntries(
+        entry.parameter_columns
+          .map((column) => [column, Number(row[column])] as const)
+          .filter(([, value]) => Number.isFinite(value)),
+      ),
+      label_column: String(row.label_column),
+      key: String(row.key),
+    })))
   configCache.set(algorithmDirectory, configs)
   return configs
 }
@@ -149,7 +154,7 @@ function loadLabels(algorithmDirectory: string, entry: ManifestEntry) {
   if (cached) return cached
 
   const labels = readParquet(entry.labels).then((rows) => new Map(
-    rows.map((row) => [Number(row.ping_id), row]),
+    rows.map((row) => [String(row.user_id) + "|" + Number(row.timestamp), row]),
   ))
   labelCache.set(algorithmDirectory, labels)
   return labels
@@ -158,8 +163,8 @@ function loadLabels(algorithmDirectory: string, entry: ManifestEntry) {
 function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Record<string, number>) {
   const requested = Object.fromEntries(
     Object.entries(params)
-      .map(([name, value]) => [parameterAbbreviations[name], value] as const)
-      .filter(([name, value]) => name && entry.parameter_columns.includes(name) && Number.isFinite(value)),
+      .map(([name, value]) => [parameterAliases[name] ?? name, value] as const)
+      .filter(([name, value]) => entry.parameter_columns.includes(name) && Number.isFinite(value)),
   )
   let best = configs[0]
   let bestDistance = Infinity
@@ -176,18 +181,23 @@ function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Recor
   return best
 }
 
-async function labelsForUser(algorithm: string, orderedPingIds: number[], params: Record<string, number>) {
+async function labelsForUser(
+  algorithm: string,
+  userId: string,
+  orderedTimestamps: number[],
+  params: Record<string, number>,
+) {
   const manifest = await loadManifest()
   const algorithmDirectory = algorithmDirectories[algorithm] ?? algorithm
-  const entry = manifest.files[algorithmDirectory]
+  const entry = manifest.algorithms[algorithmDirectory]
   const [configs, labels] = await Promise.all([
-    loadConfigs(algorithmDirectory, entry),
+    loadConfigs(algorithmDirectory, entry, manifest),
     loadLabels(algorithmDirectory, entry),
   ])
   const config = resolveConfig(entry, configs, params)
 
   return {
-    labels: orderedPingIds.map((pingId) => Number(labels.get(pingId)?.[config.label_column] ?? -1)),
+    labels: orderedTimestamps.map((timestamp) => Number(labels.get(userId + "|" + timestamp)?.[config.label_column] ?? -1)),
     configKey: config.key,
   }
 }
@@ -241,13 +251,14 @@ async function sceneForSeed(seed: number) {
       truth,
       routes,
     },
-    orderedPingIds: userPings.map((ping) => ping.ping_id),
+    userId: user,
+    orderedTimestamps: userPings.map((ping) => ping.timestamp),
   } satisfies SeedScene
 }
 
 async function buildPanel(algorithm: string | undefined, params: Record<string, number> | undefined, scene: SeedScene) {
   const normalized = normalizeAlgorithm(algorithm)
-  const cachedLabels = await labelsForUser(normalized, scene.orderedPingIds, params ?? {})
+  const cachedLabels = await labelsForUser(normalized, scene.userId, scene.orderedTimestamps, params ?? {})
 
   return {
     algo: normalized,

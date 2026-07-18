@@ -1,8 +1,10 @@
+import Image from "next/image"
 import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
+import { revealClass } from "../_lib/dashboard-utils"
 import { publicPath } from "../_lib/public-path"
 import type { DashboardView, DemoMode } from "../_lib/types"
 
@@ -25,23 +27,23 @@ export function LearnView({
   const expandedLearnFamilyTitle = expandedLearnAlgorithm ? LEARN_FAMILIES.find((family) => family.id === expandedLearnAlgorithm.family)?.title ?? "Algorithm Family" : ""
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pb-6">
-      <div className={`flex min-h-0 flex-col gap-3 transition duration-200 ${expandedLearnAlgorithm ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
-        <div className="shrink-0 space-y-1">
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+      <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-4 pb-6 transition duration-200 ${expandedLearnAlgorithm ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
+        <div className={`${revealClass()} shrink-0 space-y-1`}>
           <h2 className="text-3xl font-bold">Learn Algorithms</h2>
           <p className="text-sm text-muted-foreground">
             Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch.
           </p>
         </div>
-        <div className="space-y-5 pb-2">
-          {LEARN_FAMILIES.map((family) => (
+        <div className={`${revealClass("up", 2)} space-y-5 pb-2`}>
+          {LEARN_FAMILIES.map((family, familyIndex) => (
             <section key={family.id} className="space-y-3">
               <h3 className="text-xl font-semibold">{family.title}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                {algorithms.filter((algo) => algo.family === family.id).map((algo) => (
+                {algorithms.filter((algo) => algo.family === family.id).map((algo, algoIndex) => (
                   <Card
                     key={algo.id}
-                    className="group cursor-pointer hover:shadow-lg transition-all border-2 border-border hover:border-primary/50 flex flex-col py-0"
+                    className={`${revealClass("up", familyIndex * 4 + algoIndex + 2)} nomad-interactive-card group cursor-pointer border-2 flex flex-col py-0`}
                     onClick={() => openLearnAlgorithm(algo.id)}
                   >
                     <CardHeader className="px-5 pt-5 pb-1 shrink-0">
@@ -51,16 +53,18 @@ export function LearnView({
                     </CardHeader>
                     <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
                       <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
-                      <div className="aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
-                        <img
+                      <div className="relative aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
+                        <Image
                           src={algo.cardDiagramSrc}
                           alt={`${algo.name} card diagram`}
-                          className="w-full h-full object-contain p-1"
+                          fill
+                          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 50vw, 100vw"
+                          className="object-contain p-1"
                         />
                       </div>
                       <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium text-[#8acac8]">
                         <span>View more</span>
-                        <img src={publicPath("/assets/icons/learn-expand.svg")} alt="" className="h-4 w-4" />
+                        <Image src={publicPath("/assets/icons/learn-expand.svg")} alt="" width={16} height={16} />
                       </div>
                     </CardContent>
                   </Card>
@@ -105,7 +109,7 @@ export function LearnView({
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-md p-0 text-xs font-medium text-[#8acac8] transition-colors hover:text-[#f2f4eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
                   >
                     Collapse
-                    <img src={publicPath("/assets/icons/learn-collapse.svg")} alt="" className="h-4 w-4" />
+                    <Image src={publicPath("/assets/icons/learn-collapse.svg")} alt="" width={16} height={16} />
                   </button>
                 </div>
               </div>
@@ -117,9 +121,11 @@ export function LearnView({
                       {expandedLearnAlgorithm.description}
                     </p>
                     <div className="min-w-0 overflow-hidden rounded-md bg-[#111625]">
-                      <img
+                      <Image
                         src={expandedLearnAlgorithm.expandedDiagramSrc}
                         alt={`${expandedLearnAlgorithm.name} expanded diagram`}
+                        width={980}
+                        height={620}
                         className="block h-auto w-full max-w-full"
                       />
                     </div>
@@ -159,7 +165,7 @@ export function LearnView({
                   <Button
                     size="lg"
                     onClick={() => openLearnDemo(expandedLearnAlgorithm.id)}
-                    className="h-11 min-w-36 bg-[#459ba4] text-base font-semibold text-[#08101c] hover:bg-[#62b8bf]"
+                    className="nomad-action h-11 min-w-36 text-base"
                   >
                     <Play className="h-5 w-5 fill-current" />
                     Demo

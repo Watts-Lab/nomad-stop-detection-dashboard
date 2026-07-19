@@ -5,9 +5,15 @@ import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StopRunPreview } from "./compare-animation-panel"
+import { publicPath } from "../_lib/public-path"
+import { loadCompareData } from "../_lib/static-cache"
 import type { CompareApiResponse, DashboardView } from "../_lib/types"
 
-const HOME_PREVIEW_RUNS = [
+const HOME_PREVIEW_RUNS: Array<{
+  label: string
+  algo: string
+  params: Record<string, number>
+}> = [
   { label: "DBSTOP · dist_thresh 10", algo: "dbstop", params: { dist_thresh: 10, time_thresh: 60, min_pts: 3, dur_min: 5 } },
   { label: "Lachesis · delta_roam 25", algo: "lachesis", params: { dt_max: 60, delta_roam: 25, dur_min: 5 } },
   { label: "SeqScan · dist_thresh 20", algo: "seqscan", params: { dist_thresh: 20, time_thresh: 60, min_pts: 2, dur_min: 5 } },
@@ -43,20 +49,14 @@ function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) 
       setLoadFailed(false)
       setPreviewTime(null)
       try {
-        const res = await fetch("/api/algorithm-compare", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            seed: 1,
-            mode: "single",
-            left: {
-              algo: previewRun.algo,
-              params: previewRun.params,
-              cmap: "PiYG",
-            },
-          }),
+        const data = await loadCompareData({
+          seed: 1,
+          mode: "single",
+          left: {
+            algo: previewRun.algo,
+            params: previewRun.params,
+          },
         })
-        const data = (await res.json()) as CompareApiResponse
         if (!cancelled) {
           setPreviewData(data)
           setPreviewTime(null)
@@ -81,7 +81,7 @@ function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) 
     >
       <div
         className="absolute inset-0 bg-white bg-cover bg-center"
-        style={{ backgroundImage: "url('/issue-images/home-stop-run-placeholder.png')" }}
+        style={{ backgroundImage: "url('" + publicPath("/issue-images/home-stop-run-placeholder.png") + "')" }}
       />
       {previewData?.left && (
         <div className={`absolute inset-0 transition-opacity duration-500 ${previewReady ? "opacity-100" : "opacity-0"}`}>

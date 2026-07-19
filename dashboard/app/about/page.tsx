@@ -1,4 +1,5 @@
 import Image from "next/image"
+import { publicPath } from "@/app/_lib/public-path"
 import { NomadNav } from "@/components/nomad-nav"
 import { Card, CardContent } from "@/components/ui/card"
 import { revealClass } from "../_lib/dashboard-utils"
@@ -6,19 +7,19 @@ import { revealClass } from "../_lib/dashboard-utils"
 const people = [
   {
     name: "Anoushka Menon",
-    photo: "/headshots/Anoushka_Menon.png",
+    photo: publicPath("/headshots/Anoushka_Menon.png"),
     description: "Anoushka Menon received her M.S.E. in Data Science from the University of Pennsylvania in May 2026.",
     href: "https://github.com/anoushkamenonn",
   },
   {
     name: "Carol Tu",
-    photo: "/headshots/Carol_Tu.png",
+    photo: publicPath("/headshots/Carol_Tu.png"),
     description: "Carol Tu received her B.S.E. in Computer Science from the University of Pennsylvania in May 2026.",
     href: "https://github.com/caroltuu",
   },
   {
     name: "Jorge Barreras",
-    photo: "/headshots/Jorge_Barreras.png",
+    photo: publicPath("/headshots/Jorge_Barreras.png"),
     description: "Jorge Barreras received his Ph.D. from the University of Pennsylvania in 2022 and is a Postdoctoral Researcher at the CSSLab.",
     href: "https://github.com/paco-barreras",
   },

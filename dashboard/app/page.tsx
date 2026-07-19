@@ -14,6 +14,8 @@ import {
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
+import { publicPath } from "./_lib/public-path"
+import { loadCompareData } from "./_lib/static-cache"
 import { useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
@@ -123,29 +125,18 @@ function NomadDashboard() {
     setCompareApiData(null)
     setDemoTime(null)
     try {
-      const res = await fetch("/api/algorithm-compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          seed,
-          mode: compareMode ? "compare" : "single",
-          left: {
-            algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
-            params: parseParams(leftAlgorithm, leftValidation.normalized),
-            cmap: "PiYG",
-          },
-          right: {
-            algo: rightAlgorithm === "dbscan" ? "tadbscan" : rightAlgorithm,
-            params: parseParams(rightAlgorithm, rightValidation.normalized),
-            cmap: "PiYG",
-          },
-        }),
+      const data = await loadCompareData({
+        seed,
+        mode: compareMode ? "compare" : "single",
+        left: {
+          algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
+          params: parseParams(leftAlgorithm, leftValidation.normalized),
+        },
+        right: {
+          algo: rightAlgorithm === "dbscan" ? "tadbscan" : rightAlgorithm,
+          params: parseParams(rightAlgorithm, rightValidation.normalized),
+        },
       })
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || "Algorithm compare request failed")
-      }
-      const data = (await res.json()) as CompareApiResponse
       if (requestId !== compareRequestIdRef.current) return
       setDemoTime(null)
       setCompareApiData(data)
@@ -167,7 +158,7 @@ function NomadDashboard() {
   const loadMetricsOptions = useCallback(async () => {
     try {
       setMetricsError(null)
-      const res = await fetch("/api/algorithm-metrics", { method: "GET" })
+      const res = await fetch(publicPath("/cached-results/algorithm-metrics/options.json"))
       if (!res.ok) {
         const msg = await res.text()
         throw new Error(msg || "Failed to load aggregated metrics options")

@@ -77,7 +77,7 @@ function MetricsFrame({
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
       {label && (
-        <div className="absolute left-3 top-3 z-20 max-w-[45%] truncate rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-semibold shadow-sm">
+        <div className="absolute left-[12px] top-[12px] z-20 max-w-[40%] truncate rounded-sm bg-muted/80 px-2 py-0.5 text-xs font-semibold text-foreground">
           {label}
         </div>
       )}
@@ -138,15 +138,10 @@ export function MetricsView({
   setMetricsRightParameter: (parameter: string) => void
   startTour: () => void
 }) {
-  const leftSweep = METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm]?.find((param) => param.value === metricsLeftParameter)
-  const rightSweep = METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm]?.find((param) => param.value === metricsRightParameter)
-  const xMin = Math.min(leftSweep?.min ?? 0, metricsCompareMode ? rightSweep?.min ?? 0 : leftSweep?.min ?? 0)
-  const xMax = Math.max(leftSweep?.max ?? 0, metricsCompareMode ? rightSweep?.max ?? 0 : leftSweep?.max ?? 0)
-  const axisQuery = `&xmin=${xMin}&xmax=${xMax}`
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}${axisQuery}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}${axisQuery}&${rightFixedParameters}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}&${rightFixedParameters}`
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">

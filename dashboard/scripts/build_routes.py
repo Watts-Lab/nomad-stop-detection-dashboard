@@ -8,9 +8,9 @@ Run from the repository root:
 
     python dashboard/scripts/build_routes.py
 
-The output JSON is consumed by app/api/algorithm-compare/route.ts (RoutesCache) and
-keyed by "<from_id>-><to_id>". Building pairs are taken from the cached trajectory
-scenes so the shared route file covers the dashboard demo trajectories.
+The output JSON is loaded by app/_lib/static-cache.ts and keyed by
+"<from_id>-><to_id>". Building pairs are taken from the cached trajectory scenes
+so the shared route file covers the dashboard demo trajectories.
 """
 
 from __future__ import annotations

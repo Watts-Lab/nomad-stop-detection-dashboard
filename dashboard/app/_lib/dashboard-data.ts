@@ -1,3 +1,4 @@
+import { publicPath } from "./public-path"
 import type { DashboardView, DataPoint, MetricsParameterNote, TimeSegment } from "./types"
 
 export type ParameterConstraint = {
@@ -11,10 +12,10 @@ export type DemoEditableParam = ParameterConstraint & {
   label?: string
 }
 
-export const SEQUENTIAL_CARD_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms_card.svg"
-export const SEQUENTIAL_EXPANDED_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms.svg"
-export const DENSITY_CARD_DIAGRAM = "/assets/diagram-svgs/density_based_card.svg"
-export const DENSITY_EXPANDED_DIAGRAM = "/assets/diagram-svgs/density_based.svg"
+export const SEQUENTIAL_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/sequential_algorithms_card.svg")
+export const SEQUENTIAL_EXPANDED_DIAGRAM = publicPath("/assets/diagram-svgs/sequential_algorithms.svg")
+export const DENSITY_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/density_based_card.svg")
+export const DENSITY_EXPANDED_DIAGRAM = publicPath("/assets/diagram-svgs/density_based.svg")
 
 export const LEARN_FAMILIES = [
   { id: "sequential", title: "Sequential Algorithms" },
@@ -28,10 +29,15 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
     sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
     fixed_parameters: ["dt_max=60", "dur_min=5"],
   },
-  Sequential: {
+  "Sequential (Centroid)": {
     source: "delta_roam_vs_acc_exp.ipynb",
     sweep_parameter: "delta_roam",
     fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
+  },
+  "Sequential (First)": {
+    source: "delta_roam_vs_acc_exp.ipynb",
+    sweep_parameter: "delta_roam",
+    fixed_parameters: ["dt_max=60", "method='sliding'", "dur_min=5"],
   },
   SeqScan: {
     source: "dist_thresh_vs_acc_exp.ipynb",
@@ -48,98 +54,109 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
     sweep_parameter: "dist_thresh",
     fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "back_merge=False"],
   },
+  HDBSCAN: {
+    source: "cached_results/stop-detection-cache/hdbscan",
+    sweep_parameter: "dist_thresh",
+    fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "min_cluster_size=1"],
+  },
+  "Grid-Based": {
+    source: "cached_results/stop-detection-cache/gridbased",
+    sweep_parameter: "cell_size",
+    fixed_parameters: ["min_time=5", "min_cluster_size=2"],
+  },
 }
 
 export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
 export const DUR_MIN_VALUES = [5, 10]
+export const CELL_SIZE_VALUES = [25, 37.5, 50, 75, 100, 175, 250, 375, 500]
 
 export const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>> = {
   dbstop: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   seqscan: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   hdbscan: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   dbscan: {
-    eps_spatial: { min: 0, max: 50, step: 5 },
+    eps_spatial: { min: 0, max: 50, step: 2.5 },
     T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
   },
   lachesis: {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-centroid": {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-first": {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
-    cell_size: { min: 25, max: 500, step: 25, allowedValues: [25, 50, 100, 250, 500] },
+    cell_size: { min: 25, max: 500, step: 12.5, allowedValues: CELL_SIZE_VALUES },
     min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
 }
 
 export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
   dbstop: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   seqscan: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   hdbscan: {
-    dist_thresh: { min: 0, max: 50, step: 5 },
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   dbscan: {
-    eps_spatial: { min: 0, max: 50, step: 5, label: "dist_thresh" },
+    eps_spatial: { min: 0, max: 50, step: 2.5, label: "dist_thresh" },
     T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES, label: "time_thresh" },
     minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES, label: "min_pts" },
   },
   lachesis: {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-centroid": {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   "sequential-first": {
-    delta_roam: { min: 5, max: 60, step: 5 },
+    delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
-    cell_size: { min: 25, max: 500, step: 25, allowedValues: [25, 50, 100, 250, 500] },
+    cell_size: { min: 25, max: 500, step: 12.5, allowedValues: CELL_SIZE_VALUES },
     min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
 }
@@ -147,10 +164,12 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
 export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   dbstop: "DBSTOP",
   lachesis: "Lachesis",
-  "sequential-centroid": "Sequential",
-  "sequential-first": "Sequential",
+  "sequential-centroid": "Sequential (Centroid)",
+  "sequential-first": "Sequential (First)",
   seqscan: "SeqScan",
   dbscan: "ST-DBSCAN",
+  hdbscan: "HDBSCAN",
+  gridbased: "Grid-Based",
 }
 
 export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
@@ -159,11 +178,15 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   Lachesis: [
-    { value: "delta_roam", label: "Δroam", min: 0, max: 120 },
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
-  Sequential: [
-    { value: "delta_roam", label: "Δroam", min: 0, max: 120 },
+  "Sequential (Centroid)": [
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  "Sequential (First)": [
+    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   SeqScan: [
@@ -173,6 +196,25 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
   "ST-DBSCAN": [
     { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
   ],
+  HDBSCAN: [
+    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
+  ],
+  "Grid-Based": [
+    { value: "cell_size", label: "cell_size", min: 0, max: 500 },
+    { value: "min_time", label: "min_time", min: 0, max: 180 },
+  ],
+}
+
+export const METRICS_RESULTS_FILE: Record<string, string> = {
+  Lachesis: "lachesis_results.parquet",
+  "Sequential (Centroid)": "sequential_centroid_results.parquet",
+  "Sequential (First)": "sequential_first_results.parquet",
+  SeqScan: "seqscan_results.parquet",
+  "ST-DBSCAN": "st_dbscan_results.parquet",
+  DBSTOP: "dbstop_results.parquet",
+  HDBSCAN: "hdbscan_results.parquet",
+  "Grid-Based": "gridbased_results.parquet",
 }
 
 export const algorithms = [

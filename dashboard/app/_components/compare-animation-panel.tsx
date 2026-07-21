@@ -14,6 +14,7 @@ import type {
 } from "../_lib/types"
 
 const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
+const GROUND_TRUTH_COLOR = "#0f766e"
 type PlaybackState = "playing" | "paused" | "complete"
 
 function DemoSceneRenderer({
@@ -271,6 +272,10 @@ function DemoSceneRenderer({
       lachesisDiameterFrames,
       anchorPointMode: panel.algo,
       truthStops,
+      truthBars: truthStops.map((stop) => [
+        stop.timestamp * 1000,
+        (stop.timestamp + stop.duration * 60) * 1000,
+      ]),
       segments,
       focusBounds: {
         minX: Math.min(...focusXs),
@@ -345,6 +350,10 @@ function DemoSceneRenderer({
     let timer = 0
     let routeGlowFrame = 0
     let routeGlowStartedAt = 0
+    let nextPathFrame = 0
+    let nextPathStartedAt = 0
+    let nextPathStopIndex = -1
+    let nextPathVisible = false
     let pulsePhase = 0
     let pulseStrength = 0
     let hoverPingIndex: number | null = null
@@ -393,21 +402,21 @@ function DemoSceneRenderer({
       const completedFallback: number[][][] = []
       let activeCached: number[][] = []
       let activeFallback: number[][] = []
-      let next: number[][] = []
-      preparedSegments.forEach((segment) => {
+      let next: typeof preparedSegments[number] | null = null
+      for (const segment of preparedSegments) {
         if (timestampSeconds >= segment.end) {
           if (segment.isFallback) completedFallback.push(segment.points)
           else completedCached.push(segment.points)
-          return
+          continue
         }
         if (timestampSeconds >= segment.start) {
           const active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
           if (segment.isFallback) activeFallback = active
           else activeCached = active
-          return
+          continue
         }
-        if (next.length === 0) next = segment.points
-      })
+        if (!next) next = segment
+      }
       return { completedCached, completedFallback, activeCached, activeFallback, next }
     }
     const latestPingIndexAt = (timestampSeconds: number) => {
@@ -552,12 +561,47 @@ function DemoSceneRenderer({
       if (routeGlowAllowed()) startRouteGlow()
       else stopRouteGlow()
     }
+    const stopNextPathFlow = () => {
+      if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
+      nextPathFrame = 0
+      nextPathStopIndex = -1
+      mapChart.setOption({ series: [{ id: "next-path", data: [] }] }, { lazyUpdate: true })
+    }
+    const startNextPathFlow = () => {
+      if (nextPathFrame || !nextPathVisible) return
+      nextPathStartedAt = performance.now()
+      const step = (now: number) => {
+        const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
+        const next = routeProgressAt(timestampSeconds).next
+        if (!showGroundTruth || !next) {
+          stopNextPathFlow()
+          return
+        }
+        if (next.stopIndex !== nextPathStopIndex) {
+          nextPathStartedAt = now
+          nextPathStopIndex = next.stopIndex
+        }
+        const travelSeconds = Math.max(0.4, next.length / 90)
+        const cycleElapsed = (now - nextPathStartedAt) / 1000 % (travelSeconds + 0.5)
+        const progress = Math.min(1, cycleElapsed / travelSeconds)
+        mapChart.setOption({
+          series: [{ id: "next-path", data: [{ coords: partialPath(next, progress) }] }],
+        }, { lazyUpdate: true })
+        nextPathFrame = window.requestAnimationFrame(step)
+      }
+      nextPathFrame = window.requestAnimationFrame(step)
+    }
+    const syncNextPathFlow = () => {
+      if (nextPathVisible) startNextPathFlow()
+      else stopNextPathFlow()
+    }
     const renderScene = (timestampSeconds: number) => {
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
       const centroidAnchorFrames = centroidAnchorFramesAt(timestampSeconds)
       const lachesisDiameterFrames = lachesisDiameterFramesAt(timestampSeconds)
+      nextPathVisible = showGroundTruth && Boolean(groundTruthAt(timestampSeconds).current && route.next)
       const anchorEdges = [
         ...chartData.anchorEdgeData.filter((edge) => edge.value[4] <= timestampSeconds),
         ...centroidAnchorFrames.flatMap((frame) => frame.edges),
@@ -572,7 +616,7 @@ function DemoSceneRenderer({
           { id: "completed-fallback-paths", data: showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
           { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
-          { id: "next-path", data: showGroundTruth && route.next.length > 0 ? [{ coords: route.next }] : [] },
+          ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
           { id: "route-glow", data: [] },
           { id: "ghost-pings", data: chartData.pingData },
           { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
@@ -584,9 +628,11 @@ function DemoSceneRenderer({
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
+      syncNextPathFlow()
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: chartData.pingData.map((_, index) => index) },
+          { id: "ground-truth-bars", data: showGroundTruth ? chartData.truthBars : [] },
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
@@ -594,6 +640,8 @@ function DemoSceneRenderer({
     }
     const renderTrajectoryPreview = (pingCount: number) => {
       const previewPings = chartData.pingData.slice(0, pingCount)
+      nextPathVisible = false
+      stopNextPathFlow()
       mapChart.setOption({
         series: [
           { id: "completed-paths", data: [] },
@@ -614,6 +662,7 @@ function DemoSceneRenderer({
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: previewPings.map((_, index) => index) },
+          { id: "ground-truth-bars", data: [] },
           { id: "stop-bars", data: [] },
           { id: "cursor", data: [] },
         ],
@@ -731,6 +780,7 @@ function DemoSceneRenderer({
       window.clearTimeout(timer)
       paused = false
       stopRouteGlow()
+      stopNextPathFlow()
       sequenceIndex = 0
       setPlaybackState("playing")
       onPlaybackStateChangeRef.current?.("playing")
@@ -743,6 +793,7 @@ function DemoSceneRenderer({
     const playLocalPreview = () => {
       window.clearTimeout(timer)
       stopRouteGlow()
+      stopNextPathFlow()
       playTrajectoryPreview(() => {
         paused = true
         syncPlaybackState()
@@ -920,7 +971,7 @@ function DemoSceneRenderer({
           silent: true,
           z: 2,
           data: [],
-          lineStyle: { color: "#4b918d", width: 2, opacity: 0.38, type: "dashed" },
+          lineStyle: { color: "#4b918d", width: 3, opacity: 0.38, type: "dashed" },
         },
         {
           id: "active-path",
@@ -933,7 +984,7 @@ function DemoSceneRenderer({
           z: 4,
           data: [],
           lineStyle: {
-            color: "#0f766e",
+            color: GROUND_TRUTH_COLOR,
             width: 4,
             opacity: 0.95,
             shadowBlur: 10,
@@ -986,7 +1037,7 @@ function DemoSceneRenderer({
               type: "polygon",
               shape: { points: [tip, left, right] },
               style: {
-                fill: "#0f766e",
+                fill: GROUND_TRUTH_COLOR,
                 stroke: "#ffffff",
                 lineWidth: 1,
                 shadowBlur: 10,
@@ -1087,6 +1138,23 @@ function DemoSceneRenderer({
           },
         },
         {
+          id: "ground-truth-bars",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 3,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const start = api.coord([api.value(0), 0.1])
+            const end = api.coord([api.value(1), 0.1])
+            return {
+              type: "line",
+              shape: { x1: start[0], y1: start[1], x2: end[0], y2: end[1] },
+              style: { stroke: GROUND_TRUTH_COLOR, lineWidth: 5 },
+            }
+          },
+        },
+        {
           id: "stop-bars",
           type: "custom",
           coordinateSystem: "cartesian2d",
@@ -1147,6 +1215,7 @@ function DemoSceneRenderer({
       window.clearTimeout(timer)
       window.clearInterval(pulseTimer)
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
+      if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
       window.removeEventListener("resize", resize)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)

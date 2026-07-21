@@ -13,7 +13,11 @@ import type {
   EChartsParams,
 } from "../_lib/types"
 
-const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
+const DEMO_CLUSTER_COLORS = [
+  "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f", "#00a8cc", "#72b01d", "#8c6d31",
+  "#e377c2", "#9467bd", "#2ca02c", "#d62728", "#17becf", "#bcbd22", "#8c564b", "#ff6f91", "#6b8e23", "#00b894",
+  "#0984e3", "#6c5ce7", "#e17055", "#d63031", "#008080", "#c44569", "#4a69bd", "#f19066", "#b33771", "#218c74",
+]
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 type PlaybackState = "playing" | "paused" | "complete"

@@ -39,6 +39,7 @@ function DemoSceneRenderer({
   showGroundTruth,
   showStops,
   variant = "full",
+  playback = "automatic",
   onPreviewComplete,
 }: {
   panel: ComparePanelResponse
@@ -49,14 +50,16 @@ function DemoSceneRenderer({
   showGroundTruth: boolean
   showStops: boolean
   variant?: "full" | "preview"
+  playback?: "automatic" | "external"
   onPreviewComplete?: () => void
 }) {
   const scene = panel.scene
+  const automaticPlayback = playback === "automatic"
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => {})
   const replayRef = useRef<() => void>(() => {})
-  const selectedTimestampRef = useRef<number | null>(null)
+  const selectedTimestampRef = useRef<number | null>(currentTime)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const labels = useMemo(() => {
@@ -402,14 +405,14 @@ function DemoSceneRenderer({
           { id: "direction-arrows", data: showGroundTruth ? directionArrowsFor(route) : [] },
           { id: "ground-truth-marker", data: showGroundTruth ? [groundTruthPositionAt(timestampSeconds, route)].filter(Boolean) : [] },
         ],
-      }, { lazyUpdate: true })
+      }, { lazyUpdate: automaticPlayback })
       timelineChart.setOption({
         series: [
           { id: "dur-min-lines", data: durMinLinesAt(timestampSeconds) },
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
-      }, { lazyUpdate: true })
+      }, { lazyUpdate: automaticPlayback })
     }
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
@@ -503,7 +506,7 @@ function DemoSceneRenderer({
     const bounds = mapBounds()
 
     mapChart.setOption({
-      animation: true,
+      animation: automaticPlayback,
       animationDurationUpdate: 120,
       grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
       xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
@@ -692,7 +695,7 @@ function DemoSceneRenderer({
     })
 
     timelineChart.setOption({
-      animation: true,
+      animation: automaticPlayback,
       animationDurationUpdate: 180,
       animationEasingUpdate: "cubicOut",
       grid: { left: 34, right: 22, top: 0, bottom: 28 },
@@ -770,9 +773,11 @@ function DemoSceneRenderer({
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
     }
-    const initialTimestamp = variant === "preview"
-      ? chartData.timeSequence[0]
-      : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    const initialTimestamp = !automaticPlayback && selectedTimestampRef.current !== null
+      ? selectedTimestampRef.current
+      : variant === "preview"
+        ? chartData.timeSequence[0]
+        : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
     sequenceIndex = chartData.timeSequence.findIndex((timestamp) => timestamp >= initialTimestamp)
     if (sequenceIndex < 0) sequenceIndex = chartData.timeSequence.length - 1
     paused = true
@@ -782,14 +787,17 @@ function DemoSceneRenderer({
     timelineEl.style.cursor = "ew-resize"
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
-    if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
-    const flashTimer = window.setInterval(() => {
-      const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
-      // Stop blinking once playback has reached the end of the timeline.
-      const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
-      flashOn = ended ? false : !flashOn
-      mapChart.setOption({ series: [{ id: "buildings", data: buildingsSeriesData(timestampSeconds) }] })
-    }, 500)
+    if (automaticPlayback && variant === "preview") timer = window.setTimeout(replay, initialDelay)
+    let flashTimer = 0
+    if (automaticPlayback) {
+      flashTimer = window.setInterval(() => {
+        const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
+        // Stop blinking once playback has reached the end of the timeline.
+        const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
+        flashOn = ended ? false : !flashOn
+        mapChart.setOption({ series: [{ id: "buildings", data: buildingsSeriesData(timestampSeconds) }] })
+      }, 500)
+    }
 
     return () => {
       window.clearTimeout(timer)
@@ -805,12 +813,12 @@ function DemoSceneRenderer({
       mapChart.dispose()
       timelineChart.dispose()
     }
-  }, [chartData, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
+  }, [automaticPlayback, chartData, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
 
   useEffect(() => {
-    if (!chartData || currentTime !== null) return
+    if (!automaticPlayback || !chartData || currentTime !== null) return
     onTimeChange(variant === "preview" ? chartData.timeSequence[0] : chartData.timeSequence[chartData.timeSequence.length - 1])
-  }, [chartData, currentTime, onTimeChange, variant])
+  }, [automaticPlayback, chartData, currentTime, onTimeChange, variant])
 
   useEffect(() => {
     if (!chartData || currentTime === null) return
@@ -941,11 +949,13 @@ export function StopRunPreview({
   currentTime,
   onTimeChange,
   onComplete,
+  playback = "automatic",
 }: {
   panel: ComparePanelResponse | null | undefined
   currentTime: number | null
   onTimeChange: (timestamp: number) => void
   onComplete?: () => void
+  playback?: "automatic" | "external"
 }) {
   if (!panel?.scene) {
     return (
@@ -966,6 +976,7 @@ export function StopRunPreview({
       showGroundTruth
       showStops
       variant="preview"
+      playback={playback}
       onPreviewComplete={onComplete}
     />
   )

@@ -14,6 +14,7 @@ import type {
 } from "../_lib/types"
 
 const DEMO_CLUSTER_COLORS = ["#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f"]
+const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 type PlaybackState = "playing" | "paused" | "complete"
 
@@ -220,6 +221,9 @@ function DemoSceneRenderer({
         value: [point.cluster, sourceIndex, pingIndex, point.cluster, point.timestamp],
       }]
     })
+    const coreTimelineData = DENSITY_ALGORITHMS.includes(panel.algo)
+      ? cachedCorePointData.map((point) => [point[5] * 1000, point[2]])
+      : []
     const useCachedCorePoints = Boolean(panel.corePoints?.length) && panel.algo !== "sequential-centroid"
     const anchorPointData = useCachedCorePoints ? cachedCorePointData : firstAnchorData
     const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
@@ -268,6 +272,7 @@ function DemoSceneRenderer({
       stops,
       anchorPointData,
       anchorEdgeData,
+      coreTimelineData,
       centroidAnchorFrames: visibleCentroidAnchorFrames,
       lachesisDiameterFrames,
       anchorPointMode: panel.algo,
@@ -632,6 +637,7 @@ function DemoSceneRenderer({
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: chartData.pingData.map((_, index) => index) },
+          { id: "core-point-arrows", data: showStops ? chartData.coreTimelineData : [] },
           { id: "ground-truth-bars", data: showGroundTruth ? chartData.truthBars : [] },
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
@@ -662,6 +668,7 @@ function DemoSceneRenderer({
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: previewPings.map((_, index) => index) },
+          { id: "core-point-arrows", data: [] },
           { id: "ground-truth-bars", data: [] },
           { id: "stop-bars", data: [] },
           { id: "cursor", data: [] },
@@ -1138,6 +1145,26 @@ function DemoSceneRenderer({
           },
         },
         {
+          id: "core-point-arrows",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 5,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const top = api.coord([api.value(0), 0.98])
+            const tip = api.coord([api.value(0), 0.8])
+            const color = clusterColor(Number(api.value(1)))
+            return {
+              type: "group",
+              children: [
+                { type: "line", shape: { x1: top[0], y1: top[1], x2: tip[0], y2: tip[1] - 4 }, style: { stroke: color, lineWidth: 2 } },
+                { type: "polygon", shape: { points: [[tip[0], tip[1]], [tip[0] - 4, tip[1] - 5], [tip[0] + 4, tip[1] - 5]] }, style: { fill: color } },
+              ],
+            }
+          },
+        },
+        {
           id: "ground-truth-bars",
           type: "custom",
           coordinateSystem: "cartesian2d",
@@ -1170,7 +1197,7 @@ function DemoSceneRenderer({
             return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.4 } } : null
           },
         },
-        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 5, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
+        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 6, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
       ],
     })
 

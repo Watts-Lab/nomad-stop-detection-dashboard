@@ -12,14 +12,21 @@ const TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='tour-map']",
     popover: {
       title: "Watch a Trajectory Play Out",
-      description: "Grey dots are raw GPS pings from one person's trip. As the agent moves, the algorithm groups nearby pings into colored circles dependent on the algorithm's distance and duration thresholds (signifying confirmed stops). Toggle Ground Truth to see the real destination it's heading to.",
+      description: "Black dots are raw GPS pings from one person's trip. As the agent moves, the algorithm groups nearby pings into colored circles dependent on the algorithm's distance and duration thresholds (signifying confirmed stops). Toggle Ground Truth to see the real destination it's heading to.",
+    },
+  },
+  {
+    element: "[data-tour='tour-map']",
+    popover: {
+      title: "Recognize Anchor & Core Points",
+      description: "Sequential (first-anchored) and sequential (centroid-anchored) use the first ping or evolving centroid respectively as a reference when deciding whether new pings join a stop. Density-based algorithms use core points—pings with enough neighbors to seed or expand a cluster. Both appear on the map as larger cluster-colored circles with a white outline; core-point pings also have matching colored arrows on the timeline.",
     },
   },
   {
     element: "[data-tour='tour-timeline']",
     popover: {
-      title: "Scrub the Time-Series View",
-      description: "Drag or scroll along the timeline to jump to any moment. Tick marks show when each ping arrived, and colored bars mark when the algorithm confirmed a stop, so you can see exactly how long each stop lasted.",
+      title: "Read and Scrub the Timeline",
+      description: "Drag or scroll to move through time. Black ticks are GPS pings; for density-based algorithms, colored arrows mark core-point pings. Colored bands show detected stops, teal lines along the bottom show ground-truth time inside buildings, and the cyan line marks the current time.",
     },
   },
   {

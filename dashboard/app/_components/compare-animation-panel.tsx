@@ -341,9 +341,13 @@ function DemoSceneRenderer({
     }
     const buildingsSeriesData = (timestampSeconds: number) => {
       const truth = groundTruthAt(timestampSeconds)
+      const currentBuildingFlash = automaticPlayback
+        ? flashOn
+        : timestampSeconds < chartData.timeSequence[chartData.timeSequence.length - 1]
+          && Math.floor(pulsePhaseRef.current * 8) % 2 === 1
       return chartData.buildings.map((building, index) => [
         index,
-        showGroundTruth && building.id === truth.current?.location && flashOn
+        showGroundTruth && building.id === truth.current?.location && currentBuildingFlash
           ? 1
           : showGroundTruth && building.id === truth.next?.location
             ? 2

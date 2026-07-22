@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
 import { revealClass } from "../_lib/dashboard-utils"
+import { publicPath } from "../_lib/public-path"
 import type { DashboardView, DemoMode } from "../_lib/types"
 
 export function LearnView({
@@ -63,7 +64,7 @@ export function LearnView({
                       </div>
                       <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium text-[#8acac8]">
                         <span>View more</span>
-                        <Image src="/assets/icons/learn-expand.svg" alt="" width={16} height={16} />
+                        <Image src={publicPath("/assets/icons/learn-expand.svg")} alt="" width={16} height={16} />
                       </div>
                     </CardContent>
                   </Card>
@@ -108,7 +109,7 @@ export function LearnView({
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-md p-0 text-xs font-medium text-[#8acac8] transition-colors hover:text-[#f2f4eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
                   >
                     Collapse
-                    <Image src="/assets/icons/learn-collapse.svg" alt="" width={16} height={16} />
+                    <Image src={publicPath("/assets/icons/learn-collapse.svg")} alt="" width={16} height={16} />
                   </button>
                 </div>
               </div>

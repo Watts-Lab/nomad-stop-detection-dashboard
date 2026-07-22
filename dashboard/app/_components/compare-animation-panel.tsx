@@ -3,11 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import { Pause, Play, RotateCcw } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
-import { assignDemoClusters } from "../_lib/dashboard-utils"
+import {
+  assignDemoClusters,
+  darkenHex,
+} from "../_lib/dashboard-utils"
 import type {
   ComparePanelResponse,
   EChartsApi,
@@ -57,7 +61,7 @@ function DemoSceneRenderer({
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
-  const [playbackState, setPlaybackState] = useState<PlaybackState>("complete")
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const labels = useMemo(() => {
     if (!scene) return []
     // Prefer the real cached labels from the stop-detection cache; fall back to the
@@ -129,6 +133,7 @@ function DemoSceneRenderer({
         isFallback: !cached,
       }
     }
+    const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
     const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
       ...stop,
       destination: destinationFor(stop.x, stop.y),
@@ -230,6 +235,7 @@ function DemoSceneRenderer({
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
+      durMinSec: revealDelay,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
   }, [labels, panel.algo, panel.params, scene])
@@ -1224,7 +1230,7 @@ export function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} sharedPlaybackState={sharedPlaybackState} onPlaybackStateChange={onPlaybackStateChange} />
+            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} />
           </div>
         ) : (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">

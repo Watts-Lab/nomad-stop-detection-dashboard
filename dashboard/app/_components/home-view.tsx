@@ -9,7 +9,11 @@ import { publicPath } from "../_lib/public-path"
 import { loadCompareData } from "../_lib/static-cache"
 import type { CompareApiResponse, DashboardView } from "../_lib/types"
 
-const HOME_PREVIEW_RUNS = [
+const HOME_PREVIEW_RUNS: Array<{
+  label: string
+  algo: string
+  params: Record<string, number>
+}> = [
   { label: "DBSTOP · dist_thresh 10", algo: "dbstop", params: { dist_thresh: 10, time_thresh: 60, min_pts: 3, dur_min: 5 } },
   { label: "Lachesis · Δroam 25", algo: "lachesis", params: { dt_max: 60, delta_roam: 25, dur_min: 5 } },
   { label: "SeqScan · dist_thresh 20", algo: "seqscan", params: { dist_thresh: 20, time_thresh: 60, min_pts: 2, dur_min: 5 } },

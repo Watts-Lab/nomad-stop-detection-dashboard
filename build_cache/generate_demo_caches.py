@@ -13,7 +13,7 @@ from two_stop_trajectories import generate_trajectories as generate_two_stop_tra
 
 CONFIG_DIR = Path(__file__).resolve().parent
 SCENARIOS = [
-    ("2_stops", REPO_ROOT / "cached_results" / "stop-detection-cache"),
+    ("2_stops", REPO_ROOT / "cached_results" / "two-stop-cache"),
     ("low_ha", REPO_ROOT / "cached_results" / "four-stop-cache" / "low_ha"),
     ("high_ha", REPO_ROOT / "cached_results" / "four-stop-cache" / "high_ha"),
 ]

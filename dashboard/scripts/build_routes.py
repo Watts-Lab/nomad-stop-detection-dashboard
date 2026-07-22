@@ -26,9 +26,9 @@ from nomad.city_gen import City
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CITY = Path(data_folder.__file__).parent / "garden-city.gpkg"
 DEFAULT_SCENES = [
-    REPO_ROOT / "cached_results" / "stop-detection-cache" / "scene.json",
+    REPO_ROOT / "cached_results" / "two-stop-cache" / "scene.json",
 ]
-DEFAULT_OUT = REPO_ROOT / "cached_results" / "stop-detection-cache" / "routes.json"
+DEFAULT_OUT = REPO_ROOT / "cached_results" / "two-stop-cache" / "routes.json"
 
 
 def _round_point(x, y):

@@ -22,19 +22,14 @@ from nomad.stop_detection.validation import compute_stop_detection_metrics
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import stop_detection_algs.dbstop as DBSTOP
-import stop_detection_algs.dbscan as TADBSCAN
-import stop_detection_algs.density_based as DENSITY_BASED
-import stop_detection_algs.grid_based as GRIDBASED
-import stop_detection_algs.hdbscan as HDBSCAN
-import stop_detection_algs.lachesis as LACHESIS
+import stop_detection_algs.density as DENSITY
 import stop_detection_algs.sequential as SEQUENTIAL
 
 
 CONFIG_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PROJECT_ROOT
 NOMAD_DATA_DIR = Path(data_folder.__file__).parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "cached_results" / "stop-detection-cache"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "cached_results" / "two-stop-cache"
 COORDINATE_PRECISION = 0
 COORDINATE_DTYPE = "int"
 PARQUET_COMPRESSION = "zstd"
@@ -92,6 +87,7 @@ CORE_POINT_COLUMNS = [
     "timestamp",
     "role",
     "source_timestamp",
+    "core_timestamp",
     "cluster",
     "config_id",
 ]
@@ -202,6 +198,11 @@ def write_parquet_dataset(frame, path, drop_columns=None):
 
 
 def write_core_points_parquet(frame, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(path, index=False, compression=PARQUET_COMPRESSION)
+
+
+def write_single_parquet(frame, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(path, index=False, compression=PARQUET_COMPRESSION)
 
@@ -363,7 +364,7 @@ def param_grid(**values):
 
 
 def label_lachesis(sparse_df, params, key):
-    return LACHESIS.lachesis_labels(
+    return SEQUENTIAL.lachesis_labels(
         sparse_df,
         dt_max=params["dmx"],
         delta_roam=params["dr"],
@@ -380,7 +381,7 @@ def label_sequential_centroid(sparse_df, params, key):
         dt_max=params["dmx"],
         dur_min=params["dmn"],
         method="centroid",
-        core_plotting=True,
+        anchor_plotting=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -393,7 +394,7 @@ def label_sequential_first(sparse_df, params, key):
         dt_max=params["dmx"],
         dur_min=params["dmn"],
         method="sliding",
-        core_plotting=True,
+        anchor_plotting=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -407,19 +408,17 @@ def label_gridbased(sparse_df, params, key):
         + "-"
         + np.floor(grid_df["y"] / params["cs"]).astype(int).astype(str)
     )
-    return GRIDBASED.grid_based_labels(
+    return SEQUENTIAL.grid_based_labels(
         grid_df,
         time_thresh=params["mt"],
         min_cluster_size=2,
         dur_min=params["mt"],
-        core_plotting=True,
-        config_key=key,
         traj_cols={**TRAJ_COLS, "location_id": "location_id"},
     )
 
 
 def label_seqscan(sparse_df, params, key):
-    return DENSITY_BASED.seqscan_labels(
+    return DENSITY.seqscan_labels(
         sparse_df,
         dist_thresh=params["dt"],
         time_thresh=params["tt"],
@@ -433,7 +432,7 @@ def label_seqscan(sparse_df, params, key):
 
 
 def label_st_dbscan(sparse_df, params, key):
-    return TADBSCAN.ta_dbscan_labels(
+    return DENSITY.ta_dbscan_labels(
         sparse_df,
         dist_thresh=params["dt"],
         time_thresh=params["tt"],
@@ -446,7 +445,7 @@ def label_st_dbscan(sparse_df, params, key):
 
 
 def label_dbstop(sparse_df, params, key):
-    return DBSTOP.dbstop_labels(
+    return DENSITY.dbstop_labels(
         sparse_df,
         dist_thresh=params["dt"],
         time_thresh=params["tt"],
@@ -460,7 +459,7 @@ def label_dbstop(sparse_df, params, key):
 
 
 def label_hdbscan(sparse_df, params, key):
-    return HDBSCAN.hdbscan_labels(
+    return DENSITY.hdbscan_labels(
         sparse_df,
         dist_thresh=params["dt"],
         time_thresh=params["tt"],
@@ -523,6 +522,7 @@ def algorithm_specs():
                     {**params, "mcs": 2}
                     for params in param_grid(cs=CELL_SIZE_VALUES, mt=MIN_TIME_VALUES)
                 ],
+                "core_points": False,
             },
             {
                 "algorithm": "st_dbscan",
@@ -572,9 +572,10 @@ def add_metadata(frame, config_id):
 def compact_core_points(frame):
     frame = frame.loc[:, CORE_POINT_COLUMNS].copy()
     frame["user_id"] = frame["user_id"].astype("category")
-    frame["role"] = frame["role"].astype("category")
+    frame["role"] = frame["role"].astype("int8")
     frame["timestamp"] = frame["timestamp"].astype("int64")
     frame["source_timestamp"] = frame["source_timestamp"].astype("Int64")
+    frame["core_timestamp"] = frame["core_timestamp"].astype("Int64")
     frame["cluster"] = frame["cluster"].astype("int16")
     frame["config_id"] = frame["config_id"].astype("uint16")
     return frame
@@ -747,13 +748,14 @@ def run_algorithm(spec, sparse_df, diaries_df, poi_subset, output_dir, workers):
         index=False,
         compression=PARQUET_COMPRESSION,
     )
-    write_parquet_dataset(
-        stops_df.loc[:, ["user_id", "cluster", "timestamp", "duration", "x", "y", "config_id"]],
-        algorithm_dir / "stops",
+    stops_out = compact_coordinates(stops_df.loc[:, ["user_id", "cluster", "timestamp", "duration", "x", "y", "config_id"]])
+    write_single_parquet(
+        stops_out,
+        algorithm_dir / "stops.parquet",
     )
     has_core_points = spec.get("core_points", True)
     if has_core_points:
-        write_core_points_parquet(core_points_df.loc[:, CORE_POINT_COLUMNS], algorithm_dir / "core_points" / PARQUET_PART_FILE)
+        write_core_points_parquet(core_points_df.loc[:, CORE_POINT_COLUMNS], algorithm_dir / "core_points.parquet")
     metrics_df.to_parquet(
         algorithm_dir / "metrics.parquet",
         index=False,
@@ -765,14 +767,12 @@ def run_algorithm(spec, sparse_df, diaries_df, poi_subset, output_dir, workers):
         "labels": f"{algorithm}/labels.parquet",
         "labels_layout": "wide_by_config",
         "label_join_key": ["user_id", "timestamp"],
-        "stops": f"{algorithm}/stops/{PARQUET_PART_FILE}",
-        "stops_dataset": f"{algorithm}/stops",
+        "stops": f"{algorithm}/stops.parquet",
         "metrics": f"{algorithm}/metrics.parquet",
     }
     if has_core_points:
         manifest_entry.update({
-            "core_points": f"{algorithm}/core_points/{PARQUET_PART_FILE}",
-            "core_points_dataset": f"{algorithm}/core_points",
+            "core_points": f"{algorithm}/core_points.parquet",
         })
     return manifest_entry, configs_df
 
@@ -800,7 +800,7 @@ def write_configs_json(output_dir, configs_df):
 def write_manifest(output_dir, config_key, files, users):
     manifest = {
         "config_key": config_key,
-        "format": "stop-detection-dashboard-parquet-cache-v2",
+        "format": "stop-detection-dashboard-parquet-cache-v3",
         "coordinate_precision": COORDINATE_PRECISION,
         "coordinate_dtype": COORDINATE_DTYPE,
         "algorithm_keys": list(files.keys()),

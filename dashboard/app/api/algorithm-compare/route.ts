@@ -75,8 +75,10 @@ type ConfigRow = {
 
 type CorePointResponse = {
   timestamp: number
-  role: string
+  role: number
   sourceTimestamp: number
+  coreTimestamp: number
+  sourceCoreTimestamp: number
   cluster: number
   x: number
   y: number
@@ -148,7 +150,7 @@ const CACHE_ROOT = process.env.CACHED_RESULTS_DIR
   ? path.resolve(process.env.CACHED_RESULTS_DIR)
   : path.resolve(process.cwd(), "..", "cached_results")
 
-const STOP_CACHE_DIR = path.join(CACHE_ROOT, "stop-detection-cache")
+const STOP_CACHE_DIR = path.join(CACHE_ROOT, "two-stop-cache")
 const FOUR_STOP_CACHE_DIR = path.join(CACHE_ROOT, "four-stop-cache")
 const DEFAULT_TRAJECTORY = "two-stop"
 const TRAJECTORY_CACHE_DIRS: Record<string, string> = {
@@ -323,16 +325,31 @@ async function labelsForUser(
   const corePointIndex = algoDir === "lachesis" ? null : await loadCorePoints(cacheDir, algoDir, entry)
   const coreRows = corePointIndex?.get(`${config.config_id}|${userId}`) ?? []
   const pingByTimestamp = new Map(seedPings.map((ping) => [ping.timestamp, ping]))
+  const coreTimestampByPoint = new Map<string, number>()
+  for (const row of coreRows) {
+    if (Number(row.role) !== 1) continue
+    const timestamp = Number(row.timestamp)
+    const coreTimestamp = Number(row.core_timestamp)
+    coreTimestampByPoint.set(
+      `${Number(row.cluster)}|${timestamp}`,
+      Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+    )
+  }
   const corePoints = coreRows.flatMap((row) => {
     const timestamp = Number(row.timestamp)
     const sourceTimestamp = Number(row.source_timestamp)
+    const role = Number(row.role)
+    const coreTimestamp = Number(row.core_timestamp)
     const point = pingByTimestamp.get(timestamp)
     const sourcePoint = pingByTimestamp.get(sourceTimestamp)
     if (!point || !sourcePoint) return []
+    const sourceCoreTimestamp = coreTimestampByPoint.get(`${Number(row.cluster)}|${sourceTimestamp}`) ?? sourceTimestamp
     return [{
       timestamp,
-      role: String(row.role),
+      role,
       sourceTimestamp,
+      coreTimestamp: Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+      sourceCoreTimestamp,
       cluster: Number(row.cluster),
       x: point.x,
       y: point.y,

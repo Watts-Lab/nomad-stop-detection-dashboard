@@ -1,21 +1,31 @@
+"""Shared plotting-point output for density cores and sequential anchors.
+
+The ``role`` column is numeric: ``1`` identifies a core/anchor and ``-1``
+identifies a retained border/accepted point. Noise points are not exported.
+"""
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 
-CORE_POINT_COLUMNS = [
+PLOTTING_POINT_COLUMNS = [
     "user_id",
     "timestamp",
     "config_key",
     "role",
     "source_timestamp",
+    "core_timestamp",
     "cluster",
     "x",
     "y",
     "value",
     "value_name",
 ]
+
+# Backwards-compatible name for callers that imported the original schema.
+CORE_POINT_COLUMNS = PLOTTING_POINT_COLUMNS
 
 
 def _user_values(data, traj_cols):
@@ -24,29 +34,50 @@ def _user_values(data, traj_cols):
     return np.full(len(data), None, dtype=object)
 
 
+def _empty_plotting_points():
+    return pd.DataFrame(
+        {
+            column: pd.Series(dtype="int8" if column == "role" else "object")
+            for column in PLOTTING_POINT_COLUMNS
+        }
+    )
+
+
 def _empty_core_points():
-    return pd.DataFrame(columns=CORE_POINT_COLUMNS)
+    return _empty_plotting_points()
+
+
+def _empty_anchor_points():
+    return _empty_plotting_points()
+
+
+def write_plotting_points(points, plotting_path):
+    if plotting_path is None:
+        return
+    path = Path(plotting_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    points.to_parquet(path, index=False)
 
 
 def write_core_points(core_points, core_plotting_path):
-    if core_plotting_path is None:
-        return
-    path = Path(core_plotting_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    core_points.to_parquet(path, index=False)
+    """Compatibility wrapper for the original density-specific helper name."""
+    write_plotting_points(core_points, core_plotting_path)
 
 
-def finish_result(result, core_points, core_plotting=False, core_plotting_path=None):
-    write_core_points(core_points, core_plotting_path)
-    if core_plotting:
-        return result, core_points
+def finish_result(result, points, return_points=False, plotting_path=None):
+    write_plotting_points(points, plotting_path)
+    if return_points:
+        return result, points
     return result
 
 
-def rows_from_roles(data, timestamps, labels, roles, source_timestamps, values, value_name, config_key, traj_cols, coord_key1, coord_key2):
+def rows_from_roles(data, timestamps, labels, roles, source_timestamps, values, value_name, config_key, traj_cols, coord_key1, coord_key2, core_timestamps=None):
     mask = roles.notna()
     if not mask.any():
         return _empty_core_points()
+
+    if core_timestamps is None:
+        core_timestamps = pd.Series(np.nan, index=data.index, name="core_timestamp")
 
     frame = pd.DataFrame(
         {
@@ -55,6 +86,7 @@ def rows_from_roles(data, timestamps, labels, roles, source_timestamps, values, 
             "config_key": config_key,
             "role": roles.to_numpy(),
             "source_timestamp": source_timestamps.to_numpy(),
+            "core_timestamp": core_timestamps.to_numpy(),
             "cluster": labels.to_numpy(),
             "x": data[traj_cols[coord_key1]].to_numpy(),
             "y": data[traj_cols[coord_key2]].to_numpy(),
@@ -63,7 +95,9 @@ def rows_from_roles(data, timestamps, labels, roles, source_timestamps, values, 
         },
         index=data.index,
     )
-    return frame.loc[mask, CORE_POINT_COLUMNS].reset_index(drop=True)
+    result = frame.loc[mask, PLOTTING_POINT_COLUMNS].reset_index(drop=True)
+    result["role"] = result["role"].astype("int8")
+    return result
 
 
 def nearest_core_source(timestamps, labels, cores):
@@ -84,11 +118,32 @@ def nearest_core_source(timestamps, labels, cores):
     return source
 
 
-def density_core_points(data, timestamps, output, neighbor_counts, config_key, traj_cols, coord_key1, coord_key2):
+def core_activation_timestamps(timestamps, cores, neighbors, min_pts):
+    result = pd.Series(np.nan, index=timestamps.index, name="core_timestamp")
+    if neighbors is None or min_pts is None:
+        return result
+
+    core_mask = (cores >= 0).fillna(False)
+    for idx in timestamps.index[core_mask]:
+        timestamp = timestamps.loc[idx]
+        if timestamp not in neighbors:
+            continue
+        neighbor_times = np.sort(np.asarray(list(neighbors[timestamp])))
+        if len(neighbor_times) < min_pts:
+            continue
+        result.loc[idx] = max(timestamp, neighbor_times[min_pts - 1])
+    return result
+
+
+def density_core_points(data, timestamps, output, neighbor_counts, config_key, traj_cols, coord_key1, coord_key2, neighbors=None, min_pts=None):
     labels = output["cluster"]
     cores = output["core"]
-    roles = pd.Series(np.where(labels < 0, None, np.where(cores >= 0, "core", "border")), index=output.index)
+    roles = pd.Series(pd.NA, index=output.index, dtype="Int8")
+    clustered = labels >= 0
+    roles.loc[clustered] = -1
+    roles.loc[clustered & (cores >= 0)] = 1
     source_timestamps = nearest_core_source(timestamps, labels, cores)
+    core_timestamps = core_activation_timestamps(timestamps, cores, neighbors, min_pts)
     values = neighbor_counts.reindex(output.index)
     return rows_from_roles(
         data,
@@ -102,10 +157,13 @@ def density_core_points(data, timestamps, output, neighbor_counts, config_key, t
         traj_cols,
         coord_key1,
         coord_key2,
+        core_timestamps,
     )
 
 
-def records_to_core_points(records):
+def records_to_anchor_points(records):
     if not records:
-        return _empty_core_points()
-    return pd.DataFrame.from_records(records, columns=CORE_POINT_COLUMNS)
+        return _empty_anchor_points()
+    result = pd.DataFrame.from_records(records, columns=PLOTTING_POINT_COLUMNS)
+    result["role"] = result["role"].astype("int8")
+    return result

@@ -209,20 +209,21 @@ function DemoSceneRenderer({
     const cachedCorePointKeys = new Set<string>()
     const cachedCorePointData = (panel.corePoints ?? []).flatMap((point) => {
       const pingIndex = pingIndexByTimestamp.get(point.timestamp)
-      const roleIsCore = point.role === "core" || point.role === "anchor" || point.role.endsWith("_core")
+      const roleIsCore = point.role === 1
       if (pingIndex === undefined || !roleIsCore) return []
       const key = `${point.timestamp}|${point.cluster}|${point.role}`
       if (cachedCorePointKeys.has(key)) return []
       cachedCorePointKeys.add(key)
-      return [[point.x, point.y, point.cluster, pingIndex, point.cluster, point.timestamp]]
+      return [[point.x, point.y, point.cluster, pingIndex, point.cluster, point.coreTimestamp]]
     })
     const cachedCoreEdges = (panel.corePoints ?? []).flatMap((point) => {
       const pingIndex = pingIndexByTimestamp.get(point.timestamp)
       const sourceIndex = pingIndexByTimestamp.get(point.sourceTimestamp)
       if (pingIndex === undefined || sourceIndex === undefined || point.timestamp === point.sourceTimestamp) return []
+      const visibleAt = Math.max(point.timestamp, point.sourceCoreTimestamp)
       return [{
         coords: [[point.sourceX, point.sourceY], [point.x, point.y]],
-        value: [point.cluster, sourceIndex, pingIndex, point.cluster, point.timestamp],
+        value: [point.cluster, sourceIndex, pingIndex, point.cluster, visibleAt],
       }]
     })
     const coreTimelineData = DENSITY_ALGORITHMS.includes(panel.algo)
@@ -1113,7 +1114,20 @@ function DemoSceneRenderer({
           symbolSize: 15,
           itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
         },
-        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 9, data: [], symbolSize: 9, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.5, brushType: "stroke" }, itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.4, opacity: 0.95 } },
+        {
+          id: "current-ping",
+          name: "Current ping",
+          type: "effectScatter",
+          coordinateSystem: "cartesian2d",
+          z: 9,
+          data: [],
+          symbol: "pin",
+          symbolSize: 30,
+          animationDurationUpdate: 180,
+          animationEasingUpdate: "cubicOut",
+          rippleEffect: { scale: 1.8, brushType: "stroke" },
+          itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.2, opacity: 0.96 },
+        },
       ],
     })
 

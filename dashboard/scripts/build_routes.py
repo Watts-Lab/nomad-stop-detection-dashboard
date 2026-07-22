@@ -8,9 +8,9 @@ Run from the repository root:
 
     python dashboard/scripts/build_routes.py
 
-The output JSON is consumed by app/api/algorithm-compare/route.ts (RoutesCache) and
-keyed by "<from_id>-><to_id>". By default this rebuilds the two-stop route cache;
-pass --scene and --out for the four-stop cache roots.
+The output JSON is loaded by app/_lib/static-cache.ts and keyed by
+"<from_id>-><to_id>". By default this rebuilds the two-stop route cache; pass
+--scene and --out for the four-stop cache roots.
 """
 
 from __future__ import annotations

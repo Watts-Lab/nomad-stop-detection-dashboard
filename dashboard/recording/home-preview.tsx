@@ -15,11 +15,13 @@ const PREVIEW_RUNS: Array<{
   { label: "ST-DBSCAN · eps 15", algo: "dbscan", params: { eps_spatial: 15, T_max: 60, minPts: 3 } },
   { label: "Grid-based · cell 100", algo: "gridbased", params: { cell_size: 100, min_time: 5 } },
 ]
+const ACTIVE_RUNS = PREVIEW_RUNS.slice(0, 1)
 
 const FPS = 30
 const INITIAL_DELAY_MS = 1150
 const FRAME_DELAY_MS = 30
 const HOLD_MS = 2000
+const POINT_REVEAL_MS = 120
 const SCENE_STEP_SECONDS = 30
 const ignoreTimeChange = () => {}
 
@@ -32,7 +34,7 @@ function timingFor(start: number, end: number, fps: number) {
 }
 
 async function loadPanels() {
-  return Promise.all(PREVIEW_RUNS.map(async (run) => {
+  return Promise.all(ACTIVE_RUNS.map(async (run) => {
     const data = await loadCompareData({
       seed: 1,
       mode: "single",
@@ -46,12 +48,12 @@ export async function calculateHomePreviewMetadata() {
   const data = await loadCompareData({
     seed: 1,
     mode: "single",
-    left: { algo: PREVIEW_RUNS[0].algo, params: PREVIEW_RUNS[0].params },
+    left: { algo: ACTIVE_RUNS[0].algo, params: ACTIVE_RUNS[0].params },
   })
   const pings = data.left.scene?.pings
   if (!pings?.length) throw new Error("Home preview scene has no pings")
   const timing = timingFor(pings[0].timestamp, pings[pings.length - 1].timestamp, FPS)
-  return { durationInFrames: timing.runFrames * PREVIEW_RUNS.length }
+  return { durationInFrames: timing.runFrames * ACTIVE_RUNS.length }
 }
 
 export function HomePreview() {
@@ -83,7 +85,7 @@ export function HomePreview() {
   const start = scene.pings[0].timestamp
   const end = scene.pings[scene.pings.length - 1].timestamp
   const timing = timingFor(start, end, fps)
-  const runIndex = Math.min(Math.floor(frame / timing.runFrames), PREVIEW_RUNS.length - 1)
+  const runIndex = Math.min(Math.floor(frame / timing.runFrames), ACTIVE_RUNS.length - 1)
   const runFrame = frame % timing.runFrames
   const playbackFrame = Math.max(0, runFrame - timing.initialFrames)
   const step = Math.min(
@@ -93,18 +95,27 @@ export function HomePreview() {
   const currentTime = runFrame < timing.initialFrames
     ? start
     : Math.min(start + step * SCENE_STEP_SECONDS, end)
+  const pointRevealProgress = (timestamp: number) => {
+    if (timestamp <= start) return 1
+    const revealStep = Math.ceil((timestamp - start) / SCENE_STEP_SECONDS)
+    const revealFrame = timing.initialFrames + Math.ceil((revealStep - 1) * fps * FRAME_DELAY_MS / 1000)
+    const transitionFrames = Math.ceil(POINT_REVEAL_MS * fps / 1000)
+    return Math.min(1, Math.max(0, (runFrame - revealFrame + 1) / transitionFrames))
+  }
 
   return (
     <AbsoluteFill className="bg-white">
       <StopRunPreview
-        key={PREVIEW_RUNS[runIndex].algo}
+        key={ACTIVE_RUNS[runIndex].algo}
         panel={panels[runIndex]}
         currentTime={currentTime}
         onTimeChange={ignoreTimeChange}
         playback="external"
+        pulsePhase={(frame % (fps * 4)) / (fps * 4)}
+        pointRevealProgress={pointRevealProgress}
       />
       <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-[#d7dbd2] bg-white/90 px-2.5 py-1 text-xs font-semibold text-[#202124] shadow-sm">
-        {PREVIEW_RUNS[runIndex].label}
+        {ACTIVE_RUNS[runIndex].label}
       </span>
     </AbsoluteFill>
   )

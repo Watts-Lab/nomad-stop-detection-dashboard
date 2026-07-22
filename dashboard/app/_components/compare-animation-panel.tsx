@@ -40,6 +40,8 @@ function DemoSceneRenderer({
   showStops,
   variant = "full",
   playback = "automatic",
+  pulsePhase = 0,
+  pointRevealProgress,
   onPreviewComplete,
 }: {
   panel: ComparePanelResponse
@@ -51,6 +53,8 @@ function DemoSceneRenderer({
   showStops: boolean
   variant?: "full" | "preview"
   playback?: "automatic" | "external"
+  pulsePhase?: number
+  pointRevealProgress?: (timestamp: number) => number
   onPreviewComplete?: () => void
 }) {
   const scene = panel.scene
@@ -60,6 +64,8 @@ function DemoSceneRenderer({
   const toggleRef = useRef<() => void>(() => {})
   const replayRef = useRef<() => void>(() => {})
   const selectedTimestampRef = useRef<number | null>(currentTime)
+  const pulsePhaseRef = useRef(pulsePhase)
+  const pointRevealProgressRef = useRef(pointRevealProgress)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const labels = useMemo(() => {
@@ -194,7 +200,7 @@ function DemoSceneRenderer({
         maxX: Math.max(...focusXs),
         maxY: Math.max(...focusYs),
       },
-      stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
+      stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration, stop.end]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
       durMinSec: revealDelay,
@@ -389,6 +395,21 @@ function DemoSceneRenderer({
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
+      const currentPing = [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]]]
+      const appearanceFor = (timestamp: number) => automaticPlayback ? 1 : pointRevealProgressRef.current?.(timestamp) ?? 1
+      const currentPingAppearance = appearanceFor(currentPing[0][4])
+      const noisePingAppearance = automaticPlayback ? {} : { symbolSize: (value: number[]) => 7 * appearanceFor(value[4]), itemStyle: { color: (params: EChartsParams) => echarts.color.modifyAlpha("#1f2326", 0.72 * appearanceFor(params.data[4])) } }
+      const clusterPingAppearance = automaticPlayback ? {} : { symbolSize: (value: number[]) => 12 * appearanceFor(value[4]), itemStyle: { color: (params: EChartsParams) => echarts.color.modifyAlpha(clusterColor(params.data[2]), 0.95 * appearanceFor(params.data[4])) } }
+      const detectedStopAppearance = automaticPlayback ? {} : { symbolSize: (value: number[]) => 20 * appearanceFor(value[6]), itemStyle: { color: (params: EChartsParams) => echarts.color.modifyAlpha(clusterColor(params.data[2]), 0.95 * appearanceFor(params.data[6])) } }
+      const rippleSeries = automaticPlayback ? [] : [0, 1 / 3, 2 / 3].map((offset, index) => {
+        const phase = (pulsePhaseRef.current + offset) % 1
+        return {
+          id: `current-ping-ripple-${index}`,
+          data: currentPing,
+          symbolSize: 13 * currentPingAppearance * (1 + 1.4 * phase),
+          itemStyle: { opacity: 0.7 * currentPingAppearance * (1 - phase) },
+        }
+      })
 
       mapChart.setOption({
         series: [
@@ -398,10 +419,11 @@ function DemoSceneRenderer({
           { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
           { id: "next-path", data: showGroundTruth && route.next.length > 0 ? [{ coords: route.next }] : [] },
-          { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds) : [] },
-          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds) : [] },
-          { id: "detected-stops", data: showStops ? chartData.stopData.slice(0, detectedStopCount) : [] },
-          { id: "current-ping", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]]] },
+          { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds) : [], ...noisePingAppearance },
+          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds) : [], ...clusterPingAppearance },
+          { id: "detected-stops", data: showStops ? chartData.stopData.slice(0, detectedStopCount) : [], ...detectedStopAppearance },
+          ...rippleSeries,
+          { id: "current-ping", data: currentPing, ...(!automaticPlayback ? { symbolSize: 13 * currentPingAppearance, itemStyle: { opacity: currentPingAppearance } } : {}) },
           { id: "direction-arrows", data: showGroundTruth ? directionArrowsFor(route) : [] },
           { id: "ground-truth-marker", data: showGroundTruth ? [groundTruthPositionAt(timestampSeconds, route)].filter(Boolean) : [] },
         ],
@@ -656,7 +678,8 @@ function DemoSceneRenderer({
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 7, itemStyle: { color: "rgba(31, 35, 38, 0.72)" } },
         { id: "cluster-pings", name: "Cluster pings", type: "scatter", coordinateSystem: "cartesian2d", z: 6, data: [], symbolSize: 12, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#202124", borderWidth: 0.8, opacity: 0.95 } },
         { id: "detected-stops", name: "Detected stops", type: "scatter", coordinateSystem: "cartesian2d", z: 7, data: [], symbol: "diamond", symbolSize: 20, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" } },
-        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.4, brushType: "stroke" }, itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
+        ...(!automaticPlayback ? [0, 1, 2].map((index) => ({ id: `current-ping-ripple-${index}`, type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 7, data: [], symbolSize: 13, itemStyle: { color: "transparent", borderColor: (params: EChartsParams) => clusterColor(params.data[2]), borderWidth: 1.5 } })) : []),
+        { id: "current-ping", name: "Current ping", type: automaticPlayback ? "effectScatter" : "scatter", coordinateSystem: "cartesian2d", z: 8, data: [], symbolSize: 13, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", ...(automaticPlayback ? { rippleEffect: { scale: 2.4, brushType: "stroke" } } : {}), itemStyle: { color: (params: EChartsParams) => clusterColor(params.data[2]), borderColor: "#ffffff", borderWidth: 1.5 } },
         { id: "ground-truth-marker", name: "Ground truth position", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 9, data: [], symbolSize: 11, itemStyle: { color: "#0f766e", borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(15, 118, 110, 0.35)" } },
         {
           id: "direction-arrows",
@@ -823,8 +846,10 @@ function DemoSceneRenderer({
   useEffect(() => {
     if (!chartData || currentTime === null) return
     selectedTimestampRef.current = currentTime
+    pulsePhaseRef.current = pulsePhase
+    pointRevealProgressRef.current = pointRevealProgress
     renderSceneRef.current?.(currentTime)
-  }, [chartData, currentTime])
+  }, [chartData, currentTime, pointRevealProgress, pulsePhase])
 
   if (!scene) return null
 
@@ -950,12 +975,16 @@ export function StopRunPreview({
   onTimeChange,
   onComplete,
   playback = "automatic",
+  pulsePhase = 0,
+  pointRevealProgress,
 }: {
   panel: ComparePanelResponse | null | undefined
   currentTime: number | null
   onTimeChange: (timestamp: number) => void
   onComplete?: () => void
   playback?: "automatic" | "external"
+  pulsePhase?: number
+  pointRevealProgress?: (timestamp: number) => number
 }) {
   if (!panel?.scene) {
     return (
@@ -977,6 +1006,8 @@ export function StopRunPreview({
       showStops
       variant="preview"
       playback={playback}
+      pulsePhase={pulsePhase}
+      pointRevealProgress={pointRevealProgress}
       onPreviewComplete={onComplete}
     />
   )

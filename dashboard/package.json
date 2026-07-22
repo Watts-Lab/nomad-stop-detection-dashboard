@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "recording:studio": "remotion studio recording/index.ts",
-    "recording:render": "remotion render recording/index.ts HomePreview public/videos/home-stop-preview.mp4"
+    "recording:render": "remotion render recording/index.ts HomePreview public/videos/home-stop-preview.mp4 --scale=3"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

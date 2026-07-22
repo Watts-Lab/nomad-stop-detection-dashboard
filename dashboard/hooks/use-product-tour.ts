@@ -12,7 +12,7 @@ const TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='tour-map']",
     popover: {
       title: "Watch a Trajectory Play Out",
-      description: "Grey dots are raw GPS pings from one person's trip. As the agent moves, the algorithm groups nearby pings into colored diamonds dependent on the algorithm's distance and duration thresholds (signifying confirmed stops). Toggle Ground Truth to see the real destination it's heading to.",
+      description: "Grey dots are raw GPS pings from one person's trip. As the agent moves, the algorithm groups nearby pings into colored circles dependent on the algorithm's distance and duration thresholds (signifying confirmed stops). Toggle Ground Truth to see the real destination it's heading to.",
     },
   },
   {

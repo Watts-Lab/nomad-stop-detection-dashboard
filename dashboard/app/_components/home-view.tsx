@@ -1,77 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
 import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { StopRunPreview } from "./compare-animation-panel"
 import { publicPath } from "../_lib/public-path"
-import { loadCompareData } from "../_lib/static-cache"
-import type { CompareApiResponse, DashboardView } from "../_lib/types"
-
-const HOME_PREVIEW_RUNS: Array<{
-  label: string
-  algo: string
-  params: Record<string, number>
-}> = [
-  { label: "DBSTOP · dist_thresh 10", algo: "dbstop", params: { dist_thresh: 10, time_thresh: 60, min_pts: 3, dur_min: 5 } },
-  { label: "Lachesis · delta_roam 25", algo: "lachesis", params: { dt_max: 60, delta_roam: 25, dur_min: 5 } },
-  { label: "SeqScan · dist_thresh 20", algo: "seqscan", params: { dist_thresh: 20, time_thresh: 60, min_pts: 2, dur_min: 5 } },
-  { label: "ST-DBSCAN · eps 15", algo: "dbscan", params: { eps_spatial: 15, T_max: 60, minPts: 3 } },
-  { label: "Grid-based · cell 100", algo: "gridbased", params: { cell_size: 100, min_time: 5 } },
-]
+import type { DashboardView } from "../_lib/types"
 
 function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) => void }) {
-  const [previewIndex, setPreviewIndex] = useState(0)
-  const [previewData, setPreviewData] = useState<CompareApiResponse | null>(null)
-  const [previewTime, setPreviewTime] = useState<number | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
-  const nextRunTimerRef = useRef(0)
-  const previewRun = HOME_PREVIEW_RUNS[previewIndex]
-  const previewReady = Boolean(previewData?.left && previewTime !== null)
-
-  const handlePreviewComplete = useCallback(() => {
-    window.clearTimeout(nextRunTimerRef.current)
-    nextRunTimerRef.current = window.setTimeout(() => {
-      setPreviewIndex((index) => (index + 1) % HOME_PREVIEW_RUNS.length)
-    }, 2000)
-  }, [])
-
-  useEffect(() => {
-    return () => window.clearTimeout(nextRunTimerRef.current)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadPreview = async () => {
-      window.clearTimeout(nextRunTimerRef.current)
-      setLoadFailed(false)
-      setPreviewTime(null)
-      try {
-        const data = await loadCompareData({
-          seed: 1,
-          mode: "single",
-          left: {
-            algo: previewRun.algo,
-            params: previewRun.params,
-          },
-        })
-        if (!cancelled) {
-          setPreviewData(data)
-          setPreviewTime(null)
-        }
-      } catch {
-        if (!cancelled) setLoadFailed(true)
-      }
-    }
-
-    void loadPreview()
-    return () => {
-      cancelled = true
-    }
-  }, [previewRun])
-
   return (
     <button
       type="button"
@@ -79,28 +14,17 @@ function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) 
       className="group relative h-[360px] w-full overflow-hidden rounded-md border border-[#263449] bg-white text-left outline-none ring-offset-2 ring-offset-[#0a1020] transition hover:border-[#459ba4] focus-visible:ring-2 focus-visible:ring-[#62b8bf]"
       aria-label="Open stop detection demo"
     >
-      <div
-        className="absolute inset-0 bg-white bg-cover bg-center"
-        style={{ backgroundImage: "url('" + publicPath("/issue-images/home-stop-run-placeholder.png") + "')" }}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        poster={publicPath("/issue-images/home-stop-run-placeholder.png")}
+        preload="auto"
+        src={publicPath("/videos/home-stop-preview.mp4")}
+        className="absolute inset-0 h-full w-full object-cover"
+        aria-hidden="true"
       />
-      {previewData?.left && (
-        <div className={`absolute inset-0 transition-opacity duration-500 ${previewReady ? "opacity-100" : "opacity-0"}`}>
-          <StopRunPreview
-            panel={previewData.left}
-            currentTime={previewTime}
-            onTimeChange={setPreviewTime}
-            onComplete={handlePreviewComplete}
-          />
-        </div>
-      )}
-      {loadFailed && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-medium text-[#202124]">
-          Preview unavailable
-        </div>
-      )}
-      <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-[#d7dbd2] bg-white/90 px-2.5 py-1 text-xs font-semibold text-[#202124] shadow-sm">
-        {previewRun.label}
-      </span>
       <span className="pointer-events-none absolute inset-0 z-10 bg-[#459ba4]/0 transition group-hover:bg-[#459ba4]/10" />
       <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-[#62b8bf]/60 bg-[#08101c]/85 px-4 py-2 text-sm font-semibold text-[#f2f4eb] opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100">
         Go to demo

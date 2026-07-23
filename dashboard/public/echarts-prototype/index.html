@@ -239,18 +239,6 @@
           },
           series: [
             {
-              name: "Per-user trajectories",
-              id: "user-trajectories",
-              type: "line",
-              data: userTrajectoryData,
-              symbol: "none",
-              lineStyle: {
-                color: "rgba(31, 119, 180, 0.08)",
-                width: 1,
-              },
-              z: 2,
-            },
-            {
               name: "Individual",
               id: "individual-results",
               type: "scatter",
@@ -302,24 +290,6 @@
               z: 5,
             },
             {
-              name: meanPerUserMaxLabel,
-              id: "mean-per-user-max",
-              type: "line",
-              data: meanPerUserMaxLine,
-              symbol: "none",
-              lineStyle: {
-                color: "#d62728",
-                width: 3,
-                type: "solid",
-              },
-              itemStyle: {
-                color: "#d62728",
-              },
-              emphasis: {
-                disabled: true,
-              },
-            },
-            {
               name: highestAverageLabel,
               id: "highest-average-retention",
               type: "line",
@@ -366,7 +336,7 @@
               symbol: "circle",
               symbolSize: 7,
               lineStyle: {
-                color: "#2ca02c",
+                color: "#2ca021",
                 width: 2,
               },
               itemStyle: {
@@ -402,7 +372,7 @@
               silent: true,
               showInLegend: false,
               itemStyle: {
-                color: "#2ca02c",
+                color: "#b91c1c",
                 borderColor: "rgba(255, 255, 255, 0.95)",
                 borderWidth: 1.5,
               },

@@ -368,12 +368,12 @@
               data: emptyHighlight,
               animation: false,
               symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
-              symbolSize: 22,
+              symbolSize: 8,
               silent: true,
               showInLegend: false,
               itemStyle: {
                 color: "#b91c1c",
-                borderColor: "rgba(255, 255, 255, 0.95)",
+                borderColor: "rgba(255, 255, 255, 0)",
                 borderWidth: 1.5,
               },
               z: 12,
@@ -389,6 +389,7 @@
           chart.setOption({
             series: [
               { id: "individual-results", itemStyle: { opacity: 0.08 } },
+              { id: "per-user-max", itemStyle: { opacity: 0.08 } },
               { id: "highlighted-user-line", data: userLine },
               { id: "hovered-per-user-max", data: [point] },
             ],

@@ -83,7 +83,8 @@ export type MetricsParameterNote = NonNullable<MetricsOptionsResponse["parameter
 
 export type EChartsParams = {
   seriesId?: string
-  data: number[]
+  data: number[] | { value: number[] }
+  value?: number[]
   dataIndex: number
   coordSys: { x: number; y: number; width: number; height: number }
 }

@@ -148,7 +148,11 @@ export function LearnView({
                         <tbody>
                           {expandedLearnAlgorithm.parameters.map((param, idx) => (
                             <tr key={param.name} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
-                              <td className="px-3 py-2 font-mono text-sm">{param.name}</td>
+                              <td className="px-3 py-2 font-mono text-sm">
+                                {param.name === "delta_roam" ? (
+                                  <span className="inline-flex items-baseline gap-0.5 font-sans">Δ<sub className="text-[0.7em] leading-none">roam</sub></span>
+                                ) : param.name}
+                              </td>
                               <td className="px-3 py-2 font-mono text-sm">{param.defaultValue}</td>
                               <td className="px-3 py-2 text-sm text-muted-foreground">{param.description}</td>
                             </tr>

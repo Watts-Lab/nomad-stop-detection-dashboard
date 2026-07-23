@@ -45,6 +45,7 @@ function NomadDashboard() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
+  const [demoTrajectory, setDemoTrajectory] = useState("two-stop")
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
@@ -127,6 +128,7 @@ function NomadDashboard() {
     try {
       const data = await loadCompareData({
         seed,
+        trajectory: demoTrajectory,
         mode: compareMode ? "compare" : "single",
         left: {
           algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
@@ -147,7 +149,7 @@ function NomadDashboard() {
       if (requestId !== compareRequestIdRef.current) return
       setCompareLoading(false)
     }
-  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode])
+  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, demoTrajectory])
 
   const handleNewTrajectory = useCallback(() => {
     const nextSeed = compareSeed + 1
@@ -317,6 +319,7 @@ function NomadDashboard() {
           rightParams={rightParams}
           leftParamErrors={leftParamErrors}
           rightParamErrors={rightParamErrors}
+          demoTrajectory={demoTrajectory}
           compareApiData={compareApiData}
           compareLoading={compareLoading}
           compareError={compareError}
@@ -328,6 +331,7 @@ function NomadDashboard() {
           setRightParams={setRightParams}
           setLeftParamErrors={setLeftParamErrors}
           setRightParamErrors={setRightParamErrors}
+          setDemoTrajectory={setDemoTrajectory}
           handleCompareModeToggle={handleCompareModeToggle}
           handleLeftAlgorithmChange={handleLeftAlgorithmChange}
           handleRightAlgorithmChange={handleRightAlgorithmChange}

@@ -153,7 +153,13 @@ function loadRoutes(cacheRoot: string) {
   const cached = routesCache.get(cacheRoot)
   if (cached) return cached
 
-  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json")
+  const routes = Promise.all([
+    fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json"),
+    fetchJson<NonNullable<CompareScene["routes"]>>(stopCacheRoot, "routes.json"),
+  ]).then(([trajectoryRoutes, sharedRoutes]) => ({
+    ...trajectoryRoutes,
+    streets: sharedRoutes.streets,
+  }))
   routesCache.set(cacheRoot, routes)
   return routes
 }

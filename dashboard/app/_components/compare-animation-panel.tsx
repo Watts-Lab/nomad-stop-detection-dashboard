@@ -20,7 +20,7 @@ const DEMO_CLUSTER_COLORS = [
 ]
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
-type PlaybackState = "playing" | "paused" | "complete"
+const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 
 function DemoSceneRenderer({
   panel,
@@ -34,8 +34,6 @@ function DemoSceneRenderer({
   onPreviewComplete,
   previewRunId = 0,
   onReplayStart,
-  sharedPlaybackState = "complete",
-  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse
   mode: "single" | "compare"
@@ -48,8 +46,6 @@ function DemoSceneRenderer({
   onPreviewComplete?: () => void
   previewRunId?: number
   onReplayStart?: () => void
-  sharedPlaybackState?: PlaybackState
-  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -58,8 +54,6 @@ function DemoSceneRenderer({
   const replayRef = useRef<() => void>(() => {})
   const previewRef = useRef<() => void>(() => {})
   const onReplayStartRef = useRef(onReplayStart)
-  const sharedPlaybackStateRef = useRef(sharedPlaybackState)
-  const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
@@ -227,15 +221,16 @@ function DemoSceneRenderer({
       }]
     })
     const coreTimelineData = DENSITY_ALGORITHMS.includes(panel.algo)
-      ? cachedCorePointData.map((point) => [point[5] * 1000, point[2]])
+      ? cachedCorePointData.map((point) => [point[5] * 1000, point[2], point[3]])
       : []
     const useCachedCorePoints = Boolean(panel.corePoints?.length) && panel.algo !== "sequential-centroid"
     const anchorPointData = useCachedCorePoints ? cachedCorePointData : firstAnchorData
     const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
     const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
-      const building = row.location ? buildingById.get(row.location) : null
-      return building ? [{ ...row, destination: { id: row.location, center: building.center } }] : []
+      if (!row.location) return []
+      const building = buildingById.get(row.location)
+      return building ? [{ ...row, location: row.location, destination: { id: row.location, center: building.center } }] : []
     })
     const segments = truthStops.slice(1).map((current, index) => {
       const previous = truthStops[index]
@@ -263,13 +258,37 @@ function DemoSceneRenderer({
       ...focusPoints.map(([, y]) => y),
       ...focusBuildings.flatMap((building) => [building.minY, building.maxY]),
     ]
+    const streets = scene.routes?.streets ?? []
+    const streetIds = new Set(streets.map((street) => street.id))
+    const streetLanes = streets.flatMap((street) => {
+      const [, xPart, yPart] = street.id.split("-")
+      const gridX = Number(xPart.slice(1))
+      const gridY = Number(yPart.slice(1))
+      const xs = street.coords.map(([x]) => x)
+      const ys = street.coords.map(([, y]) => y)
+      const minStreetX = Math.min(...xs)
+      const maxStreetX = Math.max(...xs)
+      const minStreetY = Math.min(...ys)
+      const maxStreetY = Math.max(...ys)
+      const centerX = (minStreetX + maxStreetX) / 2
+      const centerY = (minStreetY + maxStreetY) / 2
+      const left = streetIds.has(`s-x${gridX - 1}-y${gridY}`)
+      const right = streetIds.has(`s-x${gridX + 1}-y${gridY}`)
+      const down = streetIds.has(`s-x${gridX}-y${gridY - 1}`)
+      const up = streetIds.has(`s-x${gridX}-y${gridY + 1}`)
+      return [
+        ...(left || right ? [[[left ? minStreetX : centerX, centerY], [right ? maxStreetX : centerX, centerY]]] : []),
+        ...(down || up ? [[[centerX, down ? minStreetY : centerY], [centerX, up ? maxStreetY : centerY]]] : []),
+      ]
+    })
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
     for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
 
     return {
-      streets: scene.routes?.streets ?? [],
+      streets,
+      streetLanes,
       buildings,
       blockSide,
       pings,
@@ -282,10 +301,6 @@ function DemoSceneRenderer({
       lachesisDiameterFrames,
       anchorPointMode: panel.algo,
       truthStops,
-      truthBars: truthStops.map((stop) => [
-        stop.timestamp * 1000,
-        (stop.timestamp + stop.duration * 60) * 1000,
-      ]),
       segments,
       focusBounds: {
         minX: Math.min(...focusXs),
@@ -367,23 +382,25 @@ function DemoSceneRenderer({
     let nextPathVisible = false
     let pulsePhase = 0
     let pulseStrength = 0
+    let previewing = false
     let hoverPingIndex: number | null = null
+    let hoverPingIndexes: Set<number> | null = null
+    let hoverBuildingId = ""
+    let tourActionActive = false
     const syncPlaybackState = () => {
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
       const nextState = atEnd && paused ? "complete" : paused ? "paused" : "playing"
       setPlaybackState(nextState)
-      onPlaybackStateChangeRef.current?.(nextState)
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
-    const associatedWithHover = (pingIndex: number, cluster: number) =>
-      hoverPingIndex === null ||
-      hoverPingIndex === pingIndex ||
-      (cluster >= 0 && chartData.pings[hoverPingIndex]?.cluster === cluster)
-    const associationOpacity = (pingIndex: number, cluster: number) => associatedWithHover(pingIndex, cluster) ? 0.75 : 0.12
-    const anchorOpacity = (pingIndex: number, cluster: number) => associatedWithHover(pingIndex, cluster) ? 1 : 0.12
-    const edgeOpacity = (pingIndex: number, cluster: number) => associatedWithHover(pingIndex, cluster) ? 0.7 : 0.08
+    const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
+    const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
+    const anchorOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 1 : 0.2
+    const edgeOpacity = (sourceIndex: number, targetIndex: number) =>
+      hoverPingIndexes === null || (hoverPingIndexes.has(sourceIndex) && hoverPingIndexes.has(targetIndex)) ? 0.7 : 0.1
+    const pingScale = (pingIndex: number) => hoverPingIndexes?.has(pingIndex) ? 1.1 : 1
     const pingCircle = (api: EChartsApi) => {
       const center = api.coord([api.value(0), api.value(1)])
       const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
@@ -462,15 +479,17 @@ function DemoSceneRenderer({
     }
     const styledScatterPoint = (point: number[]) => ({
       value: point,
+      symbolSize: 5 * pingScale(point[3]),
       itemStyle: {
-        opacity: associationOpacity(point[3], point[2]),
+        opacity: associationOpacity(point[3]),
       },
     })
     const styledAnchorPoint = (point: number[]) => ({
       value: point,
+      symbolSize: 15 * pingScale(point[3]),
       itemStyle: {
         color: clusterColor(point[2]),
-        opacity: anchorOpacity(point[3], point[2]),
+        opacity: anchorOpacity(point[3]),
       },
     })
     const groundTruthAt = (timestampSeconds: number) => {
@@ -484,7 +503,9 @@ function DemoSceneRenderer({
       const truth = groundTruthAt(timestampSeconds)
       return chartData.buildings.map((building, index) => [
         index,
-        showGroundTruth && building.id === truth.current?.location
+        showGroundTruth && building.id === hoverBuildingId
+          ? 3
+          : showGroundTruth && building.id === truth.current?.location
           ? 1 + pulseStrength
           : showGroundTruth && building.id === truth.next?.location
             ? 2
@@ -493,6 +514,19 @@ function DemoSceneRenderer({
     }
     const buildingGlowData = (timestampSeconds: number) =>
       buildingsSeriesData(timestampSeconds).filter(([, state]) => state > 0 && state < 2)
+    const pastTruthStopData = (timestampSeconds: number) => chartData.truthStops.flatMap((stop, index) =>
+      stop.timestamp + stop.duration * 60 < timestampSeconds
+        ? [[stop.timestamp * 1000, (stop.timestamp + stop.duration * 60) * 1000, index]]
+        : []
+    )
+    const currentTruthStopData = (timestampSeconds: number) => {
+      const current = groundTruthAt(timestampSeconds).current
+      return current ? [[current.timestamp * 1000, (current.timestamp + current.duration * 60) * 1000, pulseStrength, chartData.truthStops.indexOf(current)]] : []
+    }
+    const nextTruthStopData = (timestampSeconds: number) => {
+      const next = groundTruthAt(timestampSeconds).next
+      return next ? [[next.timestamp * 1000, (next.timestamp + next.duration * 60) * 1000, chartData.truthStops.indexOf(next)]] : []
+    }
     const routeGlowPoints = (route: ReturnType<typeof routeProgressAt>) =>
       [
         ...route.completedCached,
@@ -533,16 +567,12 @@ function DemoSceneRenderer({
       routeGlowFrame = 0
       mapChart.setOption({ series: [{ id: "route-glow", data: [] }] }, { lazyUpdate: true })
     }
-    const routeGlowAllowed = () =>
-      showGroundTruth && paused && (syncMaster || (mode === "compare" && sharedPlaybackStateRef.current !== "playing"))
+    const routeGlowAllowed = () => showGroundTruth
     const startRouteGlow = () => {
       if (routeGlowFrame || !routeGlowAllowed()) return
       routeGlowStartedAt = performance.now()
-      const routeGlowSpeed = 30
-      const routeGlowStartDelay = 1
-      const routeGlowFadeInSeconds = 0.5
-      const routeGlowEndHoldSeconds = 1
-      const routeGlowFadeOutSeconds = 0.5
+      const routeGlowSpeed = 24
+      const routeGlowSpacing = 5.5
       const step = (now: number) => {
         if (!routeGlowAllowed()) {
           stopRouteGlow()
@@ -551,19 +581,12 @@ function DemoSceneRenderer({
         const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
         const points = routeGlowPoints(routeProgressAt(timestampSeconds))
         const length = routeLength(points)
-        const travelSeconds = length / routeGlowSpeed
-        const endHoldStarts = routeGlowStartDelay + travelSeconds
-        const fadeOutStarts = endHoldStarts + routeGlowEndHoldSeconds
-        const cycleSeconds = fadeOutStarts + routeGlowFadeOutSeconds
-        const cycleElapsed = ((now - routeGlowStartedAt) / 1000) % cycleSeconds
-        const distance = Math.min(length, Math.max(0, cycleElapsed - routeGlowStartDelay) * routeGlowSpeed)
-        const marker = length > 0 ? routeMarkerAt(points, distance) : null
-        const opacity = cycleElapsed < routeGlowFadeInSeconds
-          ? cycleElapsed / routeGlowFadeInSeconds * 0.98
-          : cycleElapsed > fadeOutStarts
-            ? (cycleSeconds - cycleElapsed) / routeGlowFadeOutSeconds * 0.98
-            : 0.98
-        mapChart.setOption({ series: [{ id: "route-glow", data: marker ? [[...marker, opacity]] : [] }] }, { lazyUpdate: true })
+        const offset = (now - routeGlowStartedAt) / 1000 * routeGlowSpeed % routeGlowSpacing
+        const markers = Array.from(
+          { length: Math.ceil(length / routeGlowSpacing) },
+          (_, index) => routeMarkerAt(points, (offset + index * routeGlowSpacing) % length),
+        ).filter((marker) => marker !== null)
+        mapChart.setOption({ series: [{ id: "route-glow", data: markers }] }, { lazyUpdate: true })
         routeGlowFrame = window.requestAnimationFrame(step)
       }
       routeGlowFrame = window.requestAnimationFrame(step)
@@ -607,6 +630,7 @@ function DemoSceneRenderer({
       else stopNextPathFlow()
     }
     const renderScene = (timestampSeconds: number) => {
+      previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
@@ -618,6 +642,25 @@ function DemoSceneRenderer({
         ...centroidAnchorFrames.flatMap((frame) => frame.edges),
         ...lachesisDiameterFrames.map((frame) => frame.edge),
       ]
+      hoverPingIndexes = hoverPingIndex === null ? null : new Set([hoverPingIndex])
+      const connectedPings = hoverPingIndexes
+      if (connectedPings) {
+        const pending = [hoverPingIndex]
+        while (pending.length) {
+          const current = pending.pop()!
+          anchorEdges.forEach((edge) => {
+            const neighbor = edge.value[1] === current
+              ? edge.value[2]
+              : edge.value[2] === current
+                ? edge.value[1]
+                : null
+            if (neighbor !== null && !connectedPings.has(neighbor)) {
+              connectedPings.add(neighbor)
+              pending.push(neighbor)
+            }
+          })
+        }
+      }
 
       mapChart.setOption({
         series: [
@@ -628,23 +671,24 @@ function DemoSceneRenderer({
           { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
-          { id: "route-glow", data: [] },
-          { id: "ghost-pings", data: chartData.pingData },
+          { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3]), itemStyle: { opacity: associatedWithHover(point[3]) ? 1 : 0.18 } })) },
           { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
-          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3], point[2])]) : [] },
+          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3])]) : [] },
           { id: "detected-stops", data: [] },
-          { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[2], edge.value[0]) } })) : [] },
+          { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, chartData.pingData[latestPingIndex][2]) } }] },
+          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], symbolSize: 9 * pingScale(latestPingIndex), itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
       syncNextPathFlow()
       timelineChart.setOption({
         series: [
-          { id: "ping-ticks", data: chartData.pingData.map((_, index) => index) },
-          { id: "core-point-arrows", data: showStops ? chartData.coreTimelineData : [] },
-          { id: "ground-truth-bars", data: showGroundTruth ? chartData.truthBars : [] },
+          { id: "ping-ticks", data: chartData.pingData.map((_, index) => [index]) },
+          { id: "core-point-ticks", data: showStops ? chartData.coreTimelineData : [] },
+          { id: "past-truth-stops", data: showGroundTruth ? pastTruthStopData(timestampSeconds) : [] },
+          { id: "next-truth-stop", data: showGroundTruth ? nextTruthStopData(timestampSeconds) : [] },
+          { id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] },
           { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
@@ -673,15 +717,18 @@ function DemoSceneRenderer({
       }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
-          { id: "ping-ticks", data: previewPings.map((_, index) => index) },
-          { id: "core-point-arrows", data: [] },
-          { id: "ground-truth-bars", data: [] },
+          { id: "ping-ticks", data: previewPings.map((_, index) => [index]) },
+          { id: "core-point-ticks", data: [] },
+          { id: "past-truth-stops", data: [] },
+          { id: "next-truth-stop", data: [] },
+          { id: "current-truth-stop", data: [] },
           { id: "stop-bars", data: [] },
           { id: "cursor", data: [] },
         ],
       }, { lazyUpdate: true })
     }
     const playTrajectoryPreview = (onComplete: () => void) => {
+      previewing = true
       const frames = 18
       let frame = 0
       const step = () => {
@@ -698,16 +745,38 @@ function DemoSceneRenderer({
     }
     const activeTimestamp = () => selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
     const setHoveredPing = (pingIndex: number | null) => {
-      if (hoverPingIndex === pingIndex) return
+      const ping = pingIndex === null ? null : chartData.pings[pingIndex]
+      const buildingId = ping ? groundTruthAt(ping.t).current?.location ?? "" : ""
+      if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId) return
       hoverPingIndex = pingIndex
+      hoverBuildingId = buildingId
       renderScene(activeTimestamp())
     }
-    const onMapMouseOver = (params: echarts.ECElementEvent) => {
-      if (params.seriesId === "anchor-edges") {
-        setHoveredPing(paramsValue(params)[2])
+    const setHoveredBuilding = (buildingId: string) => {
+      if (hoverPingIndex === null && hoverBuildingId === buildingId) return
+      hoverPingIndex = null
+      hoverBuildingId = buildingId
+      renderScene(activeTimestamp())
+    }
+    const tourCorePingIndexes = new Set(chartData.coreTimelineData.map((point) => point[2]))
+    const tourTimelinePingIndex = chartData.pings.find((ping) => !tourCorePingIndexes.has(ping.i))?.i ?? 0
+    const tourAnchorPingIndex = chartData.anchorPointData[0]?.[3] ?? tourTimelinePingIndex
+    const onTourAction: EventListener = (event) => {
+      if (mode !== "single") return
+      const action = (event as CustomEvent).detail
+      if (action === "clear") {
+        tourActionActive = false
+        setHoveredPing(null)
         return
       }
+      tourActionActive = true
+      if (action === "timeline-ping") setHoveredPing(tourTimelinePingIndex)
+      if (action === "anchor-point") setHoveredPing(tourAnchorPingIndex)
+      if (action === "ground-truth") setHoveredBuilding(chartData.truthStops[0]?.location ?? "")
+    }
+    const onMapMouseOver = (params: echarts.ECElementEvent) => {
       if (
+        params.seriesId === "ghost-pings" ||
         params.seriesId === "cluster-pings" ||
         params.seriesId === "noise-pings" ||
         params.seriesId === "current-ping" ||
@@ -716,7 +785,20 @@ function DemoSceneRenderer({
         setHoveredPing(paramsValue(params)[3])
       }
     }
-    const onMapMouseOut = () => setHoveredPing(null)
+    const onMapMouseOut = () => {
+      if (!tourActionActive) setHoveredPing(null)
+    }
+    const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
+      const value = paramsValue(params)
+      if (params.seriesId === "ping-ticks") setHoveredPing(Number(value[0]))
+      if (params.seriesId === "core-point-ticks") setHoveredPing(Number(value[2]))
+      if (params.seriesId === "past-truth-stops") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
+      if (params.seriesId === "current-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[3])].location)
+      if (params.seriesId === "next-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
+    }
+    const onTimelineMouseOut = () => {
+      if (!tourActionActive) setHoveredPing(null)
+    }
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
       for (let candidate = 0; candidate < chartData.timeSequence.length; candidate += 1) {
@@ -796,7 +878,6 @@ function DemoSceneRenderer({
       stopNextPathFlow()
       sequenceIndex = 0
       setPlaybackState("playing")
-      onPlaybackStateChangeRef.current?.("playing")
       onReplayStartRef.current?.()
       playTrajectoryPreview(() => {
         onTimeChange(chartData.timeSequence[0])
@@ -829,7 +910,7 @@ function DemoSceneRenderer({
     mapChart.setOption({
       animation: false,
       animationDurationUpdate: 0,
-      backgroundColor: "#d2d2d2",
+      backgroundColor: "#e7e9e4",
       grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
       xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
       yAxis: { type: "value", min: bounds.yMin, max: bounds.yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
@@ -895,11 +976,25 @@ function DemoSceneRenderer({
               type: "polygon",
               shape: { points: street.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: "#d2d2d2",
-                stroke: "#d2d2d2",
+                fill: "#b9bec1",
+                stroke: "#b9bec1",
                 lineWidth: 1,
               },
             }
+          },
+        },
+        {
+          id: "street-lanes",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 1,
+          data: chartData.streetLanes.map((_, index) => index),
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const [start, end] = chartData.streetLanes[params.dataIndex]
+            const startPixel = api.coord(start)
+            const endPixel = api.coord(end)
+            return { type: "line", shape: { x1: startPixel[0], y1: startPixel[1], x2: endPixel[0], y2: endPixel[1] }, style: { stroke: "#f4cf55", lineWidth: 1.6, lineDash: [7, 6], shadowBlur: 1, shadowColor: "rgba(32, 33, 36, 0.3)" } }
           },
         },
         {
@@ -911,13 +1006,18 @@ function DemoSceneRenderer({
           data: chartData.buildings.map((_, index) => [index, 0]),
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
+            const state = Number(api.value(1))
+            const next = state === 2
+            const hovered = state === 3
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: "#8b8b8b",
-                stroke: "#ffffff",
-                lineWidth: 2,
+                fill: hovered ? "#0097ae" : "#8b8b8b",
+                stroke: hovered ? GROUND_TRUTH_COLOR : next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",
+                lineWidth: hovered ? 3.2 : next ? 2.6 : 2,
+                shadowBlur: hovered ? 14 : 0,
+                shadowColor: "rgba(15, 118, 110, 0.55)",
               },
             }
           },
@@ -984,7 +1084,7 @@ function DemoSceneRenderer({
           silent: true,
           z: 2,
           data: [],
-          lineStyle: { color: "#4b918d", width: 3, opacity: 0.38, type: "dashed" },
+          lineStyle: { color: FUTURE_GROUND_TRUTH_COLOR, width: 3, opacity: 0.38, type: "dashed" },
         },
         {
           id: "active-path",
@@ -1031,36 +1131,22 @@ function DemoSceneRenderer({
           z: 6,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const mid = api.coord([api.value(0), api.value(1)])
-            const ahead = api.coord([api.value(2), api.value(3)])
-            const opacity = Number(api.value(4))
-            let dx = ahead[0] - mid[0]
-            let dy = ahead[1] - mid[1]
-            const length = Math.hypot(dx, dy) || 1
-            dx /= length
-            dy /= length
-            const perpX = -dy
-            const perpY = dx
-            const reach = 8
-            const halfWidth = 5.5
-            const tip = [mid[0] + dx * reach, mid[1] + dy * reach]
-            const left = [mid[0] - dx * reach + perpX * halfWidth, mid[1] - dy * reach + perpY * halfWidth]
-            const right = [mid[0] - dx * reach - perpX * halfWidth, mid[1] - dy * reach - perpY * halfWidth]
+            const center = api.coord([api.value(0), api.value(1)])
             return {
-              type: "polygon",
-              shape: { points: [tip, left, right] },
+              type: "circle",
+              shape: { cx: center[0], cy: center[1], r: 4 },
               style: {
                 fill: GROUND_TRUTH_COLOR,
                 stroke: "#ffffff",
                 lineWidth: 1,
-                shadowBlur: 10,
-                shadowColor: `rgba(15, 118, 110, ${opacity * 0.43})`,
-                opacity,
+                shadowBlur: 7,
+                shadowColor: "rgba(15, 118, 110, 0.4)",
+                opacity: 0.96,
               },
             }
           },
         },
-        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: true, z: 3, data: [], symbolSize: 5, itemStyle: { color: "#000000" } },
+        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: false, z: 3, data: [], symbolSize: 5, itemStyle: { color: "#000000" } },
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
         {
           id: "cluster-pings",
@@ -1071,11 +1157,12 @@ function DemoSceneRenderer({
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api)
+            const scale = pingScale(Number(api.value(3)))
             return {
               type: "group",
               children: [
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius }, style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) } },
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: 3.6 }, style: { fill: "#000000", opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale }, style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: 3.6 * scale }, style: { fill: "#000000", opacity: Number(api.value(5)) } },
               ],
             }
           },
@@ -1140,57 +1227,105 @@ function DemoSceneRenderer({
           id: "ping-ticks",
           type: "custom",
           coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 1,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const ping = chartData.pings[params.dataIndex]
-            const top = api.coord([ping.t * 1000, 0.72])
-            const bottom = api.coord([ping.t * 1000, 0.28])
-            return { type: "line", shape: { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }, style: { stroke: "#000000", lineWidth: 2.5, opacity: 0.85 } }
-          },
-        },
-        {
-          id: "core-point-arrows",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 5,
+          silent: false,
+          z: 7,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const top = api.coord([api.value(0), 0.98])
-            const tip = api.coord([api.value(0), 0.8])
-            const color = clusterColor(Number(api.value(1)))
+            const pingIndex = Number(api.value(0))
+            const ping = chartData.pings[pingIndex]
+            const hovered = hoverPingIndex === pingIndex
+            const halfHeight = 0.22 * (hovered ? 1.2 : 1)
+            const top = api.coord([ping.t * 1000, 0.5 + halfHeight])
+            const bottom = api.coord([ping.t * 1000, 0.5 - halfHeight])
+            const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
             return {
               type: "group",
               children: [
-                { type: "line", shape: { x1: top[0], y1: top[1], x2: tip[0], y2: tip[1] - 4 }, style: { stroke: color, lineWidth: 2 } },
-                { type: "polygon", shape: { points: [[tip[0], tip[1]], [tip[0] - 4, tip[1] - 5], [tip[0] + 4, tip[1] - 5]] }, style: { fill: color } },
+                { type: "line", z2: hovered ? 9 : 0, shape, style: { stroke: "rgba(0, 0, 0, 0)", lineWidth: 10 } },
+                { type: "line", z2: hovered ? 10 : 0, shape, style: { stroke: "#000000", lineWidth: hovered ? 5 : 2.5, opacity: hoverPingIndex === null || hovered ? 0.85 : 0.2 } },
               ],
             }
           },
         },
         {
-          id: "ground-truth-bars",
+          id: "core-point-ticks",
           type: "custom",
           coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 3,
+          silent: false,
+          z: 7,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.1])
-            const end = api.coord([api.value(1), 0.1])
-            return {
-              type: "line",
-              shape: { x1: start[0], y1: start[1], x2: end[0], y2: end[1] },
-              style: { stroke: GROUND_TRUTH_COLOR, lineWidth: 5 },
-            }
+            const hovered = hoverPingIndex === Number(api.value(2))
+            const halfHeight = 0.22 * (hovered ? 1.2 : 1)
+            const top = api.coord([api.value(0), 0.5 + halfHeight])
+            const bottom = api.coord([api.value(0), 0.5 - halfHeight])
+            const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
+            const color = clusterColor(Number(api.value(1)))
+            return hovered
+              ? { type: "group", children: [
+                { type: "line", z2: 10, shape, style: { stroke: "#000000", lineWidth: 6 } },
+                { type: "line", z2: 11, shape, style: { stroke: color, lineWidth: 3.5, opacity: 0.95 } },
+              ] }
+              : { type: "line", z2: 1, shape, style: { stroke: color, lineWidth: 3.5, opacity: hoverPingIndex === null ? 0.95 : 0.2 } }
+          },
+        },
+        {
+          id: "past-truth-stops",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: false,
+          z: 3,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const start = api.coord([api.value(0), 0.18])
+            const end = api.coord([api.value(1), 0.82])
+            const shape = echarts.graphic.clipRectByRect(
+              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
+              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
+            )
+            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2, opacity: 0.62 } } : null
+          },
+        },
+        {
+          id: "current-truth-stop",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: false,
+          z: 4,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const start = api.coord([api.value(0), 0.18])
+            const end = api.coord([api.value(1), 0.82])
+            const pulse = Number(api.value(2))
+            const shape = echarts.graphic.clipRectByRect(
+              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
+              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
+            )
+            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2 + pulse, shadowBlur: 4 + pulse * 8, shadowColor: "rgba(15, 118, 110, 0.48)" } } : null
+          },
+        },
+        {
+          id: "next-truth-stop",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: false,
+          z: 2,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const start = api.coord([api.value(0), 0.18])
+            const end = api.coord([api.value(1), 0.82])
+            const shape = echarts.graphic.clipRectByRect(
+              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
+              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
+            )
+            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: FUTURE_GROUND_TRUTH_COLOR, lineWidth: 2, opacity: 0.78 } } : null
           },
         },
         {
           id: "stop-bars",
           type: "custom",
           coordinateSystem: "cartesian2d",
+          silent: true,
           z: 4,
           data: [],
           renderItem(params: EChartsParams, api: EChartsApi) {
@@ -1224,16 +1359,21 @@ function DemoSceneRenderer({
     syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
     window.addEventListener("resize", resize)
+    window.addEventListener("nomad-tour-action", onTourAction)
     timelineEl.style.cursor = "ew-resize"
     mapChart.on("mouseover", onMapMouseOver)
     mapChart.on("mouseout", onMapMouseOut)
     mapChart.on("globalout", onMapMouseOut)
+    timelineChart.on("mouseover", onTimelineMouseOver)
+    timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
     const pulseTimer = window.setInterval(() => {
+      if (previewing) return
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
+      if (ended && pulseStrength === 0) return
       pulsePhase = ended ? 0 : pulsePhase + 0.24
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({
@@ -1241,6 +1381,9 @@ function DemoSceneRenderer({
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
           { id: "building-glow", data: buildingGlowData(timestampSeconds) },
         ],
+      })
+      timelineChart.setOption({
+        series: [{ id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] }],
       })
     }, 80)
 
@@ -1250,6 +1393,7 @@ function DemoSceneRenderer({
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
       window.removeEventListener("resize", resize)
+      window.removeEventListener("nomad-tour-action", onTourAction)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
       toggleRef.current = () => {}
@@ -1258,6 +1402,8 @@ function DemoSceneRenderer({
       mapChart.off("mouseover", onMapMouseOver)
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
+      timelineChart.off("mouseover", onTimelineMouseOver)
+      timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
       timelineEl.removeEventListener("wheel", onTimelineWheel)
       renderSceneRef.current = null
@@ -1272,14 +1418,9 @@ function DemoSceneRenderer({
   }, [onReplayStart])
 
   useEffect(() => {
-    onPlaybackStateChangeRef.current = onPlaybackStateChange
-  }, [onPlaybackStateChange])
-
-  useEffect(() => {
-    sharedPlaybackStateRef.current = sharedPlaybackState
     if (syncMaster) return
     renderSceneRef.current?.(selectedTimestampRef.current ?? currentTime ?? 0)
-  }, [currentTime, sharedPlaybackState, syncMaster])
+  }, [currentTime, syncMaster])
 
   useEffect(() => {
     if (!previewRunId || syncMaster) return
@@ -1361,8 +1502,6 @@ export function CompareAnimationPanel({
   showStops,
   previewRunId,
   onReplayStart,
-  sharedPlaybackState,
-  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1373,8 +1512,6 @@ export function CompareAnimationPanel({
   showStops: boolean
   previewRunId?: number
   onReplayStart?: () => void
-  sharedPlaybackState?: PlaybackState
-  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const sceneMetadata = panel?.scene ? `Agent: ${panel.scene.user_id}` : null
 
@@ -1389,7 +1526,7 @@ export function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} sharedPlaybackState={sharedPlaybackState} onPlaybackStateChange={onPlaybackStateChange} />
+            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} />
           </div>
         ) : (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">

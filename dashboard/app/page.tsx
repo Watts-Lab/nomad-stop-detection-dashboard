@@ -247,7 +247,13 @@ function NomadDashboard() {
   const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
   const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
-  const { startTour } = useProductTour(tourReady)
+  const prepareTour = useCallback(() => {
+    setShowGroundTruth(true)
+    setShowStops(true)
+    const lastPing = compareApiData?.left?.scene?.pings.slice(-1)[0]
+    if (lastPing) setDemoTime(lastPing.timestamp)
+  }, [compareApiData])
+  const { startTour } = useProductTour(tourReady, prepareTour)
 
   useEffect(() => {
     const nextRoute = dashboardRouteState(searchParamString)

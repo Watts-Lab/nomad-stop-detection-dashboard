@@ -95,22 +95,18 @@ export default function AboutPage() {
     <div className="nomad-shell h-screen overflow-y-auto bg-background text-foreground">
       <NomadNav currentView="about" />
       <main className="nomad-page-frame grid gap-12 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(32rem,1.15fr)] lg:gap-16 lg:py-14">
-        <div className="space-y-14 lg:sticky lg:top-[7rem] lg:flex lg:h-[calc(100vh-9rem)] lg:flex-col lg:justify-between lg:self-start">
+        <div className="space-y-12 lg:sticky lg:top-[131px] lg:self-start">
           <section className={`${revealClass()} space-y-5`}>
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#8acac8]">About NOMAD</p>
             <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
-              Making human mobility analysis more transparent and reproducible.
+              Open tools for human mobility science.
             </h1>
-            <div className="max-w-xl space-y-4 text-base leading-relaxed text-[#b6c9dc] sm:text-lg">
-              <p>
-                The Network for Open Mobility Analysis and Datasets (NOMAD) is a research initiative at the
-                Computational Social Science Lab at the University of Pennsylvania.
-              </p>
-              <p>
-                We build datasets, methods, and tools that make it easier to understand how raw mobility traces
-                become meaningful measures of human movement.
-              </p>
-            </div>
+            <p className="max-w-xl text-base leading-relaxed text-[#b6c9dc] sm:text-lg">
+              The Network for Open Mobility Analysis and Datasets (NOMAD) expands access to large-scale GPS
+              mobility data and standardizes analytical tools for human mobility science and epidemiology. By
+              lowering technical and data-access barriers, NOMAD helps researchers and policymakers use mobility
+              data for reproducible research and evidence-informed policy.
+            </p>
           </section>
 
           <section className={`${revealClass("up", 2)} max-w-xl space-y-4 border-t border-[#263449] pt-6`}>

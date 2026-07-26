@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "recording:studio": "remotion studio recording/index.ts",
-    "recording:render": "remotion render recording/index.ts HomePreview public/videos/home-stop-preview.mp4 --scale=3"
+    "recording:render": "remotion render recording/index.ts HomePreview public/videos/home-stop-preview.mp4 --scale=3",
+    "recording:native": "node recording/native/capture.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -73,11 +74,13 @@
     "@types/react-dom": "19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.6",
+    "ffmpeg-static": "^5.3.0",
     "playwright": "^1.60.0",
     "postcss": "^8.5",
     "remotion": "4.0.496",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "vite": "^8.1.5"
   }
 }

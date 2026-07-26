@@ -1,6 +1,7 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
+import { copyFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import ffmpegPath from "ffmpeg-static"
 import { chromium } from "playwright"
@@ -12,7 +13,8 @@ const MAX_FRAMES = FPS * 30
 const LOAD_TIME = "2024-01-01T00:00:00Z"
 const RECORDING_TIME = "2024-01-01T00:01:00Z"
 const recordingRoot = path.dirname(fileURLToPath(import.meta.url))
-const outputPath = path.join(recordingRoot, "home-stop-preview-native.mp4")
+const outputPath = path.join(recordingRoot, "home-stop-preview.mp4")
+const publicOutputPath = path.resolve(recordingRoot, "../public/videos/home-stop-preview.mp4")
 
 const server = await createServer({
   configFile: path.join(recordingRoot, "vite.config.ts"),
@@ -94,7 +96,9 @@ try {
   const [exitCode] = await once(encoder, "close")
   if (exitCode !== 0) throw new Error(encoderError)
 
+  await copyFile(outputPath, publicOutputPath)
   console.log(outputPath)
+  console.log(publicOutputPath)
 } finally {
   if (encoder && !encoder.killed && encoder.exitCode === null) encoder.kill()
   await browser?.close()

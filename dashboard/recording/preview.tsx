@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { StopRunPreview } from "../../app/_components/compare-animation-panel"
-import { loadCompareData } from "../../app/_lib/static-cache"
-import type { ComparePanelResponse } from "../../app/_lib/types"
+import { StopRunPreview } from "../app/_components/compare-animation-panel"
+import { loadCompareData } from "../app/_lib/static-cache"
+import type { ComparePanelResponse } from "../app/_lib/types"
 
 const DBSTOP_PARAMS = {
   dist_thresh: 10,
@@ -10,7 +10,7 @@ const DBSTOP_PARAMS = {
   dur_min: 5,
 }
 
-export function NativeHomePreview() {
+export function HomePreviewRecording() {
   const [panel, setPanel] = useState<ComparePanelResponse | null>(null)
   const [currentTime, setCurrentTime] = useState<number | null>(null)
   const [started, setStarted] = useState(false)

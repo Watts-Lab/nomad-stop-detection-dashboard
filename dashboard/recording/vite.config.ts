@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
 
 const recordingRoot = path.dirname(fileURLToPath(import.meta.url))
-const dashboardRoot = path.resolve(recordingRoot, "../..")
+const dashboardRoot = path.resolve(recordingRoot, "..")
 
 export default defineConfig({
   root: recordingRoot,

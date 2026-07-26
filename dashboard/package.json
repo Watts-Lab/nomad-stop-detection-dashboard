@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "recording:native": "node recording/native/capture.mjs"
+    "recording:render": "node recording/capture.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

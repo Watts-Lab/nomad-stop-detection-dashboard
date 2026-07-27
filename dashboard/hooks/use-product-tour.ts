@@ -9,19 +9,55 @@ const DEMO_TOUR_STORAGE_KEY = "hasSeenTour"
 export const METRICS_TOUR_STORAGE_KEY = "hasSeenMetricsTour"
 export const METRICS_TOUR_FOCUS_EVENT = "nomad:metrics-tour-focus"
 
+const tourAction = (detail = "clear") => () => {
+  window.dispatchEvent(new CustomEvent("nomad-tour-action", { detail }))
+}
+const clearTourAction = tourAction()
+
 const DEMO_TOUR_STEPS: DriveStep[] = [
   {
     element: "[data-tour='tour-map']",
+    onHighlightStarted: tourAction("timeline-ping"),
+    onDeselected: clearTourAction,
     popover: {
-      title: "Watch a Trajectory Play Out",
-      description: "Grey dots are raw GPS pings from one person's trip. As the agent moves, the algorithm groups nearby pings into colored diamonds dependent on the algorithm's distance and duration thresholds (signifying confirmed stops). Toggle Ground Truth to see the real destination it's heading to.",
+      title: "Raw GPS Pings",
+      description: "Black dots are raw GPS pings from one person's trip. Hover any ping to enlarge it and its revealed edge-connected tree, fade unrelated pings, and highlight the same ping on the timeline. That hover is being demonstrated now.",
+    },
+  },
+  {
+    element: "[data-tour='tour-map']",
+    onHighlightStarted: tourAction("anchor-point"),
+    onDeselected: clearTourAction,
+    popover: {
+      title: "Stops, Anchor Points, and Edges",
+      description: "Colored pings belong to detected stops. Larger colored circles with white outlines are anchor or core points, and connecting lines show which revealed pings are linked to them. The active anchor or core point and its connected tree are highlighted now.",
+    },
+  },
+  {
+    element: "[data-tour='tour-map']",
+    onHighlightStarted: tourAction("ground-truth"),
+    onDeselected: clearTourAction,
+    popover: {
+      title: "Ground-Truth Buildings and Routes",
+      description: "Ground Truth shows the real buildings visited and the route between them. The matching building lights up when you hover its ground-truth interval in the timeline; the tour is showing that building highlight now.",
     },
   },
   {
     element: "[data-tour='tour-timeline']",
+    onHighlightStarted: tourAction("timeline-ping"),
+    onDeselected: clearTourAction,
     popover: {
-      title: "Scrub the Time-Series View",
-      description: "Drag or scroll along the timeline to jump to any moment. Tick marks show when each ping arrived, and colored bars mark when the algorithm confirmed a stop, so you can see exactly how long each stop lasted.",
+      title: "Hover Timeline Pings",
+      description: "Black vertical bars are GPS pings. Hover one to raise and outline it, fade the other bars, and highlight that ping plus its revealed connected tree on the map. The tour is demonstrating this now; future pings remain black until playback reveals their stop status.",
+    },
+  },
+  {
+    element: "[data-tour='tour-timeline']",
+    onHighlightStarted: tourAction("ground-truth"),
+    onDeselected: clearTourAction,
+    popover: {
+      title: "Read the Timeline Layers",
+      description: "Colored vertical bars mark core-point pings, translucent colored bands mark detected stops, and teal outline rectangles mark ground-truth time inside buildings. Completed intervals remain as faded boxes; during playback the current box glows and the next box is light teal. The cyan line marks playback time, and you can drag or scroll here to scrub.",
     },
   },
   {
@@ -97,32 +133,41 @@ function broadcastMetricsTourFocus(step?: DriveStep) {
  * Returns startTour, which replays the tour on demand regardless of the
  * localStorage flag.
  */
-export function useProductTour(ready: boolean, steps = DEMO_TOUR_STEPS, storageKey = DEMO_TOUR_STORAGE_KEY) {
+export function useProductTour(
+  ready: boolean,
+  prepareTour = () => {},
+  steps = DEMO_TOUR_STEPS,
+  storageKey = DEMO_TOUR_STORAGE_KEY,
+) {
   const driverRef = useRef<Driver | null>(null)
   const autoStartedRef = useRef(false)
 
   const startTour = useCallback(() => {
-    if (!driverRef.current) {
-      driverRef.current = driver({
-        showProgress: true,
-        smoothScroll: true,
-        stageRadius: 8,
-        popoverClass: "nomad-tour-popover",
-        steps,
-        onHighlightStarted: (_element, step) => {
-          broadcastMetricsTourFocus(step)
-        },
-        onDeselected: () => {
-          broadcastMetricsTourFocus()
-        },
-        onDestroyed: () => {
-          broadcastMetricsTourFocus()
-          window.localStorage.setItem(storageKey, "true")
-        },
-      })
-    }
-    driverRef.current.drive()
-  }, [steps, storageKey])
+    prepareTour()
+    window.requestAnimationFrame(() => {
+      if (!driverRef.current) {
+        driverRef.current = driver({
+          showProgress: true,
+          smoothScroll: true,
+          stageRadius: 8,
+          popoverClass: "nomad-tour-popover",
+          steps,
+          onHighlightStarted: (_element, step) => {
+            broadcastMetricsTourFocus(step)
+          },
+          onDeselected: () => {
+            broadcastMetricsTourFocus()
+          },
+          onDestroyed: () => {
+            broadcastMetricsTourFocus()
+            clearTourAction()
+            window.localStorage.setItem(storageKey, "true")
+          },
+        })
+      }
+      driverRef.current.drive()
+    })
+  }, [steps, storageKey, prepareTour])
 
   useEffect(() => {
     if (!ready || autoStartedRef.current) return

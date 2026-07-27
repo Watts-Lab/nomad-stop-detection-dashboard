@@ -2,9 +2,16 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const basePath = process.env.PAGES_BASE_PATH ?? ""
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "export",
+  basePath,
+  trailingSlash: true,
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+  },
   turbopack: {
     root: __dirname,
   },

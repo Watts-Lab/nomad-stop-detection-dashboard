@@ -1,5 +1,6 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
 import { DASHBOARD_VIEWS, METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
+import { publicPath } from "./public-path"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { CompareScene, DashboardView } from "./types"
 
@@ -22,6 +23,10 @@ export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1
   return ["page-reveal", variantClass, delayClass].filter(Boolean).join(" ")
 }
 
+export function parameterDisplayName(name: string) {
+  return name === "delta_roam" ? "Δroam" : name
+}
+
 export function prototypeChartSrc(algorithm: string, sweepParameter: string, demoAlgorithmId?: string) {
   const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
@@ -30,7 +35,7 @@ export function prototypeChartSrc(algorithm: string, sweepParameter: string, dem
     data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
     ...(demoAlgorithmId ? { algo: demoAlgorithmId } : {}),
   })
-  return `/echarts-prototype/index.html?${params.toString()}`
+  return publicPath("/echarts-prototype/index.html") + "?" + params.toString()
 }
 
 export function validateAlgorithmParams(

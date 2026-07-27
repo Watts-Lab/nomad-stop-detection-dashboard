@@ -1,3 +1,4 @@
+import { publicPath } from "./public-path"
 import type { DashboardView, DataPoint, MetricsParameterNote, TimeSegment } from "./types"
 
 export type ParameterConstraint = {
@@ -11,10 +12,10 @@ export type DemoEditableParam = ParameterConstraint & {
   label?: string
 }
 
-export const SEQUENTIAL_CARD_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms_card.svg"
-export const SEQUENTIAL_EXPANDED_DIAGRAM = "/assets/diagram-svgs/sequential_algorithms.svg"
-export const DENSITY_CARD_DIAGRAM = "/assets/diagram-svgs/density_based_card.svg"
-export const DENSITY_EXPANDED_DIAGRAM = "/assets/diagram-svgs/density_based.svg"
+export const SEQUENTIAL_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/sequential_algorithms_card.svg")
+export const SEQUENTIAL_EXPANDED_DIAGRAM = publicPath("/assets/diagram-svgs/sequential_algorithms.svg")
+export const DENSITY_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/density_based_card.svg")
+export const DENSITY_EXPANDED_DIAGRAM = publicPath("/assets/diagram-svgs/density_based.svg")
 
 export const LEARN_FAMILIES = [
   { id: "sequential", title: "Sequential Algorithms" },

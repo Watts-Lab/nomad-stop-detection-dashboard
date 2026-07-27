@@ -45,18 +45,13 @@ npm install
 npm run dev
 ```
 
-## Cache-Backed API Contract
+## Static Cache
 
-The app routes in `dashboard/app/api/*` do not call Python or import `nomad`.
-They serve placeholder/cached responses from:
-
-- `cached_results/algorithm-compare/default.json`
-- `cached_results/algorithm-metrics/options.json`
-- `cached_results/algorithm-metrics/default.json`
-
-You can replace these JSON files with real cached outputs later, keeping the same response shapes.
+The dashboard reads comparison and metrics data directly from
+`dashboard/public/cached-results`. The source cache is kept in `cached_results`.
+The app does not require Next API routes or a Python backend at runtime.
 
 ## Notes
 
 - Static placeholder figures are in `dashboard/public`.
-- Python scripts in `dashboard/scripts` were copied for reference only and are not used by the API routes.
+- Python scripts in `dashboard/scripts` generate cached data and are not used by the deployed dashboard.

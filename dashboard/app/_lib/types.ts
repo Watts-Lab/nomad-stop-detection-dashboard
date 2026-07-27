@@ -8,11 +8,22 @@ export type ComparePanelResponse = {
   scene?: CompareScene | null
   params?: Record<string, number>
   labels?: number[]
+  corePoints?: Array<{
+    timestamp: number
+    role: string
+    sourceTimestamp: number
+    cluster: number
+    x: number
+    y: number
+    sourceX: number
+    sourceY: number
+  }>
   configKey?: string | null
 }
 
 export type CompareApiResponse = {
   seed: number
+  trajectory: string
   mode?: "single" | "compare"
   left: ComparePanelResponse
   right?: ComparePanelResponse
@@ -83,7 +94,8 @@ export type MetricsParameterNote = NonNullable<MetricsOptionsResponse["parameter
 
 export type EChartsParams = {
   seriesId?: string
-  data: number[]
+  data: number[] | { value: number[] }
+  value?: number[]
   dataIndex: number
   coordSys: { x: number; y: number; width: number; height: number }
 }

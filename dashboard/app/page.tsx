@@ -15,6 +15,8 @@ import {
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
+import { publicPath } from "./_lib/public-path"
+import { loadCompareData } from "./_lib/static-cache"
 import { METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY, useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
@@ -45,6 +47,7 @@ function NomadDashboard() {
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
   const [requestedUserId, setRequestedUserId] = useState<string | null>(null)
+  const [demoTrajectory, setDemoTrajectory] = useState("two-stop")
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
@@ -125,30 +128,20 @@ function NomadDashboard() {
     setCompareApiData(null)
     setDemoTime(null)
     try {
-      const res = await fetch("/api/algorithm-compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          seed,
-          userId: requestedUserId ?? undefined,
-          mode: compareMode ? "compare" : "single",
-          left: {
-            algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
-            params: parseParams(leftAlgorithm, leftValidation.normalized),
-            cmap: "PiYG",
-          },
-          right: {
-            algo: rightAlgorithm === "dbscan" ? "tadbscan" : rightAlgorithm,
-            params: parseParams(rightAlgorithm, rightValidation.normalized),
-            cmap: "PiYG",
-          },
-        }),
+      const data = await loadCompareData({
+        seed,
+        userId: requestedUserId ?? undefined,
+        trajectory: demoTrajectory,
+        mode: compareMode ? "compare" : "single",
+        left: {
+          algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
+          params: parseParams(leftAlgorithm, leftValidation.normalized),
+        },
+        right: {
+          algo: rightAlgorithm === "dbscan" ? "tadbscan" : rightAlgorithm,
+          params: parseParams(rightAlgorithm, rightValidation.normalized),
+        },
       })
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || "Algorithm compare request failed")
-      }
-      const data = (await res.json()) as CompareApiResponse
       if (requestId !== compareRequestIdRef.current) return
       setDemoTime(null)
       setCompareApiData(data)
@@ -159,7 +152,7 @@ function NomadDashboard() {
       if (requestId !== compareRequestIdRef.current) return
       setCompareLoading(false)
     }
-  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, requestedUserId])
+  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, requestedUserId, demoTrajectory])
 
   const handleNewTrajectory = useCallback(() => {
     setRequestedUserId(null)
@@ -171,7 +164,7 @@ function NomadDashboard() {
   const loadMetricsOptions = useCallback(async () => {
     try {
       setMetricsError(null)
-      const res = await fetch("/api/algorithm-metrics", { method: "GET" })
+      const res = await fetch(publicPath("/cached-results/algorithm-metrics/options.json"))
       if (!res.ok) {
         const msg = await res.text()
         throw new Error(msg || "Failed to load aggregated metrics options")
@@ -295,8 +288,19 @@ function NomadDashboard() {
   const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
-  const { startTour } = useProductTour(tourReady)
-  const { startTour: startMetricsTour } = useProductTour(metricsTourReady, METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY)
+  const prepareTour = useCallback(() => {
+    setShowGroundTruth(true)
+    setShowStops(true)
+    const lastPing = compareApiData?.left?.scene?.pings.slice(-1)[0]
+    if (lastPing) setDemoTime(lastPing.timestamp)
+  }, [compareApiData])
+  const { startTour } = useProductTour(tourReady, prepareTour)
+  const { startTour: startMetricsTour } = useProductTour(
+    metricsTourReady,
+    undefined,
+    METRICS_TOUR_STEPS,
+    METRICS_TOUR_STORAGE_KEY,
+  )
 
   useEffect(() => {
     const nextRoute = dashboardRouteState(searchParamString)
@@ -368,6 +372,7 @@ function NomadDashboard() {
           rightParams={rightParams}
           leftParamErrors={leftParamErrors}
           rightParamErrors={rightParamErrors}
+          demoTrajectory={demoTrajectory}
           compareApiData={compareApiData}
           compareLoading={compareLoading}
           compareError={compareError}
@@ -379,6 +384,7 @@ function NomadDashboard() {
           setRightParams={setRightParams}
           setLeftParamErrors={setLeftParamErrors}
           setRightParamErrors={setRightParamErrors}
+          setDemoTrajectory={setDemoTrajectory}
           handleCompareModeToggle={handleCompareModeToggle}
           handleLeftAlgorithmChange={handleLeftAlgorithmChange}
           handleRightAlgorithmChange={handleRightAlgorithmChange}

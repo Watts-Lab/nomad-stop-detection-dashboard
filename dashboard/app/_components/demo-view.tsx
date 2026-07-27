@@ -15,7 +15,7 @@ const demoTrajectoryOptions = [
   {
     id: "two-stop",
     name: "Two-stop trajectory",
-    note: "Simple cached ground-truth path with two scheduled stops.",
+    note: "Ground-truth path with two stops in the destination diary.",
   },
   {
     id: "four-stop-low-ha",

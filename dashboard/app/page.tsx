@@ -8,6 +8,7 @@ import { LearnView } from "./_components/learn-view"
 import { MetricsView } from "./_components/metrics-view"
 import {
   DEMO_ALGORITHM_IDS,
+  DEMO_PARAM_ALIASES,
   FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
   METRICS_SWEEP_PARAMETERS,
@@ -43,6 +44,7 @@ function NomadDashboard() {
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareSeed, setCompareSeed] = useState(1)
+  const [requestedUserId, setRequestedUserId] = useState<string | null>(null)
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
@@ -128,6 +130,7 @@ function NomadDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           seed,
+          userId: requestedUserId ?? undefined,
           mode: compareMode ? "compare" : "single",
           left: {
             algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
@@ -156,9 +159,10 @@ function NomadDashboard() {
       if (requestId !== compareRequestIdRef.current) return
       setCompareLoading(false)
     }
-  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode])
+  }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, requestedUserId])
 
   const handleNewTrajectory = useCallback(() => {
+    setRequestedUserId(null)
     const nextSeed = compareSeed + 1
     setCompareSeed(nextSeed)
     void runCompareVisualization(nextSeed)
@@ -209,6 +213,42 @@ function NomadDashboard() {
     setActiveView("metrics")
     syncUrl("metrics")
   }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
+
+  const handleMetricsPointSelect = useCallback((payload: {
+    algoId?: string
+    param?: string
+    value?: number
+    userId?: string
+    fixed?: Record<string, string>
+  }) => {
+    const algoDef = algorithms.find((a) => a.id === payload.algoId)
+    if (!algoDef || !payload.userId || !payload.param || !Number.isFinite(payload.value)) return
+
+    const aliasMap = DEMO_PARAM_ALIASES[payload.algoId as string] ?? {}
+    const nextParams: Record<string, string> = {}
+    for (const [name, value] of Object.entries(payload.fixed ?? {})) {
+      nextParams[aliasMap[name] ?? name] = value
+    }
+    nextParams[aliasMap[payload.param] ?? payload.param] = String(payload.value)
+
+    setLeftAlgorithm(algoDef.id)
+    setLeftParams(nextParams)
+    setLeftParamErrors({})
+    setRequestedUserId(payload.userId)
+    setCompareMode(false)
+    setActiveView("demo")
+    syncUrl("demo", null, "single")
+  }, [syncUrl])
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== "nomad-metrics-point-select") return
+      handleMetricsPointSelect(event.data)
+    }
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
+  }, [handleMetricsPointSelect])
 
   const handleCompareModeToggle = useCallback(() => {
     const nextMode: DemoMode = compareMode ? "single" : "compare"

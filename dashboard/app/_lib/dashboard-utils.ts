@@ -22,12 +22,13 @@ export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1
   return ["page-reveal", variantClass, delayClass].filter(Boolean).join(" ")
 }
 
-export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
+export function prototypeChartSrc(algorithm: string, sweepParameter: string, demoAlgorithmId?: string) {
   const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
     x: field,
     field,
     data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
+    ...(demoAlgorithmId ? { algo: demoAlgorithmId } : {}),
   })
   return `/echarts-prototype/index.html?${params.toString()}`
 }

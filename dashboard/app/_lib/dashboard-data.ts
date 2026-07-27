@@ -171,6 +171,19 @@ export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   gridbased: "Grid-Based",
 }
 
+export const DEMO_ID_BY_METRICS_ALGORITHM: Record<string, string> = Object.fromEntries(
+  Object.entries(METRICS_ALGORITHM_BY_DEMO_ID).map(([demoId, metricsName]) => [metricsName, demoId]),
+)
+
+// Maps notebook/metrics parameter names to the demo's editable-param keys where they differ.
+export const DEMO_PARAM_ALIASES: Record<string, Record<string, string>> = {
+  dbscan: {
+    dist_thresh: "eps_spatial",
+    time_thresh: "T_max",
+    min_pts: "minPts",
+  },
+}
+
 export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
   DBSTOP: [
     { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },

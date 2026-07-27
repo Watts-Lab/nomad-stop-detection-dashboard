@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
+import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
 import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import type { MetricsParameterNote } from "../_lib/types"
@@ -57,6 +57,26 @@ function MetricsFrame({
 
   useEffect(() => {
     setLoading(true)
+    // The iframe's src is present in the server-rendered HTML, so the browser can finish
+    // loading it before React hydrates and attaches the onLoad handler below, silently
+    // missing that event. Poll contentDocument.readyState as a fallback for that race.
+    let cancelled = false
+    const checkLoaded = () => {
+      if (cancelled) return
+      try {
+        if (iframeRef.current?.contentDocument?.readyState === "complete") {
+          setLoading(false)
+          return
+        }
+      } catch {
+        return
+      }
+      requestAnimationFrame(checkLoaded)
+    }
+    checkLoaded()
+    return () => {
+      cancelled = true
+    }
   }, [src])
 
   useEffect(() => {
@@ -140,8 +160,8 @@ export function MetricsView({
 }) {
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter)}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter)}&${rightFixedParameters}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&${rightFixedParameters}`
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">

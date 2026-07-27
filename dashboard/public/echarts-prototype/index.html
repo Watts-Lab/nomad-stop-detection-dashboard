@@ -48,6 +48,7 @@
     const xMinParam = params.get("xmin");
     const xMaxParam = params.get("xmax");
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
+    const demoAlgoId = params.get("algo") || "";
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -244,6 +245,7 @@
               type: "scatter",
               data: scatterData,
               symbolSize: 7,
+              cursor: "pointer",
               itemStyle: {
                 color: "rgba(31, 119, 180, 0.055)",
                 borderColor: "rgba(31, 119, 180, 0.14)",
@@ -261,8 +263,9 @@
               id: "per-user-max",
               type: "scatter",
               data: perUserMaxData,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbol: "circle",
               symbolSize: 8,
+              cursor: "pointer",
               itemStyle: {
                 color: "rgba(185, 28, 28, 0.46)",
                 borderColor: "rgba(185, 28, 28, 0.46)",
@@ -350,9 +353,10 @@
               type: "scatter",
               data: perUserMaxData,
               animation: false,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbol: "circle",
               symbolSize: 22,
               showInLegend: false,
+              cursor: "pointer",
               itemStyle: {
                 color: "rgba(255, 26, 26, 0)",
               },
@@ -367,7 +371,7 @@
               type: "scatter",
               data: emptyHighlight,
               animation: false,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbol: "circle",
               symbolSize: 8,
               silent: true,
               showInLegend: false,
@@ -413,6 +417,19 @@
           if (event.seriesName === "User max" || event.seriesName === "User max hit area") clearHighlight();
         });
         chart.on("globalout", clearHighlight);
+        chart.on("click", (event) => {
+          const clickableSeries = ["Individual", "User max", "User max hit area"];
+          if (!clickableSeries.includes(event.seriesName)) return;
+          const [pointX, , userId] = event.value;
+          window.parent.postMessage({
+            type: "nomad-metrics-point-select",
+            algoId: demoAlgoId,
+            param: xField,
+            value: pointX,
+            userId,
+            fixed: fixedParameters,
+          }, window.location.origin);
+        });
         window.addEventListener("resize", () => chart.resize());
     })();
   </script>

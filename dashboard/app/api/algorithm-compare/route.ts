@@ -8,6 +8,7 @@ export const runtime = "nodejs"
 
 type ComparePayload = {
   seed?: number
+  userId?: string
   mode?: "single" | "compare"
   left?: {
     algo?: string
@@ -294,14 +295,16 @@ function prettyAlgoName(algo: string): string {
 // scene so labels can be joined by (user_id, timestamp) server-side.
 type SeedScene = { response: CompareSceneResponse; userId: string; orderedTimestamps: number[] }
 
-function sceneForSeed(seed: number): SeedScene | null {
+function sceneForSeed(seed: number, requestedUserId?: string): SeedScene | null {
   const scenePath = path.join(STOP_CACHE_DIR, "scene.json")
   const routesPath = path.join(STOP_CACHE_DIR, "routes.json")
   const scene = readJsonIfExists<SceneCache>(scenePath)
   const routes = readJsonIfExists<RoutesCache>(routesPath)
   if (!scene || scene.users.length === 0) return null
 
-  const user = scene.users[Math.abs(seed) % scene.users.length]
+  const user = requestedUserId && scene.users.includes(requestedUserId)
+    ? requestedUserId
+    : scene.users[Math.abs(seed) % scene.users.length]
   const userPings = scene.pings
     .filter((ping) => ping.user_id === user)
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -364,7 +367,7 @@ export async function POST(req: NextRequest) {
     const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
     const leftAlgo = normalizeAlgo(payload.left?.algo)
     const rightAlgo = normalizeAlgo(payload.right?.algo)
-    const scene = sceneForSeed(seed)
+    const scene = sceneForSeed(seed, payload.userId)
 
     const body: {
       seed: number

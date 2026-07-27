@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sys
 
 import geopandas as gpd
 import numpy as np
@@ -13,6 +12,8 @@ import pandas as pd
 
 import nomad.data as data_folder
 import nomad.io.base as loader
+import nomad.stop_detection.density as DENSITY
+import nomad.stop_detection.sequential as SEQUENTIAL
 import nomad.stop_detection.utils as STOP_UTILS
 import nomad.visit_attribution.visit_attribution as visits
 from nomad.city_gen import City
@@ -20,10 +21,6 @@ from nomad.map_utils import blocks_to_mercator
 from nomad.stop_detection.validation import compute_stop_detection_metrics
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
-
-import stop_detection_algs.density as DENSITY
-import stop_detection_algs.sequential as SEQUENTIAL
 
 
 CONFIG_DIR = Path(__file__).resolve().parent
@@ -586,8 +583,8 @@ def split_label_result(result):
         labels, core_points = result
         return labels, core_points.drop(columns=["config_key"], errors="ignore")
     raise RuntimeError(
-        "Local stop_detection_algs did not return core plotting data. "
-        "Use the ui-changes stop_detection_algs package before regenerating the cache."
+        "Installed NOMAD did not return core plotting data. "
+        "Install NOMAD from the cores_refactor branch before regenerating the cache."
     )
 
 

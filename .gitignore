@@ -34,12 +34,13 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
-# Build cache contains a mix of generated outputs and source notebooks/scripts.
+# Build cache contains generated outputs and source notebooks/scripts.
 build_cache/**
 !build_cache/.gitkeep
 !build_cache/**/
 !build_cache/**/*.py
 !build_cache/**/*.ipynb
+!build_cache/requirements.txt
 
 # OS/editor noise
 .DS_Store

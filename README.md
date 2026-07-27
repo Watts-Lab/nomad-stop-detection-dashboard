@@ -33,7 +33,6 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 │   └── public/             # Static images used by the dashboard
 ├── build_cache/            # Cache generation scripts
 ├── cached_results/         # Generated dashboard cache artifacts
-├── stop_detection_algs/    # Local stop-detection copies pending NOMAD upstream merge
 └── README.md
 ```
 
@@ -57,5 +56,6 @@ They read browser-friendly cache artifacts generated ahead of time under:
 Regenerate those caches with:
 
 ```bash
+python3 -m pip install -r build_cache/requirements.txt
 python3 build_cache/generate_demo_caches.py
 ```

@@ -1,5 +1,6 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
-import { DASHBOARD_VIEWS, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
+import { DASHBOARD_VIEWS, METRICS_RESULTS_FILE, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
+import { publicPath } from "./public-path"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { CompareScene, DashboardView } from "./types"
 
@@ -22,17 +23,14 @@ export function revealClass(variant: "left" | "up" | "panel" = "left", delay = 1
   return ["page-reveal", variantClass, delayClass].filter(Boolean).join(" ")
 }
 
-export function parameterDisplayName(name: string) {
-  return name === "delta_roam" ? "Δroam" : name
-}
-
 export function prototypeChartSrc(algorithm: string, sweepParameter: string) {
+  const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
-    title: `${algorithm} aggregated metrics (prototype)`,
-    x: parameterDisplayName(sweepParameter || "delta_roam"),
-    field: "delta_roam",
+    x: field,
+    field,
+    data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
   })
-  return `/echarts-prototype/index.html?${params.toString()}`
+  return publicPath("/echarts-prototype/index.html") + "?" + params.toString()
 }
 
 export function validateAlgorithmParams(
@@ -79,6 +77,12 @@ export function paramInputValue(
   defaultValue: string,
 ) {
   return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : defaultValue
+}
+
+export function parameterDisplayName(name: string) {
+  if (name === "delta_roam") return "delta roam"
+  if (name === "dt_max") return "dt max"
+  return name.replaceAll("_", " ")
 }
 
 export function darkenHex(hex: string, amount: number) {

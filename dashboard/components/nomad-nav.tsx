@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Menu, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { publicPath } from "@/app/_lib/public-path"
 import type { DashboardView } from "@/app/_lib/types"
 
 const navItems = [
@@ -21,11 +22,12 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
       <div className="nomad-page-frame flex h-[74px] items-center justify-between gap-4">
         <Link
           href="/"
+          prefetch={false}
           aria-label="Go to home"
           className="transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
         >
           <Image
-            src="/assets/logos/nomad-logo-white.svg"
+            src={publicPath("/assets/logos/nomad-logo-white.svg")}
             alt="NOMAD"
             width={212}
             height={37}
@@ -39,6 +41,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
               {index > 0 && <span aria-hidden="true" className="text-[#3a465d]">|</span>}
               <Link
                 href={item.href}
+                prefetch={false}
                 className={`border-b-2 pb-1 transition-colors ${
                   currentView === item.view
                     ? "border-[#8acac8] text-[#f2f4eb]"
@@ -52,7 +55,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
         </nav>
         <div className="flex items-center gap-2">
           <Button asChild size="lg" className="nomad-action h-11 px-4 text-base sm:px-6">
-            <Link href="/?view=demo">
+            <Link href="/?view=demo" prefetch={false}>
               <Play className="h-5 w-5 fill-current" />
               <span className="hidden sm:inline">Run Demo</span>
             </Link>
@@ -72,6 +75,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
                   <SheetClose asChild key={item.view}>
                     <Link
                       href={item.href}
+                      prefetch={false}
                       className={`rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
                         currentView === item.view
                           ? "border-[#8acac8] bg-[#202738] text-[#f2f4eb]"

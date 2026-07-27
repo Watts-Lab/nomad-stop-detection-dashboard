@@ -4,11 +4,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-from four_stop_trajectories import generate_trajectories as generate_four_stop_trajectories
 from generate_algorithm_csv_cache import DEFAULT_ALGORITHMS
 from generate_algorithm_csv_cache import REPO_ROOT
 from generate_algorithm_csv_cache import generate_cache
-from two_stop_trajectories import generate_trajectories as generate_two_stop_trajectories
+from generate_gt_trajectories import generate_trajectories
 
 
 CONFIG_DIR = Path(__file__).resolve().parent
@@ -35,8 +34,7 @@ def main():
         subprocess.run([sys.executable, str(CONFIG_DIR / "generate_configs.py"), config_key], check=True)
 
     if not args.skip_trajectories:
-        generate_two_stop_trajectories(["2_stops"])
-        generate_four_stop_trajectories(["low_ha", "high_ha"])
+        generate_trajectories([config_key for config_key, _ in SCENARIOS])
 
     for config_key, output_dir in SCENARIOS:
         generate_cache(

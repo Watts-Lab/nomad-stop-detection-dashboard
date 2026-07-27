@@ -44,16 +44,13 @@ npm install
 npm run dev
 ```
 
-## Cache-Backed API Contract
+## Static Cache
 
-The app routes in `dashboard/app/api/*` do not call Python or import `nomad`.
-They read browser-friendly cache artifacts generated ahead of time under:
+The dashboard reads comparison and metrics data directly from `dashboard/public/cached-results`.
+The source cache is generated ahead of time and kept in `cached_results`.
+The app does not require Next API routes or a Python backend at runtime.
 
-- `cached_results/two-stop-cache`
-- `cached_results/four-stop-cache/low_ha`
-- `cached_results/four-stop-cache/high_ha`
-
-Regenerate those caches with:
+Regenerate the source caches with:
 
 ```bash
 python3 -m pip install -r build_cache/requirements.txt

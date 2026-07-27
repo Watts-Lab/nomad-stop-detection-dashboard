@@ -62,7 +62,7 @@ function DemoSceneRenderer({
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
-  const [playbackState, setPlaybackState] = useState<PlaybackState>("complete")
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const labels = useMemo(() => {
     if (!scene) return []
     if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
@@ -138,6 +138,7 @@ function DemoSceneRenderer({
         isFallback: !cached,
       }
     }
+    const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
     const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
       ...stop,
       destination: destinationFor(stop.x, stop.y),
@@ -296,6 +297,7 @@ function DemoSceneRenderer({
       stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
+      durMinSec: revealDelay,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
   }, [labels, panel.algo, panel.corePoints, panel.params, scene])
@@ -1420,7 +1422,19 @@ export function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} sharedPlaybackState={sharedPlaybackState} onPlaybackStateChange={onPlaybackStateChange} />
+            <DemoSceneRenderer
+              panel={panel}
+              mode={mode}
+              currentTime={currentTime}
+              onTimeChange={onTimeChange}
+              syncMaster={syncMaster}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              previewRunId={previewRunId}
+              onReplayStart={onReplayStart}
+              sharedPlaybackState={sharedPlaybackState}
+              onPlaybackStateChange={onPlaybackStateChange}
+            />
           </div>
         ) : (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">

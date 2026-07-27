@@ -635,6 +635,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[2], edge.value[0]) } })) : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
           { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, chartData.pingData[latestPingIndex][2]) } }] },
+          { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
@@ -668,6 +669,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "current-ping-hole", data: [] },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -1123,10 +1125,27 @@ function DemoSceneRenderer({
           data: [],
           symbol: "pin",
           symbolSize: 30,
-          animationDurationUpdate: 180,
-          animationEasingUpdate: "cubicOut",
+          animationDurationUpdate: 0,
           rippleEffect: { scale: 1.8, brushType: "stroke" },
           itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.2, opacity: 0.96 },
+        },
+        {
+          id: "current-ping-hole",
+          name: "Current ping hole",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 10,
+          data: [],
+          animationDurationUpdate: 0,
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const center = api.coord([api.value(0), api.value(1)])
+            return {
+              type: "circle",
+              shape: { cx: center[0], cy: center[1] - 16, r: 4.3 },
+              style: { fill: "#ffffff", stroke: "#202124", lineWidth: 0.9 },
+            }
+          },
         },
       ],
     })

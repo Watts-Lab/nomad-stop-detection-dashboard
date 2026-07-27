@@ -20,8 +20,8 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 - **Tailwind CSS 4** provides utility-first styling and theme tokens.
 - **shadcn/ui-style components with Radix UI primitives** provide accessible controls such as cards, selects, tabs, dialogs, inputs, and tooltips.
 - **Lucide React** supplies the dashboard icons.
-- **Python scripts with matplotlib, NumPy, pandas, and GeoPandas** support notebook-derived algorithm visualizations and metric generation workflows.
-- **Cached results and public notebook figures** let the dashboard show stop detection outputs quickly during local development.
+- **Python scripts with NumPy, pandas, GeoPandas, and NOMAD** generate the static stop-detection cache.
+- **Cached parquet/JSON results** let the dashboard show stop detection outputs quickly without a live Python runtime.
 
 ## Project Structure
 
@@ -30,10 +30,10 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 ├── dashboard/              # Next.js application
 │   ├── app/                # App Router pages and API routes
 │   ├── components/         # UI components
-│   ├── public/             # Static images and notebook figures
-│   └── scripts/            # Python visualization and metrics helpers
-├── build_cache/            # Source notebooks and generator scripts
-├── cached_results/         # Local cached API/experiment outputs and screenshots
+│   └── public/             # Static images used by the dashboard
+├── build_cache/            # Cache generation scripts
+├── cached_results/         # Generated dashboard cache artifacts
+├── stop_detection_algs/    # Local stop-detection copies pending NOMAD upstream merge
 └── README.md
 ```
 
@@ -48,15 +48,14 @@ npm run dev
 ## Cache-Backed API Contract
 
 The app routes in `dashboard/app/api/*` do not call Python or import `nomad`.
-They serve placeholder/cached responses from:
+They read browser-friendly cache artifacts generated ahead of time under:
 
-- `cached_results/algorithm-compare/default.json`
-- `cached_results/algorithm-metrics/options.json`
-- `cached_results/algorithm-metrics/default.json`
+- `cached_results/two-stop-cache`
+- `cached_results/four-stop-cache/low_ha`
+- `cached_results/four-stop-cache/high_ha`
 
-You can replace these JSON files with real cached outputs later, keeping the same response shapes.
+Regenerate those caches with:
 
-## Notes
-
-- Static placeholder figures are in `dashboard/public`.
-- Python scripts in `dashboard/scripts` were copied for reference only and are not used by the API routes.
+```bash
+python3 build_cache/generate_demo_caches.py
+```

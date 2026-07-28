@@ -21,6 +21,19 @@ const DEMO_CLUSTER_COLORS = [
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
+const MAP_FOCUS_FADE_OPACITY = 0.2
+// Hue/saturation of GROUND_TRUTH_COLOR - each building-to-building hop gets its own lightness along
+// this same hue so every leg of the trip reads as a distinct shade of the ground-truth color.
+const GROUND_TRUTH_HUE = 175
+const GROUND_TRUTH_SATURATION = 70
+// Fixed, evenly-spaced lightness steps (11 points apart) rather than spreading across the trip's
+// total hop count - so the gap between consecutive shades stays the same whether the trip is short
+// or long, cycling back to the darkest shade if there are more hops than steps.
+const GROUND_TRUTH_SHADE_LIGHTNESS = [24, 35, 46, 57, 68]
+const segmentShade = (stopIndex: number) => {
+  const lightness = GROUND_TRUTH_SHADE_LIGHTNESS[stopIndex % GROUND_TRUTH_SHADE_LIGHTNESS.length]
+  return `hsl(${GROUND_TRUTH_HUE}, ${GROUND_TRUTH_SATURATION}%, ${lightness}%)`
+}
 
 function DemoSceneRenderer({
   panel,
@@ -71,11 +84,18 @@ function DemoSceneRenderer({
       x: ping.x,
       y: ping.y,
       t: ping.timestamp,
-      time: new Date(ping.timestamp * 1000).toISOString().slice(11, 19) + " UTC",
+      time: new Date(ping.timestamp * 1000).toISOString().slice(11, 19),
       cluster: labels[index],
     }))
     const pingIndexByTimestamp = new Map(pings.map((ping) => [ping.t, ping.i]))
     const pingData = pings.map((ping) => [ping.x, ping.y, ping.cluster, ping.i, ping.t])
+    const clusterMembers = new Map<number, number[]>()
+    pings.forEach((ping) => {
+      if (ping.cluster < 0) return
+      const members = clusterMembers.get(ping.cluster)
+      if (members) members.push(ping.i)
+      else clusterMembers.set(ping.cluster, [ping.i])
+    })
     const buildings = scene.buildings.flatMap((building) =>
       building.rings.map((ring) => {
         const xs = ring.map(([x]) => x)
@@ -141,8 +161,8 @@ function DemoSceneRenderer({
         Number(panel.params?.delta_roam ?? panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0),
       ),
       label: `Stop ${stop.cluster}`,
-      startTime: new Date(stop.start * 1000).toISOString().slice(11, 16) + " UTC",
-      endTime: new Date(stop.end * 1000).toISOString().slice(11, 16) + " UTC",
+      startTime: new Date(stop.start * 1000).toISOString().slice(11, 16),
+      endTime: new Date(stop.end * 1000).toISOString().slice(11, 16),
     }))
     const sequentialGroups = panel.algo.startsWith("sequential-")
       ? stops.map((stop) => pings.filter((ping) => ping.cluster === stop.cluster))
@@ -260,7 +280,7 @@ function DemoSceneRenderer({
     ]
     const streets = scene.routes?.streets ?? []
     const streetIds = new Set(streets.map((street) => street.id))
-    const streetLanes = streets.flatMap((street) => {
+    const streetLaneSegments = streets.flatMap((street) => {
       const [, xPart, yPart] = street.id.split("-")
       const gridX = Number(xPart.slice(1))
       const gridY = Number(yPart.slice(1))
@@ -281,6 +301,38 @@ function DemoSceneRenderer({
         ...(down || up ? [[[centerX, down ? minStreetY : centerY], [centerX, up ? maxStreetY : centerY]]] : []),
       ]
     })
+    // Merge each contiguous run of same-street cells into one continuous line so the dash pattern
+    // carries through the whole block instead of restarting (and visually doubling up) at every grid seam.
+    const mergeAxisRuns = (spans: [number, number][]): [number, number][] => {
+      const sorted = [...spans].sort((a, b) => a[0] - b[0])
+      const merged: [number, number][] = []
+      for (const [start, end] of sorted) {
+        const last = merged[merged.length - 1]
+        if (last && start <= last[1] + 0.01) last[1] = Math.max(last[1], end)
+        else merged.push([start, end])
+      }
+      return merged
+    }
+    const horizontalRunsByY = new Map<number, [number, number][]>()
+    const verticalRunsByX = new Map<number, [number, number][]>()
+    streetLaneSegments.forEach(([[x1, y1], [x2, y2]]) => {
+      if (y1 === y2) {
+        const spans = horizontalRunsByY.get(y1) ?? []
+        spans.push([Math.min(x1, x2), Math.max(x1, x2)])
+        horizontalRunsByY.set(y1, spans)
+      } else {
+        const spans = verticalRunsByX.get(x1) ?? []
+        spans.push([Math.min(y1, y2), Math.max(y1, y2)])
+        verticalRunsByX.set(x1, spans)
+      }
+    })
+    const streetLanes: number[][][] = []
+    horizontalRunsByY.forEach((spans, y) => {
+      mergeAxisRuns(spans).forEach(([minX, maxX]) => streetLanes.push([[minX, y], [maxX, y]]))
+    })
+    verticalRunsByX.forEach((spans, x) => {
+      mergeAxisRuns(spans).forEach(([minY, maxY]) => streetLanes.push([[x, minY], [x, maxY]]))
+    })
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
@@ -293,6 +345,7 @@ function DemoSceneRenderer({
       blockSide,
       pings,
       pingData,
+      clusterMembers,
       stops,
       anchorPointData,
       anchorEdgeData,
@@ -384,6 +437,7 @@ function DemoSceneRenderer({
     let pulseStrength = 0
     let previewing = false
     let hoverPingIndex: number | null = null
+    let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
     let hoverBuildingId = ""
     let tourActionActive = false
@@ -394,6 +448,8 @@ function DemoSceneRenderer({
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
+    const isDensityAlgorithm = DENSITY_ALGORITHMS.includes(panel.algo)
+    const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
     const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
@@ -426,26 +482,24 @@ function DemoSceneRenderer({
       return drawn
     }
     const routeProgressAt = (timestampSeconds: number) => {
-      const completedCached: number[][][] = []
-      const completedFallback: number[][][] = []
-      let activeCached: number[][] = []
-      let activeFallback: number[][] = []
+      const completed: { points: number[][]; stopIndex: number }[] = []
+      let active: { points: number[][]; stopIndex: number } | null = null
       let next: typeof preparedSegments[number] | null = null
       for (const segment of preparedSegments) {
         if (timestampSeconds >= segment.end) {
-          if (segment.isFallback) completedFallback.push(segment.points)
-          else completedCached.push(segment.points)
+          completed.push({ points: segment.points, stopIndex: segment.stopIndex })
           continue
         }
         if (timestampSeconds >= segment.start) {
-          const active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
-          if (segment.isFallback) activeFallback = active
-          else activeCached = active
+          active = {
+            points: partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start)),
+            stopIndex: segment.stopIndex,
+          }
           continue
         }
         if (!next) next = segment
       }
-      return { completedCached, completedFallback, activeCached, activeFallback, next }
+      return { completed, active, next }
     }
     const latestPingIndexAt = (timestampSeconds: number) => {
       let index = 0
@@ -503,17 +557,34 @@ function DemoSceneRenderer({
       const truth = groundTruthAt(timestampSeconds)
       return chartData.buildings.map((building, index) => [
         index,
-        showGroundTruth && building.id === hoverBuildingId
-          ? 3
-          : showGroundTruth && building.id === truth.current?.location
+        showGroundTruth && building.id === truth.current?.location
           ? 1 + pulseStrength
           : showGroundTruth && building.id === truth.next?.location
             ? 2
             : 0,
+        hoverBuildingId !== "" && building.id !== hoverBuildingId ? 1 : 0,
       ]).sort((a, b) => a[1] - b[1])
     }
     const buildingGlowData = (timestampSeconds: number) =>
-      buildingsSeriesData(timestampSeconds).filter(([, state]) => state > 0 && state < 2)
+      buildingsSeriesData(timestampSeconds).filter(([, state, faded]) => state > 0 && state < 2 && !faded)
+    // While hovering a ping that belongs to a detected stop, outline the building the algorithm
+    // assigned that stop to, in the stop's cluster color - alongside the (untouched) ground-truth glow.
+    const hoveredAssignedBuildingData = () => {
+      if (!showStops || hoverPingIndex === null) return []
+      const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
+      if (cluster < 0) return []
+      const stop = chartData.stops.find((candidate) => candidate.cluster === cluster)
+      const buildingId = stop?.destination.id
+      if (!buildingId) return []
+      const buildingIndex = chartData.buildings.findIndex((building) => building.id === buildingId)
+      return buildingIndex >= 0 ? [[buildingIndex, cluster]] : []
+    }
+    // For density-based algorithms, show the dist_thresh neighborhood radius around the hovered point.
+    const hoveredDistanceCircleData = () => {
+      if (!isDensityAlgorithm || hoverPingIndex === null) return []
+      const point = chartData.pingData[hoverPingIndex]
+      return [[point[0], point[1], point[2]]]
+    }
     const pastTruthStopData = (timestampSeconds: number) => chartData.truthStops.flatMap((stop, index) =>
       stop.timestamp + stop.duration * 60 < timestampSeconds
         ? [[stop.timestamp * 1000, (stop.timestamp + stop.duration * 60) * 1000, index]]
@@ -527,13 +598,6 @@ function DemoSceneRenderer({
       const next = groundTruthAt(timestampSeconds).next
       return next ? [[next.timestamp * 1000, (next.timestamp + next.duration * 60) * 1000, chartData.truthStops.indexOf(next)]] : []
     }
-    const routeGlowPoints = (route: ReturnType<typeof routeProgressAt>) =>
-      [
-        ...route.completedCached,
-        ...route.completedFallback,
-        route.activeCached,
-        route.activeFallback,
-      ].filter((points) => points.length > 1).flatMap((points, index) => index === 0 ? points : points.slice(1))
     const routeLength = (points: number[][]) =>
       points.slice(1).reduce((total, point, index) => {
         const previous = points[index]
@@ -571,21 +635,31 @@ function DemoSceneRenderer({
     const startRouteGlow = () => {
       if (routeGlowFrame || !routeGlowAllowed()) return
       routeGlowStartedAt = performance.now()
-      const routeGlowSpeed = 24
-      const routeGlowSpacing = 5.5
+      const routeGlowSpeed = 6
+      const routeGlowSpacing = 4
       const step = (now: number) => {
         if (!routeGlowAllowed()) {
           stopRouteGlow()
           return
         }
         const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
-        const points = routeGlowPoints(routeProgressAt(timestampSeconds))
-        const length = routeLength(points)
-        const offset = (now - routeGlowStartedAt) / 1000 * routeGlowSpeed % routeGlowSpacing
-        const markers = Array.from(
-          { length: Math.ceil(length / routeGlowSpacing) },
-          (_, index) => routeMarkerAt(points, (offset + index * routeGlowSpacing) % length),
-        ).filter((marker) => marker !== null)
+        const elapsed = (now - routeGlowStartedAt) / 1000 * routeGlowSpeed
+        const route = routeProgressAt(timestampSeconds)
+        const resolvedSegments = [...route.completed, ...(route.active ? [route.active] : [])]
+        // Each building-to-building hop marches independently (own phase, own path length) so a
+        // segment boundary reads as a distinct leg of the trip rather than one continuous belt.
+        const markers = resolvedSegments.flatMap(({ points, stopIndex }) => {
+          const length = routeLength(points)
+          if (length <= 0) return []
+          // Snap spacing to a divisor of the path length so markers wrap with an even gap instead of a leftover remainder.
+          const count = Math.max(1, Math.round(length / routeGlowSpacing))
+          const spacing = length / count
+          const offset = elapsed % spacing
+          return Array.from({ length: count }, (_, index) => {
+            const marker = routeMarkerAt(points, (offset + index * spacing) % length)
+            return marker ? [marker[0], marker[1], stopIndex] : null
+          }).filter((marker): marker is number[] => marker !== null)
+        })
         mapChart.setOption({ series: [{ id: "route-glow", data: markers }] }, { lazyUpdate: true })
         routeGlowFrame = window.requestAnimationFrame(step)
       }
@@ -642,10 +716,11 @@ function DemoSceneRenderer({
         ...centroidAnchorFrames.flatMap((frame) => frame.edges),
         ...lachesisDiameterFrames.map((frame) => frame.edge),
       ]
-      hoverPingIndexes = hoverPingIndex === null ? null : new Set([hoverPingIndex])
-      const connectedPings = hoverPingIndexes
-      if (connectedPings) {
-        const pending = [hoverPingIndex]
+      if (hoverEdgeEndpoints) {
+        // Edge hover: reveal only the connected component reachable from this edge.
+        const connectedPings = new Set<number>(hoverEdgeEndpoints)
+        hoverPingIndexes = connectedPings
+        const pending: number[] = [...hoverEdgeEndpoints]
         while (pending.length) {
           const current = pending.pop()!
           anchorEdges.forEach((edge) => {
@@ -660,24 +735,32 @@ function DemoSceneRenderer({
             }
           })
         }
+      } else if (hoverPingIndex !== null) {
+        // Ping hover: reveal every ping in the same detected stop (or just itself for noise).
+        const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
+        const members = cluster >= 0 ? chartData.clusterMembers.get(cluster) : undefined
+        hoverPingIndexes = new Set(members ?? [hoverPingIndex])
+      } else {
+        hoverPingIndexes = null
       }
 
       mapChart.setOption({
         series: [
+          { id: "streets", data: chartData.streets.map((_, index) => index) },
+          { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
           { id: "building-glow", data: buildingGlowData(timestampSeconds) },
-          { id: "completed-paths", data: showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
-          { id: "completed-fallback-paths", data: showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
-          { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
-          { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
+          { id: "assigned-building-outline", data: hoveredAssignedBuildingData() },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
           { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3]), itemStyle: { opacity: associatedWithHover(point[3]) ? 1 : 0.18 } })) },
           { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
           { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3])]) : [] },
           { id: "detected-stops", data: [] },
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
+          { id: "anchor-edges-hit-area", data: showStops ? anchorEdges : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
           { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], symbolSize: 9 * pingScale(latestPingIndex), itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
+          { id: "hover-distance-circle", data: hoveredDistanceCircleData() },
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
@@ -700,10 +783,6 @@ function DemoSceneRenderer({
       stopNextPathFlow()
       mapChart.setOption({
         series: [
-          { id: "completed-paths", data: [] },
-          { id: "completed-fallback-paths", data: [] },
-          { id: "active-path", data: [] },
-          { id: "active-fallback-path", data: [] },
           { id: "next-path", data: [] },
           { id: "route-glow", data: [] },
           { id: "ghost-pings", data: previewPings },
@@ -711,6 +790,7 @@ function DemoSceneRenderer({
           { id: "cluster-pings", data: [] },
           { id: "detected-stops", data: [] },
           { id: "anchor-edges", data: [] },
+          { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
         ],
@@ -747,14 +827,26 @@ function DemoSceneRenderer({
     const setHoveredPing = (pingIndex: number | null) => {
       const ping = pingIndex === null ? null : chartData.pings[pingIndex]
       const buildingId = ping ? groundTruthAt(ping.t).current?.location ?? "" : ""
-      if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId) return
+      if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId && hoverEdgeEndpoints === null) return
       hoverPingIndex = pingIndex
+      hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
     }
-    const setHoveredBuilding = (buildingId: string) => {
-      if (hoverPingIndex === null && hoverBuildingId === buildingId) return
+    const setHoveredEdge = (endpoints: [number, number] | null) => {
+      const same = hoverEdgeEndpoints !== null && endpoints !== null &&
+        hoverEdgeEndpoints[0] === endpoints[0] && hoverEdgeEndpoints[1] === endpoints[1]
+      const alreadyClear = hoverEdgeEndpoints === null && endpoints === null
+      if ((same || alreadyClear) && hoverPingIndex === null && hoverBuildingId === "") return
+      hoverEdgeEndpoints = endpoints
       hoverPingIndex = null
+      hoverBuildingId = ""
+      renderScene(activeTimestamp())
+    }
+    const setHoveredBuilding = (buildingId: string) => {
+      if (hoverPingIndex === null && hoverEdgeEndpoints === null && hoverBuildingId === buildingId) return
+      hoverPingIndex = null
+      hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
     }
@@ -775,29 +867,50 @@ function DemoSceneRenderer({
       if (action === "ground-truth") setHoveredBuilding(chartData.truthStops[0]?.location ?? "")
     }
     const onMapMouseOver = (params: echarts.ECElementEvent) => {
+      if (params.seriesId === "anchor-edges-hit-area") {
+        const value = paramsValue(params)
+        setHoveredEdge([Number(value[1]), Number(value[2])])
+        return
+      }
       if (
         params.seriesId === "ghost-pings" ||
         params.seriesId === "cluster-pings" ||
         params.seriesId === "noise-pings" ||
         params.seriesId === "current-ping" ||
-        params.seriesId === "anchor-points"
+        params.seriesId === "anchor-points" ||
+        params.seriesId === "ping-hit-area"
       ) {
         setHoveredPing(paramsValue(params)[3])
       }
     }
     const onMapMouseOut = () => {
-      if (!tourActionActive) setHoveredPing(null)
+      if (!tourActionActive) setHoveredEdge(null)
+    }
+    const showMapPingTip = (pingIndex: number) => {
+      if (pingHitAreaSeriesIndex < 0) return
+      mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex: pingIndex })
     }
     const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
       const value = paramsValue(params)
-      if (params.seriesId === "ping-ticks") setHoveredPing(Number(value[0]))
-      if (params.seriesId === "core-point-ticks") setHoveredPing(Number(value[2]))
+      if (params.seriesId === "ping-ticks") {
+        const pingIndex = Number(value[0])
+        setHoveredPing(pingIndex)
+        showMapPingTip(pingIndex)
+      }
+      if (params.seriesId === "core-point-ticks") {
+        const pingIndex = Number(value[2])
+        setHoveredPing(pingIndex)
+        showMapPingTip(pingIndex)
+      }
       if (params.seriesId === "past-truth-stops") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
       if (params.seriesId === "current-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[3])].location)
       if (params.seriesId === "next-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
     }
     const onTimelineMouseOut = () => {
-      if (!tourActionActive) setHoveredPing(null)
+      if (!tourActionActive) {
+        setHoveredPing(null)
+        mapChart.dispatchAction({ type: "hideTip" })
+      }
     }
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
@@ -952,12 +1065,14 @@ function DemoSceneRenderer({
               : chartData.anchorPointMode.startsWith("sequential-")
                 ? "Anchor for"
                 : "Core point for"
-            return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
+            const distanceLine = isDensityAlgorithm ? `<br>Distance threshold: ${distThreshold}` : ""
+            return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}${distanceLine}`
           }
-          if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping") {
+          if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
             const ping = chartData.pings[value[3]]
             const cluster = ping.cluster < 0 ? "Noise" : `Cluster ${ping.cluster}`
-            return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}`
+            const distanceLine = isDensityAlgorithm ? `<br>Distance threshold: ${distThreshold}` : ""
+            return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}${distanceLine}`
           }
           return ""
         },
@@ -979,6 +1094,7 @@ function DemoSceneRenderer({
                 fill: "#b9bec1",
                 stroke: "#b9bec1",
                 lineWidth: 1,
+                opacity: hoverBuildingId !== "" ? MAP_FOCUS_FADE_OPACITY : 1,
               },
             }
           },
@@ -994,7 +1110,7 @@ function DemoSceneRenderer({
             const [start, end] = chartData.streetLanes[params.dataIndex]
             const startPixel = api.coord(start)
             const endPixel = api.coord(end)
-            return { type: "line", shape: { x1: startPixel[0], y1: startPixel[1], x2: endPixel[0], y2: endPixel[1] }, style: { stroke: "#f4cf55", lineWidth: 1.6, lineDash: [7, 6], shadowBlur: 1, shadowColor: "rgba(32, 33, 36, 0.3)" } }
+            return { type: "line", shape: { x1: startPixel[0], y1: startPixel[1], x2: endPixel[0], y2: endPixel[1] }, style: { stroke: "#000000", lineWidth: 1.6, lineDash: [7, 42], opacity: hoverBuildingId !== "" ? MAP_FOCUS_FADE_OPACITY : 1 } }
           },
         },
         {
@@ -1008,16 +1124,15 @@ function DemoSceneRenderer({
             const building = chartData.buildings[Number(api.value(0))]
             const state = Number(api.value(1))
             const next = state === 2
-            const hovered = state === 3
+            const faded = Number(api.value(2)) === 1
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: hovered ? "#0097ae" : "#8b8b8b",
-                stroke: hovered ? GROUND_TRUTH_COLOR : next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",
-                lineWidth: hovered ? 3.2 : next ? 2.6 : 2,
-                shadowBlur: hovered ? 14 : 0,
-                shadowColor: "rgba(15, 118, 110, 0.55)",
+                fill: "#8b8b8b",
+                stroke: next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",
+                lineWidth: next ? 2.6 : 2,
+                opacity: faded ? MAP_FOCUS_FADE_OPACITY : 1,
               },
             }
           },
@@ -1046,33 +1161,27 @@ function DemoSceneRenderer({
           },
         },
         {
-          id: "completed-paths",
-          name: "Inferred street route",
-          type: "lines",
+          id: "assigned-building-outline",
+          name: "Algorithm-assigned building",
+          type: "custom",
           coordinateSystem: "cartesian2d",
-          polyline: true,
           silent: true,
           z: 2,
           data: [],
-          lineStyle: {
-            color: "#1f6d6a",
-            width: 2.4,
-            opacity: 0.78,
-          },
-        },
-        {
-          id: "completed-fallback-paths",
-          name: "Fallback inferred route",
-          type: "lines",
-          coordinateSystem: "cartesian2d",
-          polyline: true,
-          silent: true,
-          z: 2,
-          data: [],
-          lineStyle: {
-            color: "#d94b45",
-            width: 2.4,
-            opacity: 0.85,
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const building = chartData.buildings[Number(api.value(0))]
+            const color = clusterColor(Number(api.value(1)))
+            return {
+              type: "polygon",
+              shape: { points: building.coords.map((coord) => api.coord(coord)) },
+              style: {
+                fill: "transparent",
+                stroke: color,
+                lineWidth: 3,
+                shadowBlur: 8,
+                shadowColor: color,
+              },
+            }
           },
         },
         {
@@ -1087,44 +1196,8 @@ function DemoSceneRenderer({
           lineStyle: { color: FUTURE_GROUND_TRUTH_COLOR, width: 3, opacity: 0.38, type: "dashed" },
         },
         {
-          id: "active-path",
-          name: "Active route",
-          type: "line",
-          coordinateSystem: "cartesian2d",
-          smooth: 0.38,
-          showSymbol: false,
-          silent: true,
-          z: 4,
-          data: [],
-          lineStyle: {
-            color: GROUND_TRUTH_COLOR,
-            width: 4,
-            opacity: 0.95,
-            shadowBlur: 10,
-            shadowColor: "rgba(15, 118, 110, 0.26)",
-          },
-        },
-        {
-          id: "active-fallback-path",
-          name: "Active fallback route",
-          type: "line",
-          coordinateSystem: "cartesian2d",
-          smooth: 0.38,
-          showSymbol: false,
-          silent: true,
-          z: 4,
-          data: [],
-          lineStyle: {
-            color: "#d94b45",
-            width: 4,
-            opacity: 0.95,
-            shadowBlur: 10,
-            shadowColor: "rgba(217, 75, 69, 0.26)",
-          },
-        },
-        {
           id: "route-glow",
-          name: "Route glow",
+          name: "Ground-truth conveyor",
           type: "custom",
           coordinateSystem: "cartesian2d",
           silent: true,
@@ -1132,14 +1205,16 @@ function DemoSceneRenderer({
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const center = api.coord([api.value(0), api.value(1)])
+            const half = 3.5
+            const fill = segmentShade(Number(api.value(2)))
             return {
-              type: "circle",
-              shape: { cx: center[0], cy: center[1], r: 4 },
+              type: "rect",
+              shape: { x: center[0] - half, y: center[1] - half, width: half * 2, height: half * 2 },
               style: {
-                fill: GROUND_TRUTH_COLOR,
+                fill,
                 stroke: "#ffffff",
                 lineWidth: 1,
-                shadowBlur: 7,
+                shadowBlur: 5,
                 shadowColor: "rgba(15, 118, 110, 0.4)",
                 opacity: 0.96,
               },
@@ -1147,6 +1222,16 @@ function DemoSceneRenderer({
           },
         },
         { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: false, z: 3, data: [], symbolSize: 5, itemStyle: { color: "#000000" } },
+        {
+          id: "ping-hit-area",
+          name: "Ping hit area",
+          type: "scatter",
+          coordinateSystem: "cartesian2d",
+          z: 10,
+          data: chartData.pingData,
+          symbolSize: 18,
+          itemStyle: { color: "transparent" },
+        },
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
         {
           id: "cluster-pings",
@@ -1193,6 +1278,21 @@ function DemoSceneRenderer({
           },
         },
         {
+          id: "anchor-edges-hit-area",
+          name: "Anchor assignments hit area",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          z: 7,
+          data: [],
+          symbol: "none",
+          silent: false,
+          tooltip: { show: false },
+          lineStyle: {
+            width: 16,
+            opacity: 0,
+          },
+        },
+        {
           id: "anchor-points",
           name: "Anchor points",
           type: "scatter",
@@ -1203,8 +1303,36 @@ function DemoSceneRenderer({
           itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
         },
         { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 9, data: [], symbolSize: 9, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.5, brushType: "stroke" }, itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.4, opacity: 0.95 } },
+        {
+          id: "hover-distance-circle",
+          name: "Distance threshold radius",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 9,
+          data: [],
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const center = api.coord([api.value(0), api.value(1)])
+            const edge = api.coord([api.value(0) + distThreshold, api.value(1)])
+            const radius = Math.abs(edge[0] - center[0])
+            const color = clusterColor(Number(api.value(2)))
+            return {
+              type: "circle",
+              shape: { cx: center[0], cy: center[1], r: radius },
+              style: {
+                fill: "transparent",
+                stroke: color,
+                lineWidth: 1.6,
+                lineDash: [5, 4],
+                opacity: 0.9,
+              },
+            }
+          },
+        },
       ],
     })
+    const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
+      .findIndex((series) => series.id === "ping-hit-area")
 
     timelineChart.setOption({
       animation: true,
@@ -1378,6 +1506,8 @@ function DemoSceneRenderer({
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({
         series: [
+          { id: "streets", data: chartData.streets.map((_, index) => index) },
+          { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
           { id: "building-glow", data: buildingGlowData(timestampSeconds) },
         ],
@@ -1484,7 +1614,7 @@ function DemoSceneRenderer({
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
           <span>Timeline</span>
           <span className="font-mono tracking-normal text-[#202124]">
-            {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) + " UTC" : "--:--:-- UTC"}
+            {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) : "--:--:--"}
           </span>
         </div>
       </div>

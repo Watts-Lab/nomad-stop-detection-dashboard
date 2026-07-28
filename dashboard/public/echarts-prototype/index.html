@@ -49,6 +49,7 @@
     const xMaxParam = params.get("xmax");
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
     const demoAlgoId = params.get("algo") || "";
+    const frameId = params.get("frame") || "left";
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -337,10 +338,30 @@
               data: emptyHighlight,
               animation: false,
               symbol: "circle",
+              symbolSize: 6,
+              lineStyle: {
+                color: "rgba(44, 160, 33, 0.6)",
+                width: 2,
+                type: "dashed",
+              },
+              itemStyle: {
+                color: "rgba(44, 160, 44, 0.6)",
+              },
+              z: 9,
+            },
+            {
+              name: "Pinned user spread",
+              id: "pinned-user-line",
+              type: "line",
+              data: emptyHighlight,
+              animation: false,
+              silent: true,
+              symbol: "circle",
               symbolSize: 7,
+              showInLegend: false,
               lineStyle: {
                 color: "#2ca021",
-                width: 2,
+                width: 2.4,
               },
               itemStyle: {
                 color: "#2ca02c",
@@ -382,44 +403,97 @@
               },
               z: 12,
             },
+            {
+              name: "Pinned per-user max",
+              id: "pinned-per-user-max",
+              type: "scatter",
+              data: emptyHighlight,
+              animation: false,
+              symbol: "circle",
+              symbolSize: 10,
+              silent: true,
+              showInLegend: false,
+              itemStyle: {
+                color: "#b91c1c",
+                borderColor: "#2ca02c",
+                borderWidth: 2,
+              },
+              z: 13,
+            },
           ],
         });
         applyTourFocus(pendingTourFocus);
 
-        const highlightUser = (point) => {
-          const userId = point[2];
-          const userRows = byUser.get(userId) || [];
-          const userLine = userRows.map((d) => [d.x, d.recall, d.user_id]);
+        // A hovered point only previews a user's spread; a clicked point pins it so the
+        // green line survives mouse movement until it is unpinned or replaced.
+        let hoveredPoint = null;
+        let pinnedPoint = null;
+        const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
+
+        const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
+
+        const renderHighlight = () => {
+          // A pinned user stays drawn while hovering another one, so both spreads show at once.
+          const hovered = hoveredPoint && (!pinnedPoint || hoveredPoint[2] !== pinnedPoint[2]) ? hoveredPoint : null;
+          if (!hovered && !pinnedPoint) {
+            chart.setOption({
+              series: [
+                { id: "highlighted-user-line", data: emptyHighlight },
+                { id: "hovered-per-user-max", data: emptyHighlight },
+                { id: "pinned-user-line", data: emptyHighlight },
+                { id: "pinned-per-user-max", data: emptyHighlight },
+              ],
+            });
+            applyTourFocus(activeTourFocus);
+            return;
+          }
           chart.setOption({
             series: [
               { id: "individual-results", itemStyle: { opacity: 0.08 } },
               { id: "per-user-max", itemStyle: { opacity: 0.08 } },
-              { id: "highlighted-user-line", data: userLine },
-              { id: "hovered-per-user-max", data: [point] },
+              { id: "highlighted-user-line", data: hovered ? userLineFor(hovered) : emptyHighlight },
+              { id: "hovered-per-user-max", data: hovered ? [hovered] : emptyHighlight },
+              { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
+              { id: "pinned-per-user-max", data: pinnedPoint ? [pinnedPoint] : emptyHighlight },
             ],
           });
         };
 
-        const clearHighlight = () => {
-          chart.setOption({
-            series: [
-              { id: "highlighted-user-line", data: emptyHighlight },
-              { id: "hovered-per-user-max", data: emptyHighlight },
-            ],
-          });
-          applyTourFocus(activeTourFocus);
+        const postPinChange = () => {
+          window.parent.postMessage({
+            type: "nomad-metrics-pin-change",
+            frame: frameId,
+            algoId: demoAlgoId,
+            param: xField,
+            userId: pinnedPoint ? pinnedPoint[2] : null,
+            value: pinnedPoint ? pinnedPoint[0] : null,
+            recall: pinnedPoint ? pinnedPoint[1] : null,
+          }, window.location.origin);
         };
 
         chart.on("mouseover", (event) => {
-          if (event.seriesName === "User max" || event.seriesName === "User max hit area") highlightUser(event.value);
+          if (!isPerUserMaxSeries(event.seriesName)) return;
+          hoveredPoint = event.value;
+          renderHighlight();
         });
         chart.on("mouseout", (event) => {
-          if (event.seriesName === "User max" || event.seriesName === "User max hit area") clearHighlight();
+          if (!isPerUserMaxSeries(event.seriesName)) return;
+          hoveredPoint = null;
+          renderHighlight();
         });
-        chart.on("globalout", clearHighlight);
+        chart.on("globalout", () => {
+          hoveredPoint = null;
+          renderHighlight();
+        });
         chart.on("click", (event) => {
-          const clickableSeries = ["Individual", "User max", "User max hit area"];
-          if (!clickableSeries.includes(event.seriesName)) return;
+          if (isPerUserMaxSeries(event.seriesName)) {
+            const userId = event.value[2];
+            pinnedPoint = pinnedPoint && pinnedPoint[2] === userId ? null : event.value;
+            renderHighlight();
+            postPinChange();
+            return;
+          }
+          if (event.seriesName !== "Individual") return;
           const [pointX, , userId] = event.value;
           window.parent.postMessage({
             type: "nomad-metrics-point-select",

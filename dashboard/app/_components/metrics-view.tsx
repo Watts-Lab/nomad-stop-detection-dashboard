@@ -7,9 +7,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import type { MetricsParameterNote } from "../_lib/types"
+
+type PinnedAgent = {
+  userId: string
+  param: string
+  value: number
+  recall: number
+}
+
+function PinnedAgentCard({ pinned }: { pinned: PinnedAgent | null }) {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium text-muted-foreground">Selected agent</h4>
+      {pinned ? (
+        <div className="space-y-1 rounded-md border border-[#2ca02c]/60 bg-[#2ca02c]/5 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">Agent</span>
+            <span className="truncate text-xs font-mono text-foreground">{pinned.userId}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">Best {parameterDisplayName(pinned.param)}</span>
+            <span className="text-xs font-mono text-foreground">{pinned.value}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">Accuracy</span>
+            <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-md border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+          Click a red circle to keep that agent&apos;s trajectory on the chart; click it again to release.
+        </p>
+      )}
+    </div>
+  )
+}
 
 function MetricsParameterRows({
   algorithm,
@@ -158,10 +193,33 @@ export function MetricsView({
   setMetricsRightParameter: (parameter: string) => void
   startTour: () => void
 }) {
+  const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
+  const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
+
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&${rightFixedParameters}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}`
+
+  useEffect(() => {
+    const handlePinChange = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== "nomad-metrics-pin-change") return
+      const { frame, userId, param, value, recall } = event.data
+      const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
+      setPinned(
+        typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
+          ? { userId, param: String(param), value: Number(value), recall: Number(recall) }
+          : null,
+      )
+    }
+    window.addEventListener("message", handlePinChange)
+    return () => window.removeEventListener("message", handlePinChange)
+  }, [])
+
+  // Each chart reloads (and drops its pin) whenever its src changes.
+  useEffect(() => setPinnedLeftAgent(null), [leftMetricsPrototypeSrc])
+  useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
@@ -232,6 +290,7 @@ export function MetricsView({
               </Select>
             </div>
             <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
+            <PinnedAgentCard pinned={pinnedLeftAgent} />
 
             {metricsCompareMode && (
               <>
@@ -251,6 +310,7 @@ export function MetricsView({
                   </Select>
                 </div>
                 <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
+                <PinnedAgentCard pinned={pinnedRightAgent} />
               </>
             )}
 

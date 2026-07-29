@@ -14,51 +14,51 @@ const teamGroups = [
         name: "Jorge Barreras",
         initials: "JB",
         photo: publicPath("/headshots/Jorge_Barreras.png"),
-        role: "Postdoctoral Researcher · CSSLab",
+        role: "Postdoctoral Researcher · Principal Investigator",
         links: [
           { label: "GitHub", href: "https://github.com/paco-barreras", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/jorge-francisco-barreras-2b3826103", icon: Linkedin },
         ],
       },
       {
-        name: "Tina Ni",
-        initials: "TN",
-        photo: null,
-        role: "NOMAD Contributor",
-        links: [
-          { label: "GitHub", href: "https://github.com/tina-ni", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/tina-ni-795838284", icon: Linkedin },
-        ],
-      },
-      {
         name: "Lorenzo Santos",
         initials: "LS",
-        photo: null,
-        role: "NOMAD Contributor",
+        photo: publicPath("/headshots/Lorenzo_Santos.jpg"),
+        role: "Researcher",
         links: [
           { label: "GitHub", href: "https://github.com/santosl529", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/lorenzo-santos-de", icon: Linkedin },
         ],
       },
       {
+        name: "Darren Wang",
+        initials: "DW",
+        photo: publicPath("/headshots/Darren_Wang.png"),
+        role: "Researcher",
+        links: [
+          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
+          { label: "Personal website", href: "https://darren-wang.dev", icon: Globe },
+        ],
+      },
+      {
         name: "Celia Tung",
         initials: "CT",
         photo: null,
-        role: "NOMAD Contributor",
+        role: "Researcher",
         links: [
           { label: "GitHub", href: "https://github.com/cetung-gif", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/celia-tung-a76338308", icon: Linkedin },
         ],
       },
       {
-        name: "Darren Wang",
-        initials: "DW",
-        photo: null,
-        role: "NOMAD Contributor",
+        name: "Tina Ni",
+        initials: "TN",
+        photo: publicPath("/headshots/Tina_Ni.jpg"),
+        role: "Researcher",
         links: [
-          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
-          { label: "Personal website", href: "https://dpnimo11.github.io", icon: Globe },
+          { label: "GitHub", href: "https://github.com/tina-ni", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/tina-ni-795838284", icon: Linkedin },
         ],
       },
     ],
@@ -99,14 +99,16 @@ export default function AboutPage() {
           <section className={`${revealClass()} space-y-5`}>
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#8acac8]">About NOMAD</p>
             <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
-              Open tools for human mobility science.
+              We create tools for analysis of human mobility
             </h1>
-            <p className="max-w-xl text-base leading-relaxed text-[#b6c9dc] sm:text-lg">
-              The Network for Open Mobility Analysis and Datasets (NOMAD) expands access to large-scale GPS
-              mobility data and standardizes analytical tools for human mobility science and epidemiology. By
-              lowering technical and data-access barriers, NOMAD helps researchers and policymakers use mobility
-              data for reproducible research and evidence-informed policy.
-            </p>
+            <div className="max-w-xl space-y-5 text-sm leading-relaxed text-[#b6c9dc] sm:text-base">
+              <p>
+                NOMAD, the Network for Open Mobility Analysis and Data, is an NSF-funded initiative of the Computational Social Science Lab at the University of Pennsylvania. Our  mission is to expand access to high-precision human mobility data, to offer technical and scientific guidance on how to work with it, and to provide the tools to analyze it at scale and translate insights into research, applications, and decision-support tools. In doing so, NOMAD brings together researchers, industry partners, and decision-makers around the privacy-centered and socially beneficial use of human mobility data.
+              </p>
+              <p>
+                Furthermore, researchers can engage with NOMAD to learn about this type of data, its potential and limitations. Through tutorials and other learning resources, users can acquire the skills and knowledge necessary to transform raw mobility data into metrics and insights, as well as the current state of research in several human mobility applications.
+              </p>
+            </div>
           </section>
 
           <section className={`${revealClass("up", 2)} max-w-xl space-y-4 border-t border-[#263449] pt-6`}>

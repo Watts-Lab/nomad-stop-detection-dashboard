@@ -154,7 +154,7 @@ export function MetricsView({
           <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">
-                {metricsCompareMode ? "Algorithm A" : "Algorithm"}
+                {metricsCompareMode ? "Left" : "Algorithm"}
               </label>
               <Select
                 value={metricsLeftAlgorithm}
@@ -174,7 +174,7 @@ export function MetricsView({
             {metricsCompareMode && (
               <>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Algorithm B</label>
+                  <label className="text-sm font-medium text-muted-foreground">Right</label>
                   <Select
                     value={metricsRightAlgorithm}
                     onValueChange={(algorithm) => {

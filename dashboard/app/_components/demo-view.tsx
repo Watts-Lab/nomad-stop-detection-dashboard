@@ -186,7 +186,7 @@ export function DemoView({
                 </Select>
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Algorithm A</h4>
+                <h4 className="text-sm font-medium">Left</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                   <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
@@ -201,7 +201,7 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Algorithm B</h4>
+                <h4 className="text-sm font-medium">Right</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
                   <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>

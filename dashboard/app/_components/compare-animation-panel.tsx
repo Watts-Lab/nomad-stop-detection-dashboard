@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
+import { parameterDisplayName } from "../_lib/dashboard-utils"
 import type {
   ComparePanelResponse,
   EChartsApi,
@@ -1994,6 +1995,9 @@ export function CompareAnimationPanel({
     <Card className="h-full min-h-0 overflow-hidden py-0">
       <CardHeader className="py-3 px-4 shrink-0">
         <CardTitle className="text-base font-semibold">{panel?.title ?? "Preparing visualization"}</CardTitle>
+        {mode === "compare" && panel?.params && (
+          <p className="text-xs text-white">{Object.entries(panel.params).map(([name, value]) => `${parameterDisplayName(name)}: ${value}`).join(" · ")}</p>
+        )}
         {sceneMetadata && (
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}

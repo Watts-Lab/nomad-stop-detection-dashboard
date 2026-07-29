@@ -68,7 +68,7 @@ const TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='tour-compare-toggle']",
     popover: {
       title: "Compare Two Algorithms",
-      description: "Click here to switch into side-by-side mode: pick Algorithm A and B with independent parameters, then watch both run on the same trip at once to see where they agree, split, merge, or miss a stop.",
+      description: "Click here to switch into side-by-side mode: pick Left and Right algorithms with independent parameters, then watch both run on the same trip at once to see where they agree, split, merge, or miss a stop.",
     },
   },
 ]

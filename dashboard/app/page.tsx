@@ -402,6 +402,7 @@ function NomadDashboard() {
           metricsRightAlgorithm={metricsRightAlgorithm}
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
+          selectedUserId={compareApiData?.left.scene?.user_id}
           leftParameterNote={leftParameterNote}
           rightParameterNote={rightParameterNote}
           metricsError={metricsError}
@@ -410,6 +411,7 @@ function NomadDashboard() {
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
+          openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />
       )}

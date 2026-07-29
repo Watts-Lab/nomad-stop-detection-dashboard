@@ -12,18 +12,26 @@ import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import type { MetricsParameterNote } from "../_lib/types"
 
 type PinnedAgent = {
+  algoId: string
   userId: string
   param: string
   value: number
   recall: number
+  fixed: Record<string, string>
 }
 
-function PinnedAgentCard({ pinned }: { pinned: PinnedAgent | null }) {
+function PinnedAgentCard({
+  pinned,
+  openDemo,
+}: {
+  pinned: PinnedAgent | null
+  openDemo: (pinned: PinnedAgent) => void
+}) {
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-medium text-muted-foreground">Selected agent</h4>
       {pinned ? (
-        <div className="space-y-1 rounded-md border border-[#2ca02c]/60 bg-[#2ca02c]/5 px-3 py-2">
+        <div className="space-y-2 rounded-md border border-[#2ca02c]/60 bg-[#2ca02c]/5 px-3 py-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">Agent</span>
             <span className="truncate text-xs font-mono text-foreground">{pinned.userId}</span>
@@ -36,6 +44,9 @@ function PinnedAgentCard({ pinned }: { pinned: PinnedAgent | null }) {
             <span className="text-xs text-muted-foreground">Accuracy</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
+          <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
+            Open in Demo
+          </Button>
         </div>
       ) : (
         <p className="rounded-md border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -167,6 +178,7 @@ export function MetricsView({
   metricsRightAlgorithm,
   metricsLeftParameter,
   metricsRightParameter,
+  selectedUserId,
   leftParameterNote,
   rightParameterNote,
   metricsError,
@@ -175,6 +187,7 @@ export function MetricsView({
   setMetricsRightAlgorithm,
   setMetricsLeftParameter,
   setMetricsRightParameter,
+  openPinnedAgent,
   startTour,
 }: {
   metricsCompareMode: boolean
@@ -183,6 +196,7 @@ export function MetricsView({
   metricsRightAlgorithm: string
   metricsLeftParameter: string
   metricsRightParameter: string
+  selectedUserId?: string
   leftParameterNote: MetricsParameterNote | undefined
   rightParameterNote: MetricsParameterNote | undefined
   metricsError: string | null
@@ -191,6 +205,7 @@ export function MetricsView({
   setMetricsRightAlgorithm: (algorithm: string) => void
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
+  openPinnedAgent: (pinned: PinnedAgent) => void
   startTour: () => void
 }) {
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
@@ -198,18 +213,19 @@ export function MetricsView({
 
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}`
+  const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
 
   useEffect(() => {
     const handlePinChange = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
       if (event.data?.type !== "nomad-metrics-pin-change") return
-      const { frame, userId, param, value, recall } = event.data
+      const { frame, algoId, userId, param, value, recall, fixed } = event.data
       const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
       setPinned(
         typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
-          ? { userId, param: String(param), value: Number(value), recall: Number(recall) }
+          ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
           : null,
       )
     }
@@ -290,7 +306,7 @@ export function MetricsView({
               </Select>
             </div>
             <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
-            <PinnedAgentCard pinned={pinnedLeftAgent} />
+            <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />
 
             {metricsCompareMode && (
               <>
@@ -310,7 +326,7 @@ export function MetricsView({
                   </Select>
                 </div>
                 <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
-                <PinnedAgentCard pinned={pinnedRightAgent} />
+                <PinnedAgentCard pinned={pinnedRightAgent} openDemo={openPinnedAgent} />
               </>
             )}
 

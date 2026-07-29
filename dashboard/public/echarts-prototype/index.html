@@ -50,6 +50,7 @@
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
     const demoAlgoId = params.get("algo") || "";
     const frameId = params.get("frame") || "left";
+    const initialUserId = params.get("user");
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -427,7 +428,7 @@
         // A hovered point only previews a user's spread; a clicked point pins it so the
         // green line survives mouse movement until it is unpinned or replaced.
         let hoveredPoint = null;
-        let pinnedPoint = null;
+        let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
@@ -468,8 +469,14 @@
             userId: pinnedPoint ? pinnedPoint[2] : null,
             value: pinnedPoint ? pinnedPoint[0] : null,
             recall: pinnedPoint ? pinnedPoint[1] : null,
+            fixed: fixedParameters,
           }, window.location.origin);
         };
+
+        if (pinnedPoint) {
+          renderHighlight();
+          postPinChange();
+        }
 
         chart.on("mouseover", (event) => {
           if (!isPerUserMaxSeries(event.seriesName)) return;

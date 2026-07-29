@@ -386,10 +386,13 @@ function DemoSceneRenderer({
     if (!scene || !chartData || !mapRef.current || !timelineRef.current) return
 
     const mapEl = mapRef.current
+    const timelineEl = timelineRef.current
     const previousTouchAction = mapEl.style.touchAction
+    const previousTimelineTouchAction = timelineEl.style.touchAction
     mapEl.style.touchAction = "none"
+    timelineEl.style.touchAction = "none"
     const mapChart = echarts.init(mapEl, null, { renderer: "canvas" })
-    const timelineChart = echarts.init(timelineRef.current, null, { renderer: "canvas" })
+    const timelineChart = echarts.init(timelineEl, null, { renderer: "canvas" })
     const minX = chartData.focusBounds.minX
     const minY = chartData.focusBounds.minY
     const maxX = chartData.focusBounds.maxX
@@ -1182,6 +1185,7 @@ function DemoSceneRenderer({
       window.addEventListener("mouseup", onPointerUp)
     }
     const onTimelineWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
       window.clearTimeout(timer)
       paused = true
@@ -1633,6 +1637,16 @@ function DemoSceneRenderer({
       animationDurationUpdate: 180,
       animationEasingUpdate: "cubicOut",
       grid: { left: 34, right: 22, top: 0, bottom: 28 },
+      dataZoom: [{
+        id: "timeline-zoom",
+        type: "inside",
+        xAxisIndex: 0,
+        filterMode: "none",
+        minSpan: 1,
+        zoomOnMouseWheel: "ctrl",
+        moveOnMouseMove: "shift",
+        moveOnMouseWheel: "shift",
+      }],
       xAxis: {
         type: "time",
         min: timeMin,
@@ -1769,7 +1783,6 @@ function DemoSceneRenderer({
       ],
     })
 
-    const timelineEl = timelineRef.current
     toggleRef.current = toggle
     replayRef.current = replay
     previewRef.current = playLocalPreview
@@ -1856,6 +1869,7 @@ function DemoSceneRenderer({
       timelineEl.removeEventListener("wheel", onTimelineWheel)
       renderSceneRef.current = null
       mapEl.style.touchAction = previousTouchAction
+      timelineEl.style.touchAction = previousTimelineTouchAction
       mapChart.dispose()
       timelineChart.dispose()
     }

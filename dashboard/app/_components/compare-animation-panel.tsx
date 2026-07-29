@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
+import type { TooltipComponentPositionCallback } from "echarts"
 import { Pause, Play, RotateCcw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -35,6 +36,12 @@ const segmentShade = (stopIndex: number) => {
   return `hsl(${GROUND_TRUTH_HUE}, ${GROUND_TRUTH_SATURATION}%, ${lightness}%)`
 }
 
+const elapsedTimeLabel = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return minutes ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`
+}
+
 function DemoSceneRenderer({
   panel,
   mode,
@@ -63,13 +70,18 @@ function DemoSceneRenderer({
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
+  const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => {})
   const replayRef = useRef<() => void>(() => {})
   const previewRef = useRef<() => void>(() => {})
+  const clearSelectionRef = useRef<() => void>(() => {})
   const onReplayStartRef = useRef(onReplayStart)
   const selectedTimestampRef = useRef<number | null>(null)
+  const selectedPingIndexesRef = useRef<number[]>([])
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+  const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
+  const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
   const labels = useMemo(() => {
     if (!scene) return []
     if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
@@ -439,6 +451,11 @@ function DemoSceneRenderer({
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
+    let mapMousePosition: number[] | null = null
+    let mapPointerDown: number[] | null = null
+    let mapPingClickHandled = false
+    let backgroundClearFrame = 0
+    let pingTooltipElement: HTMLDivElement | null = null
     let hoverBuildingId = ""
     let tourActionActive = false
     const syncPlaybackState = () => {
@@ -585,6 +602,13 @@ function DemoSceneRenderer({
       const point = chartData.pingData[hoverPingIndex]
       return [[point[0], point[1], point[2]]]
     }
+    const selectedPingLineData = () => {
+      if (selectedPingIndexesRef.current.length !== 2) return []
+      return [{ coords: selectedPingIndexesRef.current.map((pingIndex) => {
+        const ping = chartData.pings[pingIndex]
+        return [ping.x, ping.y]
+      }) }]
+    }
     const pastTruthStopData = (timestampSeconds: number) => chartData.truthStops.flatMap((stop, index) =>
       stop.timestamp + stop.duration * 60 < timestampSeconds
         ? [[stop.timestamp * 1000, (stop.timestamp + stop.duration * 60) * 1000, index]]
@@ -716,7 +740,10 @@ function DemoSceneRenderer({
         ...centroidAnchorFrames.flatMap((frame) => frame.edges),
         ...lachesisDiameterFrames.map((frame) => frame.edge),
       ]
-      if (hoverEdgeEndpoints) {
+      if (selectedPingIndexesRef.current.length === 2) {
+        hoverPingIndexes = new Set(selectedPingIndexesRef.current)
+        if (hoverPingIndex !== null) hoverPingIndexes.add(hoverPingIndex)
+      } else if (hoverEdgeEndpoints) {
         // Edge hover: reveal only the connected component reachable from this edge.
         const connectedPings = new Set<number>(hoverEdgeEndpoints)
         hoverPingIndexes = connectedPings
@@ -740,6 +767,11 @@ function DemoSceneRenderer({
         const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
         const members = cluster >= 0 ? chartData.clusterMembers.get(cluster) : undefined
         hoverPingIndexes = new Set(members ?? [hoverPingIndex])
+      } else if (selectedPingIndexesRef.current.length) {
+        hoverPingIndexes = new Set(selectedPingIndexesRef.current.flatMap((pingIndex) => {
+          const cluster = chartData.pingData[pingIndex]?.[2] ?? -1
+          return cluster >= 0 ? chartData.clusterMembers.get(cluster) ?? [pingIndex] : [pingIndex]
+        }))
       } else {
         hoverPingIndexes = null
       }
@@ -761,6 +793,7 @@ function DemoSceneRenderer({
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
           { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], symbolSize: 9 * pingScale(latestPingIndex), itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
           { id: "hover-distance-circle", data: hoveredDistanceCircleData() },
+          { id: "selected-ping-line", data: selectedPingLineData() },
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
@@ -793,6 +826,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "selected-ping-line", data: selectedPingLineData() },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -832,6 +866,7 @@ function DemoSceneRenderer({
       hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
+      refreshTooltipLayout()
     }
     const setHoveredEdge = (endpoints: [number, number] | null) => {
       const same = hoverEdgeEndpoints !== null && endpoints !== null &&
@@ -842,12 +877,142 @@ function DemoSceneRenderer({
       hoverPingIndex = null
       hoverBuildingId = ""
       renderScene(activeTimestamp())
+      refreshTooltipLayout()
     }
     const setHoveredBuilding = (buildingId: string) => {
       if (hoverPingIndex === null && hoverEdgeEndpoints === null && hoverBuildingId === buildingId) return
       hoverPingIndex = null
       hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
+      renderScene(activeTimestamp())
+      refreshTooltipLayout()
+    }
+    const selectedPingPixels = () => selectedPingIndexesRef.current.map((pingIndex) => {
+      const ping = chartData.pings[pingIndex]
+      return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
+    })
+    const boxIntersectsSelection: (position: number[], width: number, height: number, points: number[][]) => boolean = (position, width, height, points) => {
+      if (!points.length) return false
+      const clearance = 10
+      const left = position[0] - clearance
+      const top = position[1] - clearance
+      const right = position[0] + width + clearance
+      const bottom = position[1] + height + clearance
+      const start = points[0]
+      const end = points[points.length - 1]
+      const deltaX = end[0] - start[0]
+      const deltaY = end[1] - start[1]
+      let entry = 0
+      let exit = 1
+      const boundaries = [
+        [-deltaX, start[0] - left],
+        [deltaX, right - start[0]],
+        [-deltaY, start[1] - top],
+        [deltaY, bottom - start[1]],
+      ]
+      for (const [direction, distance] of boundaries) {
+        if (direction === 0 && distance < 0) return false
+        if (direction < 0) entry = Math.max(entry, distance / direction)
+        if (direction > 0) exit = Math.min(exit, distance / direction)
+        if (entry > exit) return false
+      }
+      return true
+    }
+    const boxIntersectsPoint: (position: number[], width: number, height: number, point: number[]) => boolean = ([left, top], width, height, [x, y]) =>
+      x >= left - 10 && x <= left + width + 10 && y >= top - 10 && y <= top + height + 10
+    const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
+      if (!element || element.style.visibility === "hidden") return false
+      return !(
+        left + width + gap <= element.offsetLeft ||
+        left >= element.offsetLeft + element.offsetWidth + gap ||
+        top + height + gap <= element.offsetTop ||
+        top >= element.offsetTop + element.offsetHeight + gap
+      )
+    }
+    const tooltipPositions: (width: number, height: number, padding: number, gap: number, points: number[][]) => number[][] = (width, height, padding, gap, points) => {
+      const minX = Math.min(...points.map(([x]) => x))
+      const maxX = Math.max(...points.map(([x]) => x))
+      const minY = Math.min(...points.map(([, y]) => y))
+      const maxY = Math.max(...points.map(([, y]) => y))
+      const maxLeft = Math.max(padding, mapEl.clientWidth - width - padding)
+      const maxTop = Math.max(padding, mapEl.clientHeight - height - padding)
+      const clamp: (position: number[]) => number[] = ([left, top]) => [
+        Math.max(padding, Math.min(left, maxLeft)),
+        Math.max(padding, Math.min(top, maxTop)),
+      ]
+      const horizontalCenter = (minX + maxX - width) / 2
+      const verticalCenter = (minY + maxY - height) / 2
+      const localOffsets = [gap, gap + 24, gap + 48]
+      const edgeSteps = Array.from({ length: 9 }, (_, index) => index / 8)
+      return [
+        ...localOffsets.flatMap((offset) => [
+          [maxX + offset, verticalCenter],
+          [minX - offset - width, verticalCenter],
+          [horizontalCenter, minY - offset - height],
+          [horizontalCenter, maxY + offset],
+        ]),
+        ...edgeSteps.flatMap((step) => [
+          [padding + (maxLeft - padding) * step, padding],
+          [padding + (maxLeft - padding) * step, maxTop],
+          [padding, padding + (maxTop - padding) * step],
+          [maxLeft, padding + (maxTop - padding) * step],
+        ]),
+      ].map(clamp)
+    }
+    const positionComparisonTooltip = () => {
+      const selected = selectedPingIndexesRef.current
+      const tooltip = comparisonTooltipRef.current
+      if (!selected.length || !tooltip) return
+      const points = selectedPingPixels()
+      const hoveredPoint = hoverPingIndex === null ? null : (() => {
+        const ping = chartData.pings[hoverPingIndex]
+        return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
+      })()
+      const padding = 12
+      const gap = 16
+      const tooltipWidth = tooltip.offsetWidth
+      const tooltipHeight = tooltip.offsetHeight
+      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points)
+        .find((candidate) =>
+          !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
+          (!hoveredPoint || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, hoveredPoint)) &&
+          (!mapMousePosition || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, mapMousePosition)) &&
+          !boxOverlapsElement(candidate, tooltipWidth, tooltipHeight, pingTooltipElement, 10)
+        )
+      tooltip.style.visibility = position ? "visible" : "hidden"
+      if (position) {
+        tooltip.style.left = `${position[0]}px`
+        tooltip.style.top = `${position[1]}px`
+      }
+      setComparisonTooltipPosition((current) => {
+        if (!position) return current.visibility === "hidden" ? current : { ...current, visibility: "hidden" }
+        if (current.left === position[0] && current.top === position[1] && current.visibility === "visible") return current
+        return { left: position[0], top: position[1], visibility: "visible" }
+      })
+    }
+    const refreshTooltipLayout = () => {
+      mapChart.dispatchAction({ type: "hideTip" })
+      if (comparisonTooltipRef.current) comparisonTooltipRef.current.style.visibility = "hidden"
+      window.requestAnimationFrame(() => {
+        positionComparisonTooltip()
+        window.requestAnimationFrame(() => {
+          if (hoverPingIndex !== null) showMapPingTip(hoverPingIndex)
+        })
+      })
+    }
+    const selectPing = (pingIndex: number) => {
+      const selected = selectedPingIndexesRef.current
+      const next = selected.includes(pingIndex)
+        ? selected.filter((selectedPingIndex) => selectedPingIndex !== pingIndex)
+        : selected.length === 2 ? [pingIndex] : [...selected, pingIndex]
+      selectedPingIndexesRef.current = next
+      setSelectedPingIndexes(next)
+      renderScene(activeTimestamp())
+      refreshTooltipLayout()
+    }
+    const clearSelectedPings = () => {
+      selectedPingIndexesRef.current = []
+      setSelectedPingIndexes([])
       renderScene(activeTimestamp())
     }
     const tourCorePingIndexes = new Set(chartData.coreTimelineData.map((point) => point[2]))
@@ -883,24 +1048,66 @@ function DemoSceneRenderer({
         setHoveredPing(paramsValue(params)[3])
       }
     }
+    const onMapPointerMove: (event: { offsetX: number; offsetY: number }) => void = (event) => {
+      mapMousePosition = [event.offsetX, event.offsetY]
+      if (selectedPingIndexesRef.current.length) positionComparisonTooltip()
+    }
+    const onMapSelectionPointerDown: (event: PointerEvent) => void = (event) => {
+      if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
+      mapPingClickHandled = false
+      const rect = mapEl.getBoundingClientRect()
+      mapPointerDown = [event.clientX - rect.left, event.clientY - rect.top]
+    }
+    const onMapSelectionPointerUp: (event: PointerEvent) => void = (event) => {
+      if (!mapPointerDown) return
+      const start = mapPointerDown
+      mapPointerDown = null
+      const rect = mapEl.getBoundingClientRect()
+      const point = [event.clientX - rect.left, event.clientY - rect.top]
+      if (Math.hypot(point[0] - start[0], point[1] - start[1]) > 5) return
+      if (point[0] < 0 || point[0] > rect.width || point[1] < 0 || point[1] > rect.height) return
+      backgroundClearFrame = window.requestAnimationFrame(() => {
+        if (!mapPingClickHandled && selectedPingIndexesRef.current.length) clearSelectedPings()
+        mapPingClickHandled = false
+        backgroundClearFrame = 0
+      })
+    }
+    const onMapSelectionPointerCancel = () => {
+      mapPointerDown = null
+      mapPingClickHandled = false
+    }
     const onMapMouseOut = () => {
+      mapMousePosition = null
       if (!tourActionActive) setHoveredEdge(null)
+      else positionComparisonTooltip()
+    }
+    const onMapClick = (params: echarts.ECElementEvent) => {
+      if (
+        params.seriesId === "ghost-pings" ||
+        params.seriesId === "cluster-pings" ||
+        params.seriesId === "noise-pings" ||
+        params.seriesId === "current-ping" ||
+        params.seriesId === "anchor-points" ||
+        params.seriesId === "ping-hit-area"
+      ) {
+        mapPingClickHandled = true
+        selectPing(Number(paramsValue(params)[3]))
+      }
     }
     const showMapPingTip = (pingIndex: number) => {
       if (pingHitAreaSeriesIndex < 0) return
       mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex: pingIndex })
     }
     const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
+      mapMousePosition = null
       const value = paramsValue(params)
       if (params.seriesId === "ping-ticks") {
         const pingIndex = Number(value[0])
         setHoveredPing(pingIndex)
-        showMapPingTip(pingIndex)
       }
       if (params.seriesId === "core-point-ticks") {
         const pingIndex = Number(value[2])
         setHoveredPing(pingIndex)
-        showMapPingTip(pingIndex)
       }
       if (params.seriesId === "past-truth-stops") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
       if (params.seriesId === "current-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[3])].location)
@@ -911,6 +1118,27 @@ function DemoSceneRenderer({
         setHoveredPing(null)
         mapChart.dispatchAction({ type: "hideTip" })
       }
+    }
+    const onTimelineClick = (params: echarts.ECElementEvent) => {
+      const value = paramsValue(params)
+      if (params.seriesId === "ping-ticks") selectPing(Number(value[0]))
+      if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
+    }
+    const onKeyDown: (event: KeyboardEvent) => void = (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return
+      const selected = selectedPingIndexesRef.current
+      if (selected.length !== 2) return
+      const direction = event.key === "ArrowRight" ? 1 : -1
+      let nextPingIndex = selected[1] + direction
+      if (nextPingIndex === selected[0]) nextPingIndex += direction
+      if (nextPingIndex < 0 || nextPingIndex >= chartData.pings.length) return
+      event.preventDefault()
+      const next = [selected[0], nextPingIndex]
+      selectedPingIndexesRef.current = next
+      setSelectedPingIndexes(next)
+      renderScene(activeTimestamp())
+      refreshTooltipLayout()
     }
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
@@ -1017,6 +1245,50 @@ function DemoSceneRenderer({
       mapChart.resize()
       applyMapBounds()
       timelineChart.resize()
+      refreshTooltipLayout()
+    }
+    const pingTooltipPosition: TooltipComponentPositionCallback = (point, _params, element, _rect, size) => {
+      const padding = 8
+      const gap = 16
+      const tooltipWidth = size.contentSize[0]
+      const tooltipHeight = size.contentSize[1]
+      const points = selectedPingPixels()
+      const maxLeft = Math.max(padding, size.viewSize[0] - tooltipWidth - padding)
+      const maxTop = Math.max(padding, size.viewSize[1] - tooltipHeight - padding)
+      const clamp: (position: number[]) => number[] = ([left, top]) => [
+        Math.max(padding, Math.min(left, maxLeft)),
+        Math.max(padding, Math.min(top, maxTop)),
+      ]
+      const positions = [gap, gap + 24, gap + 48].flatMap((offset) => [
+        [point[0] + offset, point[1] - tooltipHeight / 2],
+        [point[0] - offset - tooltipWidth, point[1] - tooltipHeight / 2],
+        [point[0] - tooltipWidth / 2, point[1] + offset],
+        [point[0] - tooltipWidth / 2, point[1] - offset - tooltipHeight],
+        [point[0] + offset, point[1] + offset],
+        [point[0] - offset - tooltipWidth, point[1] + offset],
+        [point[0] + offset, point[1] - offset - tooltipHeight],
+        [point[0] - offset - tooltipWidth, point[1] - offset - tooltipHeight],
+      ]).map(clamp)
+      const comparisonTooltip = comparisonTooltipRef.current
+      const overlapsComparison: (position: number[]) => boolean = ([left, top]) => {
+        if (!comparisonTooltip || comparisonTooltip.style.visibility === "hidden") return false
+        return !(
+          left + tooltipWidth + gap <= comparisonTooltip.offsetLeft ||
+          left >= comparisonTooltip.offsetLeft + comparisonTooltip.offsetWidth + gap ||
+          top + tooltipHeight + gap <= comparisonTooltip.offsetTop ||
+          top >= comparisonTooltip.offsetTop + comparisonTooltip.offsetHeight + gap
+        )
+      }
+      const position = positions.find((candidate) =>
+        !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, point) &&
+        !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
+        !overlapsComparison(candidate)
+      )
+      if (element instanceof HTMLDivElement) {
+        pingTooltipElement = element
+        element.style.visibility = position ? "visible" : "hidden"
+      }
+      return position ?? positions[0]
     }
     const bounds = mapBounds()
 
@@ -1049,9 +1321,13 @@ function DemoSceneRenderer({
       ],
       tooltip: {
         trigger: "item",
+        renderMode: "html",
         borderWidth: 0,
+        confine: true,
         backgroundColor: "rgba(32, 33, 36, 0.92)",
         textStyle: { color: "#ffffff" },
+        extraCssText: "pointer-events: none;",
+        position: pingTooltipPosition,
         formatter(params: EChartsParams) {
           const value = paramsValue(params)
           if (params.seriesId === "detected-stops") {
@@ -1225,12 +1501,18 @@ function DemoSceneRenderer({
         {
           id: "ping-hit-area",
           name: "Ping hit area",
-          type: "scatter",
+          type: "custom",
           coordinateSystem: "cartesian2d",
           z: 10,
           data: chartData.pingData,
-          symbolSize: 18,
-          itemStyle: { color: "transparent" },
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const circle = pingCircle(api)
+            return {
+              type: "circle",
+              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * pingScale(Number(api.value(3))) },
+              style: { fill: "rgba(0, 0, 0, 0.001)" },
+            }
+          },
         },
         { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
         {
@@ -1329,6 +1611,17 @@ function DemoSceneRenderer({
             }
           },
         },
+        {
+          id: "selected-ping-line",
+          name: "Selected ping distance",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 11,
+          data: [],
+          symbol: "none",
+          lineStyle: { color: "#000000", width: 3 },
+        },
       ],
     })
     const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
@@ -1362,15 +1655,17 @@ function DemoSceneRenderer({
             const pingIndex = Number(api.value(0))
             const ping = chartData.pings[pingIndex]
             const hovered = hoverPingIndex === pingIndex
-            const halfHeight = 0.22 * (hovered ? 1.2 : 1)
+            const selected = selectedPingIndexesRef.current.includes(pingIndex)
+            const emphasized = hovered || selected
+            const halfHeight = 0.22 * (emphasized ? 1.2 : 1)
             const top = api.coord([ping.t * 1000, 0.5 + halfHeight])
             const bottom = api.coord([ping.t * 1000, 0.5 - halfHeight])
             const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
             return {
               type: "group",
               children: [
-                { type: "line", z2: hovered ? 9 : 0, shape, style: { stroke: "rgba(0, 0, 0, 0)", lineWidth: 10 } },
-                { type: "line", z2: hovered ? 10 : 0, shape, style: { stroke: "#000000", lineWidth: hovered ? 5 : 2.5, opacity: hoverPingIndex === null || hovered ? 0.85 : 0.2 } },
+                { type: "line", z2: emphasized ? 9 : 0, shape, style: { stroke: "rgba(0, 0, 0, 0)", lineWidth: 10 } },
+                { type: "line", z2: emphasized ? 10 : 0, shape, style: { stroke: "#000000", lineWidth: emphasized ? 5 : 2.5, opacity: hoverPingIndex === null || emphasized ? 0.85 : 0.2 } },
               ],
             }
           },
@@ -1383,13 +1678,16 @@ function DemoSceneRenderer({
           z: 7,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const hovered = hoverPingIndex === Number(api.value(2))
-            const halfHeight = 0.22 * (hovered ? 1.2 : 1)
+            const pingIndex = Number(api.value(2))
+            const hovered = hoverPingIndex === pingIndex
+            const selected = selectedPingIndexesRef.current.includes(pingIndex)
+            const emphasized = hovered || selected
+            const halfHeight = 0.22 * (emphasized ? 1.2 : 1)
             const top = api.coord([api.value(0), 0.5 + halfHeight])
             const bottom = api.coord([api.value(0), 0.5 - halfHeight])
             const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
             const color = clusterColor(Number(api.value(1)))
-            return hovered
+            return emphasized
               ? { type: "group", children: [
                 { type: "line", z2: 10, shape, style: { stroke: "#000000", lineWidth: 6 } },
                 { type: "line", z2: 11, shape, style: { stroke: color, lineWidth: 3.5, opacity: 0.95 } },
@@ -1474,6 +1772,7 @@ function DemoSceneRenderer({
     toggleRef.current = toggle
     replayRef.current = replay
     previewRef.current = playLocalPreview
+    clearSelectionRef.current = clearSelectedPings
     renderSceneRef.current = (timestampSeconds) => {
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
@@ -1488,12 +1787,20 @@ function DemoSceneRenderer({
     renderSceneRef.current(initialTimestamp)
     window.addEventListener("resize", resize)
     window.addEventListener("nomad-tour-action", onTourAction)
+    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("pointerup", onMapSelectionPointerUp)
+    window.addEventListener("pointercancel", onMapSelectionPointerCancel)
+    mapEl.addEventListener("pointerdown", onMapSelectionPointerDown)
     timelineEl.style.cursor = "ew-resize"
     mapChart.on("mouseover", onMapMouseOver)
     mapChart.on("mouseout", onMapMouseOut)
     mapChart.on("globalout", onMapMouseOut)
+    mapChart.on("click", onMapClick)
+    mapChart.on("dataZoom", refreshTooltipLayout)
+    mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
+    timelineChart.on("click", onTimelineClick)
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
@@ -1520,20 +1827,30 @@ function DemoSceneRenderer({
     return () => {
       window.clearTimeout(timer)
       window.clearInterval(pulseTimer)
+      if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
       window.removeEventListener("resize", resize)
       window.removeEventListener("nomad-tour-action", onTourAction)
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("pointerup", onMapSelectionPointerUp)
+      window.removeEventListener("pointercancel", onMapSelectionPointerCancel)
+      mapEl.removeEventListener("pointerdown", onMapSelectionPointerDown)
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
       toggleRef.current = () => {}
       replayRef.current = () => {}
       previewRef.current = () => {}
+      clearSelectionRef.current = () => {}
       mapChart.off("mouseover", onMapMouseOver)
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
+      mapChart.off("click", onMapClick)
+      mapChart.off("dataZoom", refreshTooltipLayout)
+      mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)
+      timelineChart.off("click", onTimelineClick)
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
       timelineEl.removeEventListener("wheel", onTimelineWheel)
       renderSceneRef.current = null
@@ -1558,6 +1875,11 @@ function DemoSceneRenderer({
   }, [previewRunId, syncMaster])
 
   useEffect(() => {
+    selectedPingIndexesRef.current = []
+    setSelectedPingIndexes([])
+  }, [chartData])
+
+  useEffect(() => {
     if (!chartData || currentTime !== null) return
     onTimeChange(variant === "preview" ? chartData.timeSequence[0] : chartData.timeSequence[chartData.timeSequence.length - 1])
   }, [chartData, currentTime, onTimeChange, variant])
@@ -1570,8 +1892,28 @@ function DemoSceneRenderer({
 
   if (!scene) return null
 
+  const selectedPings = selectedPingIndexes.length === 2 && chartData
+    ? selectedPingIndexes.map((pingIndex) => chartData.pings[pingIndex])
+    : null
+  const selectedPing = selectedPingIndexes.length === 1 && chartData ? chartData.pings[selectedPingIndexes[0]] : null
+  const selectedPingDistance = selectedPings
+    ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
+    : 0
+  const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
+
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+      {(selectedPings || selectedPing) && (
+        <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
+          {selectedPings ? <>
+            <div>Ping comparison</div>
+            <div>Ping {selectedPings[0].i + 1}: {selectedPings[0].time}</div>
+            <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
+            <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
+            <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
+          </> : <div>Ping {selectedPing!.i + 1} selected</div>}
+        </div>
+      )}
       {syncMaster && variant === "full" && (
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
@@ -1616,6 +1958,9 @@ function DemoSceneRenderer({
           <span className="font-mono tracking-normal text-[#202124]">
             {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) : "--:--:--"}
           </span>
+          {selectedPingIndexes.length > 0 && (
+            <button type="button" onClick={() => clearSelectionRef.current()} className="rounded border border-[#bfc6bb] bg-white px-2 py-0.5 text-[10px] text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]">Clear selection</button>
+          )}
         </div>
       </div>
     </div>

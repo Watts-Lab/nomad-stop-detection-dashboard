@@ -29,7 +29,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background text-foreground nomad-shell">
       <NomadNav currentView="about" />
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10 sm:px-5">
+      <main className="nomad-page-frame flex flex-col gap-6 py-10">
         <section className={`${revealClass()} space-y-3`}>
           <h1 className="text-3xl font-bold">About</h1>
           <p className="max-w-3xl text-base leading-relaxed text-[#b6c9dc]">

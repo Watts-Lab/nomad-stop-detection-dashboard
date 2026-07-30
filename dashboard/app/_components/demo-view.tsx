@@ -95,7 +95,7 @@ export function DemoView({
             </Button>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4" data-tour="tour-layers">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
             Ground Truth
@@ -148,7 +148,7 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button variant="outline" onClick={openMetricsFromDemo} size="lg" className="w-full">
+                <Button variant="outline" onClick={openMetricsFromDemo} size="lg" className="w-full" data-tour="tour-metrics">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
                 </Button>

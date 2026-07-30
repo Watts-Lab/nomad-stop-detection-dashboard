@@ -27,6 +27,11 @@ const demoTrajectoryOptions = [
     name: "Four-stop (noisier)",
     note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
   },
+  {
+    id: "commute-return",
+    name: "Commute return",
+    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
+  },
 ]
 
 export function DemoView({

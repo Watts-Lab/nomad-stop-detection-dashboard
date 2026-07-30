@@ -77,7 +77,7 @@ type SeedScene = {
 
 const stopCacheRoot = publicPath("/cached-results/stop-detection-cache")
 const defaultTrajectory = "two-stop"
-const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha"])
+const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha", "commute-return"])
 
 const algorithmDirectories: Record<string, string> = {
   lachesis: "lachesis",
@@ -96,10 +96,10 @@ const parameterAliases: Record<string, string> = {
   minPts: "min_pts",
 }
 
-let routesPromise: Promise<NonNullable<CompareScene["routes"]>> | null = null
 const manifestCache = new Map<string, Promise<Manifest>>()
 const configsFileCache = new Map<string, Promise<ConfigsFile["configs"]>>()
 const sceneCache = new Map<string, Promise<SceneCache>>()
+const routeCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>()
 const configCache = new Map<string, Promise<ConfigRow[]>>()
 const labelCache = new Map<string, Promise<Map<string, Record<string, unknown>>>>()
 const corePointCache = new Map<string, Promise<Map<string, Record<string, unknown>[]>>>()
@@ -149,9 +149,13 @@ function loadScene(cacheRoot: string) {
   return scene
 }
 
-function loadRoutes() {
-  routesPromise ??= fetchJson<NonNullable<CompareScene["routes"]>>(stopCacheRoot, "routes.json")
-  return routesPromise
+function loadRoutes(cacheRoot: string) {
+  const cached = routeCache.get(cacheRoot)
+  if (cached) return cached
+
+  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json")
+  routeCache.set(cacheRoot, routes)
+  return routes
 }
 
 function loadConfigs(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry, manifest: Manifest) {
@@ -306,7 +310,7 @@ function prettyAlgorithmName(algorithm: string) {
 }
 
 async function sceneForSeed(cacheRoot: string, seed: number) {
-  const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes()])
+  const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes(cacheRoot)])
   const user = scene.users[Math.abs(seed) % scene.users.length]
   const userPings = scene.pings
     .filter((ping) => ping.user_id === user)

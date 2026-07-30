@@ -12,8 +12,8 @@ import pandas as pd
 
 import nomad.data as data_folder
 import nomad.io.base as loader
-import nomad.stop_detection.density as DENSITY
-import nomad.stop_detection.sequential as SEQUENTIAL
+import nomad.stop_detection.density_algs as DENSITY
+import nomad.stop_detection.sequential_algs as SEQUENTIAL
 import nomad.stop_detection.utils as STOP_UTILS
 import nomad.visit_attribution.visit_attribution as visits
 from nomad.city_gen import City
@@ -567,6 +567,9 @@ def add_metadata(frame, config_id):
 
 
 def compact_core_points(frame):
+    frame = frame.copy()
+    if "core_timestamp" not in frame:
+        frame["core_timestamp"] = frame["timestamp"]
     frame = frame.loc[:, CORE_POINT_COLUMNS].copy()
     frame["user_id"] = frame["user_id"].astype("category")
     frame["role"] = frame["role"].astype("int8")

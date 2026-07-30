@@ -9,7 +9,7 @@ from nomad.traj_gen import Population
 
 
 CONFIG_DIR = Path(__file__).resolve().parent
-DEFAULT_CONFIG_KEYS = ["2_stops", "low_ha", "high_ha"]
+DEFAULT_CONFIG_KEYS = ["2_stops", "low_ha", "high_ha", "commute_return"]
 
 
 def parse_args():

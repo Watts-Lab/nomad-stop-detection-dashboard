@@ -55,6 +55,16 @@
 
     const chart = echarts.init(document.getElementById("chart"));
     const parameterLabel = (value) => value === "delta_roam" ? "{delta|Δ}{sub|roam}" : value;
+    const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
+    const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread"]);
+    const pointTooltip = (event) => {
+      if (!tooltipSeries.has(event.seriesName)) return "";
+      const [pointX, recall, userId] = event.value;
+      const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
+        .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
+        .join("");
+      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Accuracy</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
+    };
     let pendingTourFocus = null;
 
     window.addEventListener("message", (event) => {
@@ -188,7 +198,17 @@
             containLabel: true,
           },
           tooltip: {
-            show: false,
+            trigger: "item",
+            confine: true,
+            backgroundColor: "rgba(17, 24, 39, 0.96)",
+            borderColor: "#4b5563",
+            borderWidth: 1,
+            padding: 10,
+            textStyle: {
+              color: "#f3f4f6",
+              fontSize: 12,
+            },
+            formatter: pointTooltip,
           },
           xAxis: {
             type: "value",
@@ -257,6 +277,9 @@
                 itemStyle: {
                   opacity: 0.025,
                 },
+              },
+              tooltip: {
+                show: false,
               },
               z: 3,
             },
@@ -348,6 +371,15 @@
               itemStyle: {
                 color: "rgba(44, 160, 44, 0.6)",
               },
+              emphasis: {
+                scale: 1.8,
+                itemStyle: {
+                  borderColor: "#ffffff",
+                  borderWidth: 2,
+                  shadowBlur: 8,
+                  shadowColor: "rgba(0, 0, 0, 0.55)",
+                },
+              },
               z: 9,
             },
             {
@@ -356,7 +388,6 @@
               type: "line",
               data: emptyHighlight,
               animation: false,
-              silent: true,
               symbol: "circle",
               symbolSize: 7,
               showInLegend: false,
@@ -366,6 +397,15 @@
               },
               itemStyle: {
                 color: "#2ca02c",
+              },
+              emphasis: {
+                scale: 1.8,
+                itemStyle: {
+                  borderColor: "#ffffff",
+                  borderWidth: 2,
+                  shadowBlur: 8,
+                  shadowColor: "rgba(0, 0, 0, 0.55)",
+                },
               },
               z: 10,
             },
@@ -394,13 +434,15 @@
               data: emptyHighlight,
               animation: false,
               symbol: "circle",
-              symbolSize: 8,
+              symbolSize: 14,
               silent: true,
               showInLegend: false,
               itemStyle: {
                 color: "#b91c1c",
-                borderColor: "rgba(255, 255, 255, 0)",
-                borderWidth: 1.5,
+                borderColor: "#ffffff",
+                borderWidth: 2.5,
+                shadowBlur: 10,
+                shadowColor: "rgba(0, 0, 0, 0.6)",
               },
               z: 12,
             },
@@ -435,7 +477,7 @@
 
         const renderHighlight = () => {
           // A pinned user stays drawn while hovering another one, so both spreads show at once.
-          const hovered = hoveredPoint && (!pinnedPoint || hoveredPoint[2] !== pinnedPoint[2]) ? hoveredPoint : null;
+          const hovered = hoveredPoint;
           if (!hovered && !pinnedPoint) {
             chart.setOption({
               series: [

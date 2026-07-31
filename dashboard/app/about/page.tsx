@@ -13,7 +13,7 @@ const teamGroups = [
       {
         name: "Jorge Barreras",
         initials: "JB",
-        photo: publicPath("/headshots/Jorge_Barreras.png"),
+        photo: publicPath("/headshots/Jorge_Barreras.jpg"),
         role: "Postdoctoral Researcher · Principal Investigator",
         links: [
           { label: "GitHub", href: "https://github.com/paco-barreras", icon: Github },

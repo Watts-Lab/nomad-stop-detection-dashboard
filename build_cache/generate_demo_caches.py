@@ -1,13 +1,13 @@
 import argparse
-import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 
-from generate_algorithm_csv_cache import DEFAULT_ALGORITHMS
-from generate_algorithm_csv_cache import REPO_ROOT
-from generate_algorithm_csv_cache import generate_cache
+from generate_algorithm_cache import DEFAULT_ALGORITHMS
+from generate_algorithm_cache import DEFAULT_WORKERS
+from generate_algorithm_cache import REPO_ROOT
+from generate_algorithm_cache import generate_cache
 from generate_gt_trajectories import generate_trajectories
 
 
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument("--max-users", type=int, default=None)
     parser.add_argument("--scene-only", action="store_true")
     parser.add_argument("--skip-trajectories", action="store_true")
-    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     return parser.parse_args()
 
 

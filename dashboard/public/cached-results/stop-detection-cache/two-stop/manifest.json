@@ -1,6 +1,6 @@
 {
   "config_key": "2_stops",
-  "format": "stop-detection-dashboard-parquet-cache-v2",
+  "format": "stop-detection-dashboard-parquet-cache-v3",
   "coordinate_precision": 0,
   "coordinate_dtype": "int",
   "algorithm_keys": [
@@ -27,8 +27,7 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "lachesis/stops/part-0.parquet",
-      "stops_dataset": "lachesis/stops",
+      "stops": "lachesis/stops.parquet",
       "metrics": "lachesis/metrics.parquet"
     },
     "sequential_centroid": {
@@ -45,9 +44,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "sequential_centroid/stops/part-0.parquet",
-      "stops_dataset": "sequential_centroid/stops",
-      "metrics": "sequential_centroid/metrics.parquet"
+      "stops": "sequential_centroid/stops.parquet",
+      "metrics": "sequential_centroid/metrics.parquet",
+      "core_points": "sequential_centroid/core_points.parquet"
     },
     "sequential_first": {
       "display_name": "Sequential (first-anchored)",
@@ -63,9 +62,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "sequential_first/stops/part-0.parquet",
-      "stops_dataset": "sequential_first/stops",
-      "metrics": "sequential_first/metrics.parquet"
+      "stops": "sequential_first/stops.parquet",
+      "metrics": "sequential_first/metrics.parquet",
+      "core_points": "sequential_first/core_points.parquet"
     },
     "gridbased": {
       "display_name": "Grid-Based",
@@ -80,8 +79,7 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "gridbased/stops/part-0.parquet",
-      "stops_dataset": "gridbased/stops",
+      "stops": "gridbased/stops.parquet",
       "metrics": "gridbased/metrics.parquet"
     },
     "st_dbscan": {
@@ -98,9 +96,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "st_dbscan/stops/part-0.parquet",
-      "stops_dataset": "st_dbscan/stops",
-      "metrics": "st_dbscan/metrics.parquet"
+      "stops": "st_dbscan/stops.parquet",
+      "metrics": "st_dbscan/metrics.parquet",
+      "core_points": "st_dbscan/core_points.parquet"
     },
     "dbstop": {
       "display_name": "DBSTOP",
@@ -117,9 +115,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "dbstop/stops/part-0.parquet",
-      "stops_dataset": "dbstop/stops",
-      "metrics": "dbstop/metrics.parquet"
+      "stops": "dbstop/stops.parquet",
+      "metrics": "dbstop/metrics.parquet",
+      "core_points": "dbstop/core_points.parquet"
     },
     "seqscan": {
       "display_name": "SeqScan",
@@ -136,9 +134,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "seqscan/stops/part-0.parquet",
-      "stops_dataset": "seqscan/stops",
-      "metrics": "seqscan/metrics.parquet"
+      "stops": "seqscan/stops.parquet",
+      "metrics": "seqscan/metrics.parquet",
+      "core_points": "seqscan/core_points.parquet"
     },
     "hdbscan": {
       "display_name": "HDBSCAN",
@@ -155,9 +153,9 @@
         "user_id",
         "timestamp"
       ],
-      "stops": "hdbscan/stops/part-0.parquet",
-      "stops_dataset": "hdbscan/stops",
-      "metrics": "hdbscan/metrics.parquet"
+      "stops": "hdbscan/stops.parquet",
+      "metrics": "hdbscan/metrics.parquet",
+      "core_points": "hdbscan/core_points.parquet"
     }
   },
   "users": [
@@ -429,6 +427,7 @@
   },
   "shared_files": {
     "scene": "scene.json",
+    "routes": "routes.json",
     "trajectory": "trajectory/part-0.parquet",
     "trajectory_dataset": "trajectory",
     "diary": "diary/part-0.parquet",

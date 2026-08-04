@@ -1,9 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { Pause, Play, RotateCcw } from "lucide-react"
+import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -2079,11 +2081,21 @@ export function CompareAnimationPanel({
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const sceneMetadata = panel?.scene ? `Agent: ${panel.scene.user_id}` : null
+  const learnAlgorithmId = panel?.algo === "tadbscan" ? "dbscan" : panel?.algo
 
   return (
     <Card className="h-full min-h-0 overflow-hidden py-0">
       <CardHeader className="py-3 px-4 shrink-0">
-        <CardTitle className="text-base font-semibold">{panel?.title ?? "Preparing visualization"}</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          {panel?.title ?? "Preparing visualization"}
+          {learnAlgorithmId && (
+            <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
+              <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>
+                <HelpCircle className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
+        </CardTitle>
         {mode === "compare" && panel?.params && (
           <p className="text-xs text-white">{Object.entries(panel.params).map(([name, value]) => `${parameterDisplayName(name)}: ${value}`).join(" · ")}</p>
         )}

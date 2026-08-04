@@ -103,10 +103,10 @@ export default function AboutPage() {
             </h1>
             <div className="max-w-xl space-y-5 text-sm leading-relaxed text-[#b6c9dc] sm:text-base">
               <p>
-                NOMAD, the Network for Open Mobility Analysis and Data, is an NSF-funded initiative of the Computational Social Science Lab at the University of Pennsylvania. Our  mission is to expand access to high-precision human mobility data, to offer technical and scientific guidance on how to work with it, and to provide the tools to analyze it at scale and translate insights into research, applications, and decision-support tools. In doing so, NOMAD brings together researchers, industry partners, and decision-makers around the privacy-centered and socially beneficial use of human mobility data.
+                NOMAD, the Network for Open Mobility Analysis and Data, is an NSF-funded initiative of the Computational Social Science Lab at the University of Pennsylvania. Its mission is to expand access to high-precision human mobility data, to offer technical and scientific guidance on how to work with it, and to provide the tools to analyze it at scale and translate insights into research, applications, and decision-support tools. In doing so, NOMAD brings together researchers, industry partners, and decision-makers around the privacy-centered and socially beneficial use of human mobility data.
               </p>
               <p>
-                Furthermore, researchers can engage with NOMAD to learn about this type of data, its potential and limitations. Through tutorials and other learning resources, users can acquire the skills and knowledge necessary to transform raw mobility data into metrics and insights, as well as the current state of research in several human mobility applications.
+                Furthermore, researchers can engage with NOMAD to learn about this type of data, its potential and limitations. Through tutorials and other learning resources, users can acquire the skills and knowledge necessary to transform raw mobility data into metrics and insights, and can familiarize themselves with the current state of research in several human mobility applications.
               </p>
             </div>
           </section>
@@ -116,7 +116,8 @@ export default function AboutPage() {
               <h2 className="text-xl font-semibold">Code availability</h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 The source code for this dashboard is publicly available on GitHub. For questions about reuse,
-                licensing, data access, or collaboration, contact the NOMAD team.
+                licensing, data access, or collaboration, contact the NOMAD team at{" "}
+                <strong>nomad@seas.upenn.edu</strong>.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

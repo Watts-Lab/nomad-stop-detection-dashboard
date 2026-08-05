@@ -132,15 +132,8 @@
 
   .nomad-page-frame {
     width: 100%;
-    max-width: 84rem;
     margin-inline: auto;
-    padding-inline: 1rem;
-  }
-
-  @media (min-width: 40rem) {
-    .nomad-page-frame {
-      padding-inline: 1.25rem;
-    }
+    padding-inline: clamp(1rem, 2vw, 3rem);
   }
 
   .nomad-action {

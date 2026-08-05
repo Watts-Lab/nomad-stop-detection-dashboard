@@ -102,6 +102,29 @@ def main():
     destinations.to_csv(output_dir / "exp_2_stops_aws.csv", index=False)
 
     ######################################################################
+    # Destination diary: commute return
+    ######################################################################
+    start_time = pd.to_datetime(
+        [
+            "2024-06-01 07:30-04:00",
+            "2024-06-01 08:30-04:00",
+            "2024-06-01 17:30-04:00",
+        ]
+    )
+    unix_timestamp = [int(t.timestamp()) for t in start_time]
+    duration = [30, 480, 120]
+    location = ["h-x14-y11", "w-x17-y8", "h-x14-y11"]
+    destinations = pd.DataFrame(
+        {
+            "datetime": start_time,
+            "timestamp": unix_timestamp,
+            "duration": duration,
+            "location": location,
+        }
+    )
+    destinations.to_csv(output_dir / "exp_commute_return.csv", index=False)
+
+    ######################################################################
     # Config family: four-stop
     ######################################################################
     N_reps = 5
@@ -175,6 +198,31 @@ def main():
             "sparse_path": str(output_dir / "sparse_default"),
             "diaries_path": str(output_dir / "diaries_default"),
             "homes_path": str(output_dir / "homes_default"),
+        },
+        "agent_params": {
+            "agent_homes": "h-x14-y11",
+            "agent_workplaces": "w-x17-y8",
+            "seed_trajectory": list(range(250)),
+            "seed_sparsity": list(range(250)),
+            "beta_ping": 7,
+            "beta_durations": None,
+            "beta_start": None,
+            "ha": 15 / 15,
+        },
+    }
+
+    registry["commute_return"] = {
+        "dt": 0.2,
+        "N": 250,
+        "name_count": 2,
+        "name_seed": 2025,
+        "city_file": str(data_dir / "garden-city.gpkg"),
+        "buildings_file": str(data_dir / "garden-city-buildings-mercator.parquet"),
+        "destination_diary_file": str(output_dir / "exp_commute_return.csv"),
+        "output_files": {
+            "sparse_path": str(output_dir / "sparse_commute_return"),
+            "diaries_path": str(output_dir / "diaries_commute_return"),
+            "homes_path": str(output_dir / "homes_commute_return"),
         },
         "agent_params": {
             "agent_homes": "h-x14-y11",

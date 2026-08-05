@@ -20,8 +20,8 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 - **Tailwind CSS 4** provides utility-first styling and theme tokens.
 - **shadcn/ui-style components with Radix UI primitives** provide accessible controls such as cards, selects, tabs, dialogs, inputs, and tooltips.
 - **Lucide React** supplies the dashboard icons.
-- **Python scripts with matplotlib, NumPy, pandas, and GeoPandas** support notebook-derived algorithm visualizations and metric generation workflows.
-- **Cached results and public notebook figures** let the dashboard show stop detection outputs quickly during local development.
+- **Python scripts with NumPy, pandas, GeoPandas, and NOMAD** generate the static stop-detection cache.
+- **Cached parquet/JSON results** let the dashboard show stop detection outputs quickly without a live Python runtime.
 
 ## Project Structure
 
@@ -30,10 +30,9 @@ The dashboard currently focuses on algorithms and algorithm families such as DBS
 ├── dashboard/              # Next.js application
 │   ├── app/                # App Router pages and API routes
 │   ├── components/         # UI components
-│   ├── public/             # Static images and notebook figures
-│   └── scripts/            # Python visualization and metrics helpers
-├── build_cache/            # Source notebooks and generator scripts
-├── cached_results/         # Local cached API/experiment outputs and screenshots
+│   └── public/             # Static images used by the dashboard
+├── build_cache/            # Cache generation scripts
+├── cached_results/         # Generated dashboard cache artifacts
 └── README.md
 ```
 
@@ -47,11 +46,13 @@ npm run dev
 
 ## Static Cache
 
-The dashboard reads comparison and metrics data directly from
-`dashboard/public/cached-results`. The source cache is kept in `cached_results`.
+The dashboard reads comparison and metrics data directly from `dashboard/public/cached-results`.
+The source cache is generated ahead of time and kept in `cached_results`.
 The app does not require Next API routes or a Python backend at runtime.
 
-## Notes
+Regenerate the source caches with:
 
-- Static placeholder figures are in `dashboard/public`.
-- Python scripts in `dashboard/scripts` generate cached data and are not used by the deployed dashboard.
+```bash
+python3 -m pip install -r build_cache/requirements.txt
+python3 build_cache/generate_demo_caches.py
+```

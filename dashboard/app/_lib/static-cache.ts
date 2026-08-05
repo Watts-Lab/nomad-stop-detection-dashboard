@@ -5,6 +5,7 @@ import type { CompareApiResponse, ComparePanelResponse, CompareScene } from "./t
 
 type ComparePayload = {
   seed?: number
+  userId?: string
   trajectory?: string
   mode?: "single" | "compare"
   left?: {
@@ -21,6 +22,7 @@ type ManifestEntry = {
   display_name: string
   parameter_columns: string[]
   labels: string
+  core_points?: string
 }
 
 type Manifest = {
@@ -33,6 +35,7 @@ type Manifest = {
 type ConfigsFile = {
   configs: Array<Record<string, unknown> & {
     algorithm: string
+    config_id: number
     key: string
     label_column: string
   }>
@@ -40,6 +43,7 @@ type ConfigsFile = {
 
 type ConfigRow = {
   params: Record<string, number>
+  config_id: number
   label_column: string
   key: string
 }
@@ -74,7 +78,7 @@ type SeedScene = {
 
 const stopCacheRoot = publicPath("/cached-results/stop-detection-cache")
 const defaultTrajectory = "two-stop"
-const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha"])
+const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha", "commute-return"])
 
 const algorithmDirectories: Record<string, string> = {
   lachesis: "lachesis",
@@ -93,12 +97,13 @@ const parameterAliases: Record<string, string> = {
   minPts: "min_pts",
 }
 
-let routesPromise: Promise<NonNullable<CompareScene["routes"]>> | null = null
 const manifestCache = new Map<string, Promise<Manifest>>()
 const configsFileCache = new Map<string, Promise<ConfigsFile["configs"]>>()
 const sceneCache = new Map<string, Promise<SceneCache>>()
+const routeCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>()
 const configCache = new Map<string, Promise<ConfigRow[]>>()
 const labelCache = new Map<string, Promise<Map<string, Record<string, unknown>>>>()
+const corePointCache = new Map<string, Promise<Map<string, Record<string, unknown>[]>>>()
 
 function cacheRootForTrajectory(trajectory: string | undefined) {
   const trajectoryDirectory = trajectory && trajectoryDirectories.has(trajectory) ? trajectory : defaultTrajectory
@@ -145,9 +150,13 @@ function loadScene(cacheRoot: string) {
   return scene
 }
 
-function loadRoutes() {
-  routesPromise ??= fetchJson<NonNullable<CompareScene["routes"]>>(stopCacheRoot, "routes.json")
-  return routesPromise
+function loadRoutes(cacheRoot: string) {
+  const cached = routeCache.get(cacheRoot)
+  if (cached) return cached
+
+  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json")
+  routeCache.set(cacheRoot, routes)
+  return routes
 }
 
 function loadConfigs(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry, manifest: Manifest) {
@@ -163,6 +172,7 @@ function loadConfigs(cacheRoot: string, algorithmDirectory: string, entry: Manif
           .map((column) => [column, Number(row[column])] as const)
           .filter(([, value]) => Number.isFinite(value)),
       ),
+      config_id: Number(row.config_id),
       label_column: String(row.label_column),
       key: String(row.key),
     })))
@@ -180,6 +190,26 @@ function loadLabels(cacheRoot: string, algorithmDirectory: string, entry: Manife
   ))
   labelCache.set(cacheKey, labels)
   return labels
+}
+
+function loadCorePoints(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry) {
+  if (!entry.core_points) return null
+  const cacheKey = cacheRoot + "|" + algorithmDirectory
+  const cached = corePointCache.get(cacheKey)
+  if (cached) return cached
+
+  const corePoints = readParquet(cacheRoot, entry.core_points).then((rows) => {
+    const map = new Map<string, Record<string, unknown>[]>()
+    for (const row of rows) {
+      const key = Number(row.config_id) + "|" + String(row.user_id)
+      const existing = map.get(key)
+      if (existing) existing.push(row)
+      else map.set(key, [row])
+    }
+    return map
+  })
+  corePointCache.set(cacheKey, corePoints)
+  return corePoints
 }
 
 function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Record<string, number>) {
@@ -207,20 +237,54 @@ async function labelsForUser(
   cacheRoot: string,
   algorithm: string,
   userId: string,
+  seedPings: CompareScene["pings"],
   orderedTimestamps: number[],
   params: Record<string, number>,
 ) {
   const manifest = await loadManifest(cacheRoot)
   const algorithmDirectory = algorithmDirectories[algorithm] ?? algorithm
   const entry = manifest.algorithms[algorithmDirectory]
-  const [configs, labels] = await Promise.all([
+  const [configs, labels, corePointIndex] = await Promise.all([
     loadConfigs(cacheRoot, algorithmDirectory, entry, manifest),
     loadLabels(cacheRoot, algorithmDirectory, entry),
+    loadCorePoints(cacheRoot, algorithmDirectory, entry),
   ])
   const config = resolveConfig(entry, configs, params)
+  const coreRows = corePointIndex?.get(config.config_id + "|" + userId) ?? []
+  const pingByTimestamp = new Map(seedPings.map((ping) => [ping.timestamp, ping]))
+  const coreTimestampByPoint = new Map<string, number>()
+  for (const row of coreRows) {
+    if (Number(row.role) !== 1) continue
+    const timestamp = Number(row.timestamp)
+    const coreTimestamp = Number(row.core_timestamp)
+    coreTimestampByPoint.set(
+      Number(row.cluster) + "|" + timestamp,
+      Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+    )
+  }
 
   return {
     labels: orderedTimestamps.map((timestamp) => Number(labels.get(userId + "|" + timestamp)?.[config.label_column] ?? -1)),
+    corePoints: coreRows.flatMap((row) => {
+      const timestamp = Number(row.timestamp)
+      const sourceTimestamp = Number(row.source_timestamp)
+      const coreTimestamp = Number(row.core_timestamp)
+      const point = pingByTimestamp.get(timestamp)
+      const sourcePoint = pingByTimestamp.get(sourceTimestamp)
+      if (!point || !sourcePoint) return []
+      return [{
+        timestamp,
+        role: Number(row.role),
+        sourceTimestamp,
+        coreTimestamp: Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+        sourceCoreTimestamp: coreTimestampByPoint.get(Number(row.cluster) + "|" + sourceTimestamp) ?? sourceTimestamp,
+        cluster: Number(row.cluster),
+        x: point.x,
+        y: point.y,
+        sourceX: sourcePoint.x,
+        sourceY: sourcePoint.y,
+      }]
+    }),
     configKey: config.key,
   }
 }
@@ -246,9 +310,13 @@ function prettyAlgorithmName(algorithm: string) {
   return names[algorithm] ?? algorithm.toUpperCase()
 }
 
-async function sceneForSeed(cacheRoot: string, seed: number) {
-  const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes()])
-  const user = scene.users[Math.abs(seed) % scene.users.length]
+async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: string) {
+  const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes(cacheRoot)])
+  // A metrics-chart click asks for one specific agent; fall back to the seed rotation
+  // when that agent isn't part of the selected trajectory's scene.
+  const user = requestedUserId && scene.users.includes(requestedUserId)
+    ? requestedUserId
+    : scene.users[Math.abs(seed) % scene.users.length]
   const userPings = scene.pings
     .filter((ping) => ping.user_id === user)
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -286,7 +354,14 @@ async function buildPanel(
   scene: SeedScene,
 ) {
   const normalized = normalizeAlgorithm(algorithm)
-  const cachedLabels = await labelsForUser(cacheRoot, normalized, scene.userId, scene.orderedTimestamps, params ?? {})
+  const cachedLabels = await labelsForUser(
+    cacheRoot,
+    normalized,
+    scene.userId,
+    scene.response.pings,
+    scene.orderedTimestamps,
+    params ?? {},
+  )
 
   return {
     algo: normalized,
@@ -295,6 +370,7 @@ async function buildPanel(
     scene: scene.response,
     params: params ?? {},
     labels: cachedLabels.labels,
+    corePoints: cachedLabels.corePoints,
     configKey: cachedLabels.configKey,
   } satisfies ComparePanelResponse
 }
@@ -303,9 +379,10 @@ export async function loadCompareData(payload: ComparePayload): Promise<CompareA
   const mode = payload.mode === "single" ? "single" : "compare"
   const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
   const cacheRoot = cacheRootForTrajectory(payload.trajectory)
-  const scene = await sceneForSeed(cacheRoot, seed)
+  const scene = await sceneForSeed(cacheRoot, seed, payload.userId)
   const result: CompareApiResponse = {
     seed,
+    trajectory: payload.trajectory && trajectoryDirectories.has(payload.trajectory) ? payload.trajectory : defaultTrajectory,
     mode,
     left: await buildPanel(cacheRoot, payload.left?.algo, payload.left?.params, scene),
   }

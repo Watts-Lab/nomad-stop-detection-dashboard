@@ -19,7 +19,7 @@ const navItems = [
 export function NomadNav({ currentView }: { currentView: DashboardView | "about" }) {
   return (
     <header className="sticky top-0 z-20 border-b border-[#263449] bg-[#111625]/92 backdrop-blur">
-      <div className="nomad-page-frame flex h-[74px] items-center justify-between gap-4">
+      <div className="nomad-page-frame flex h-[74px] items-center justify-between gap-[clamp(1rem,2vw,3rem)]">
         <Link
           href="/"
           prefetch={false}
@@ -32,12 +32,12 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
             width={212}
             height={37}
             priority
-            className="h-8 w-auto brightness-0 invert"
+            className="h-[clamp(2rem,1.7rem+0.5vw,2.5rem)] w-auto brightness-0 invert"
           />
         </Link>
-        <nav className="hidden items-center gap-4 text-[15px] font-medium text-[#94a1b7] lg:flex">
+        <nav className="hidden items-center gap-[clamp(1rem,1vw,2rem)] text-[clamp(0.9375rem,0.8rem+0.25vw,1.125rem)] font-medium text-[#94a1b7] lg:flex">
           {navItems.map((item, index) => (
-            <span key={item.view} className="flex items-center gap-4">
+            <span key={item.view} className="flex items-center gap-[clamp(1rem,1vw,2rem)]">
               {index > 0 && <span aria-hidden="true" className="text-[#3a465d]">|</span>}
               <Link
                 href={item.href}
@@ -54,7 +54,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Button asChild size="lg" className="nomad-action h-11 px-4 text-base sm:px-6">
+          <Button asChild size="lg" className="nomad-action h-[clamp(2.75rem,2.4rem+0.5vw,3.25rem)] px-[clamp(1rem,1vw,1.75rem)] text-[clamp(1rem,0.9rem+0.2vw,1.125rem)]">
             <Link href="/?view=demo" prefetch={false}>
               <Play className="h-5 w-5 fill-current" />
               <span className="hidden sm:inline">Run Demo</span>

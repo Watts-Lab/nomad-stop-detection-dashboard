@@ -49,7 +49,7 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
               <div className="home-copy-reveal home-copy-reveal-3">
                 <h2 className="text-lg font-semibold text-[#f2f4eb]">What Stop Detection Is</h2>
                 <p className="mt-2 text-base leading-relaxed text-[#b6c9dc]">
-                  Stop detection identifies intervals where a person remains stationary long enough to count as a meaningful visit, reducing raw GPS streams into mobility events.
+                  A critical step in making sense of human mobility trajectories is stop detection. Stop detection enriches raw trajectory data with semantic information about visits to places of interest (POIs), trips between locations, and recurring mobility routines. This process applies a stop-detection algorithm to identify stationary segments in the trajectory of a moving object through spatio-temporal clustering of location records. Typically, detected stops are represented as tuples of the form (user_id, x, y, t_start, t_end), identifying the individual, median stop coordinates, and the first and last timestamps of the pings that make up the stop.
                 </p>
               </div>
               <div className="home-copy-reveal home-copy-reveal-4">

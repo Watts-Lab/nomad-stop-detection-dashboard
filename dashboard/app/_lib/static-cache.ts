@@ -5,6 +5,7 @@ import type { CompareApiResponse, ComparePanelResponse, CompareScene } from "./t
 
 type ComparePayload = {
   seed?: number
+  userId?: string
   trajectory?: string
   mode?: "single" | "compare"
   left?: {
@@ -309,9 +310,13 @@ function prettyAlgorithmName(algorithm: string) {
   return names[algorithm] ?? algorithm.toUpperCase()
 }
 
-async function sceneForSeed(cacheRoot: string, seed: number) {
+async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: string) {
   const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes(cacheRoot)])
-  const user = scene.users[Math.abs(seed) % scene.users.length]
+  // A metrics-chart click asks for one specific agent; fall back to the seed rotation
+  // when that agent isn't part of the selected trajectory's scene.
+  const user = requestedUserId && scene.users.includes(requestedUserId)
+    ? requestedUserId
+    : scene.users[Math.abs(seed) % scene.users.length]
   const userPings = scene.pings
     .filter((ping) => ping.user_id === user)
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -349,7 +354,14 @@ async function buildPanel(
   scene: SeedScene,
 ) {
   const normalized = normalizeAlgorithm(algorithm)
-  const cachedLabels = await labelsForUser(cacheRoot, normalized, scene.userId, scene.response.pings, scene.orderedTimestamps, params ?? {})
+  const cachedLabels = await labelsForUser(
+    cacheRoot,
+    normalized,
+    scene.userId,
+    scene.response.pings,
+    scene.orderedTimestamps,
+    params ?? {},
+  )
 
   return {
     algo: normalized,
@@ -367,9 +379,10 @@ export async function loadCompareData(payload: ComparePayload): Promise<CompareA
   const mode = payload.mode === "single" ? "single" : "compare"
   const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
   const cacheRoot = cacheRootForTrajectory(payload.trajectory)
-  const scene = await sceneForSeed(cacheRoot, seed)
+  const scene = await sceneForSeed(cacheRoot, seed, payload.userId)
   const result: CompareApiResponse = {
     seed,
+    trajectory: payload.trajectory && trajectoryDirectories.has(payload.trajectory) ? payload.trajectory : defaultTrajectory,
     mode,
     left: await buildPanel(cacheRoot, payload.left?.algo, payload.left?.params, scene),
   }

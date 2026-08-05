@@ -10,8 +10,10 @@ export type ComparePanelResponse = {
   labels?: number[]
   corePoints?: Array<{
     timestamp: number
-    role: string
+    role: number
     sourceTimestamp: number
+    coreTimestamp: number
+    sourceCoreTimestamp: number
     cluster: number
     x: number
     y: number

@@ -24,33 +24,33 @@ export const LEARN_FAMILIES = [
 
 export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   Lachesis: {
-    source: "delta_roam_vs_acc_exp.ipynb",
+    source: "Generated stop-detection cache",
     sweep_parameter: "delta_roam",
     sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
     fixed_parameters: ["dt_max=60", "dur_min=5"],
   },
   "Sequential (Centroid)": {
-    source: "delta_roam_vs_acc_exp.ipynb",
+    source: "Generated stop-detection cache",
     sweep_parameter: "delta_roam",
     fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
   },
   "Sequential (First)": {
-    source: "delta_roam_vs_acc_exp.ipynb",
+    source: "Generated stop-detection cache",
     sweep_parameter: "delta_roam",
     fixed_parameters: ["dt_max=60", "method='sliding'", "dur_min=5"],
   },
   SeqScan: {
-    source: "dist_thresh_vs_acc_exp.ipynb",
+    source: "Generated stop-detection cache",
     sweep_parameter: "dist_thresh",
     fixed_parameters: ["time_thresh=60", "min_pts=2", "back_merge=False", "dur_min=5"],
   },
   "ST-DBSCAN": {
-    source: "dist_thresh_vs_acc_exp.ipynb",
+    source: "Generated stop-detection cache",
     sweep_parameter: "dist_thresh",
     fixed_parameters: ["time_thresh=60", "min_pts=2", "remove_overlaps=True"],
   },
   DBSTOP: {
-    source: "ta_seqscan_examples.ipynb (dashboard compare path)",
+    source: "Generated stop-detection cache",
     sweep_parameter: "dist_thresh",
     fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "back_merge=False"],
   },

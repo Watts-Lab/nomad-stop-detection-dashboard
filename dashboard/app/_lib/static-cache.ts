@@ -78,7 +78,7 @@ type SeedScene = {
 
 const stopCacheRoot = publicPath("/cached-results/stop-detection-cache")
 const defaultTrajectory = "two-stop"
-const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha"])
+const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha", "commute-return"])
 
 const algorithmDirectories: Record<string, string> = {
   lachesis: "lachesis",
@@ -97,10 +97,10 @@ const parameterAliases: Record<string, string> = {
   minPts: "min_pts",
 }
 
-const routesCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>()
 const manifestCache = new Map<string, Promise<Manifest>>()
 const configsFileCache = new Map<string, Promise<ConfigsFile["configs"]>>()
 const sceneCache = new Map<string, Promise<SceneCache>>()
+const routeCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>()
 const configCache = new Map<string, Promise<ConfigRow[]>>()
 const labelCache = new Map<string, Promise<Map<string, Record<string, unknown>>>>()
 const corePointCache = new Map<string, Promise<Map<string, Record<string, unknown>[]>>>()
@@ -151,17 +151,11 @@ function loadScene(cacheRoot: string) {
 }
 
 function loadRoutes(cacheRoot: string) {
-  const cached = routesCache.get(cacheRoot)
+  const cached = routeCache.get(cacheRoot)
   if (cached) return cached
 
-  const routes = Promise.all([
-    fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json"),
-    fetchJson<NonNullable<CompareScene["routes"]>>(stopCacheRoot, "routes.json"),
-  ]).then(([trajectoryRoutes, sharedRoutes]) => ({
-    ...trajectoryRoutes,
-    streets: sharedRoutes.streets,
-  }))
-  routesCache.set(cacheRoot, routes)
+  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json")
+  routeCache.set(cacheRoot, routes)
   return routes
 }
 
@@ -198,21 +192,21 @@ function loadLabels(cacheRoot: string, algorithmDirectory: string, entry: Manife
   return labels
 }
 
-async function loadCorePoints(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry) {
-  if (!entry.core_points) return new Map<string, Record<string, unknown>[]>()
+function loadCorePoints(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry) {
+  if (!entry.core_points) return null
   const cacheKey = cacheRoot + "|" + algorithmDirectory
   const cached = corePointCache.get(cacheKey)
   if (cached) return cached
 
   const corePoints = readParquet(cacheRoot, entry.core_points).then((rows) => {
-    const grouped = new Map<string, Record<string, unknown>[]>()
+    const map = new Map<string, Record<string, unknown>[]>()
     for (const row of rows) {
-      const key = Number(row.config_id) + "|" + row.user_id
-      const points = grouped.get(key)
-      if (points) points.push(row)
-      else grouped.set(key, [row])
+      const key = Number(row.config_id) + "|" + String(row.user_id)
+      const existing = map.get(key)
+      if (existing) existing.push(row)
+      else map.set(key, [row])
     }
-    return grouped
+    return map
   })
   corePointCache.set(cacheKey, corePoints)
   return corePoints
@@ -243,33 +237,47 @@ async function labelsForUser(
   cacheRoot: string,
   algorithm: string,
   userId: string,
-  pings: CompareScene["pings"],
+  seedPings: CompareScene["pings"],
   orderedTimestamps: number[],
   params: Record<string, number>,
 ) {
   const manifest = await loadManifest(cacheRoot)
   const algorithmDirectory = algorithmDirectories[algorithm] ?? algorithm
   const entry = manifest.algorithms[algorithmDirectory]
-  const [configs, labels, corePoints] = await Promise.all([
+  const [configs, labels, corePointIndex] = await Promise.all([
     loadConfigs(cacheRoot, algorithmDirectory, entry, manifest),
     loadLabels(cacheRoot, algorithmDirectory, entry),
     loadCorePoints(cacheRoot, algorithmDirectory, entry),
   ])
   const config = resolveConfig(entry, configs, params)
-  const pingByTimestamp = new Map(pings.map((ping) => [ping.timestamp, ping]))
+  const coreRows = corePointIndex?.get(config.config_id + "|" + userId) ?? []
+  const pingByTimestamp = new Map(seedPings.map((ping) => [ping.timestamp, ping]))
+  const coreTimestampByPoint = new Map<string, number>()
+  for (const row of coreRows) {
+    if (Number(row.role) !== 1) continue
+    const timestamp = Number(row.timestamp)
+    const coreTimestamp = Number(row.core_timestamp)
+    coreTimestampByPoint.set(
+      Number(row.cluster) + "|" + timestamp,
+      Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+    )
+  }
 
   return {
     labels: orderedTimestamps.map((timestamp) => Number(labels.get(userId + "|" + timestamp)?.[config.label_column] ?? -1)),
-    corePoints: (corePoints.get(config.config_id + "|" + userId) ?? []).flatMap((row) => {
+    corePoints: coreRows.flatMap((row) => {
       const timestamp = Number(row.timestamp)
       const sourceTimestamp = Number(row.source_timestamp)
+      const coreTimestamp = Number(row.core_timestamp)
       const point = pingByTimestamp.get(timestamp)
       const sourcePoint = pingByTimestamp.get(sourceTimestamp)
       if (!point || !sourcePoint) return []
       return [{
         timestamp,
-        role: String(row.role),
+        role: Number(row.role),
         sourceTimestamp,
+        coreTimestamp: Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+        sourceCoreTimestamp: coreTimestampByPoint.get(Number(row.cluster) + "|" + sourceTimestamp) ?? sourceTimestamp,
         cluster: Number(row.cluster),
         x: point.x,
         y: point.y,

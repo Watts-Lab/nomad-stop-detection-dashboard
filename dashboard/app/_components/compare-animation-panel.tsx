@@ -21,6 +21,7 @@ const DEMO_CLUSTER_COLORS = [
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
+type PlaybackState = "playing" | "paused" | "complete"
 
 function DemoSceneRenderer({
   panel,
@@ -34,6 +35,8 @@ function DemoSceneRenderer({
   onPreviewComplete,
   previewRunId = 0,
   onReplayStart,
+  sharedPlaybackState = "complete",
+  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse
   mode: "single" | "compare"
@@ -46,6 +49,8 @@ function DemoSceneRenderer({
   onPreviewComplete?: () => void
   previewRunId?: number
   onReplayStart?: () => void
+  sharedPlaybackState?: PlaybackState
+  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const scene = panel.scene
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -54,6 +59,8 @@ function DemoSceneRenderer({
   const replayRef = useRef<() => void>(() => {})
   const previewRef = useRef<() => void>(() => {})
   const onReplayStartRef = useRef(onReplayStart)
+  const sharedPlaybackStateRef = useRef(sharedPlaybackState)
+  const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
@@ -215,9 +222,10 @@ function DemoSceneRenderer({
       const pingIndex = pingIndexByTimestamp.get(point.timestamp)
       const sourceIndex = pingIndexByTimestamp.get(point.sourceTimestamp)
       if (pingIndex === undefined || sourceIndex === undefined || point.timestamp === point.sourceTimestamp) return []
+      const visibleAt = Math.max(point.timestamp, point.sourceCoreTimestamp)
       return [{
         coords: [[point.sourceX, point.sourceY], [point.x, point.y]],
-        value: [point.cluster, sourceIndex, pingIndex, point.cluster, point.timestamp],
+        value: [point.cluster, sourceIndex, pingIndex, point.cluster, visibleAt],
       }]
     })
     const coreTimelineData = DENSITY_ALGORITHMS.includes(panel.algo)
@@ -228,9 +236,8 @@ function DemoSceneRenderer({
     const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
     const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
-      if (!row.location) return []
-      const building = buildingById.get(row.location)
-      return building ? [{ ...row, location: row.location, destination: { id: row.location, center: building.center } }] : []
+      const building = row.location ? buildingById.get(row.location) : null
+      return building ? [{ ...row, destination: { id: row.location, center: building.center } }] : []
     })
     const segments = truthStops.slice(1).map((current, index) => {
       const previous = truthStops[index]
@@ -391,6 +398,7 @@ function DemoSceneRenderer({
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
       const nextState = atEnd && paused ? "complete" : paused ? "paused" : "playing"
       setPlaybackState(nextState)
+      onPlaybackStateChangeRef.current?.(nextState)
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
@@ -677,7 +685,8 @@ function DemoSceneRenderer({
           { id: "detected-stops", data: [] },
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], symbolSize: 9 * pingScale(latestPingIndex), itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
+          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
+          { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
@@ -713,6 +722,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "current-ping-hole", data: [] },
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -878,6 +888,7 @@ function DemoSceneRenderer({
       stopNextPathFlow()
       sequenceIndex = 0
       setPlaybackState("playing")
+      onPlaybackStateChangeRef.current?.("playing")
       onReplayStartRef.current?.()
       playTrajectoryPreview(() => {
         onTimeChange(chartData.timeSequence[0])
@@ -1202,7 +1213,37 @@ function DemoSceneRenderer({
           symbolSize: 15,
           itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
         },
-        { id: "current-ping", name: "Current ping", type: "effectScatter", coordinateSystem: "cartesian2d", z: 9, data: [], symbolSize: 9, animationDurationUpdate: 180, animationEasingUpdate: "cubicOut", rippleEffect: { scale: 2.5, brushType: "stroke" }, itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.4, opacity: 0.95 } },
+        {
+          id: "current-ping",
+          name: "Current ping",
+          type: "effectScatter",
+          coordinateSystem: "cartesian2d",
+          z: 9,
+          data: [],
+          symbol: "pin",
+          symbolSize: 30,
+          animationDurationUpdate: 0,
+          rippleEffect: { scale: 1.8, brushType: "stroke" },
+          itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.2, opacity: 0.96 },
+        },
+        {
+          id: "current-ping-hole",
+          name: "Current ping hole",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 10,
+          data: [],
+          animationDurationUpdate: 0,
+          renderItem(_params: EChartsParams, api: EChartsApi) {
+            const center = api.coord([api.value(0), api.value(1)])
+            return {
+              type: "circle",
+              shape: { cx: center[0], cy: center[1] - 16, r: 4.3 },
+              style: { fill: "#ffffff", stroke: "#202124", lineWidth: 0.9 },
+            }
+          },
+        },
       ],
     })
 
@@ -1418,9 +1459,14 @@ function DemoSceneRenderer({
   }, [onReplayStart])
 
   useEffect(() => {
+    onPlaybackStateChangeRef.current = onPlaybackStateChange
+  }, [onPlaybackStateChange])
+
+  useEffect(() => {
+    sharedPlaybackStateRef.current = sharedPlaybackState
     if (syncMaster) return
     renderSceneRef.current?.(selectedTimestampRef.current ?? currentTime ?? 0)
-  }, [currentTime, syncMaster])
+  }, [currentTime, sharedPlaybackState, syncMaster])
 
   useEffect(() => {
     if (!previewRunId || syncMaster) return
@@ -1502,6 +1548,8 @@ export function CompareAnimationPanel({
   showStops,
   previewRunId,
   onReplayStart,
+  sharedPlaybackState,
+  onPlaybackStateChange,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1512,6 +1560,8 @@ export function CompareAnimationPanel({
   showStops: boolean
   previewRunId?: number
   onReplayStart?: () => void
+  sharedPlaybackState?: PlaybackState
+  onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const sceneMetadata = panel?.scene ? `Agent: ${panel.scene.user_id}` : null
 
@@ -1526,7 +1576,19 @@ export function CompareAnimationPanel({
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
         {panel?.scene ? (
           <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer panel={panel} mode={mode} currentTime={currentTime} onTimeChange={onTimeChange} syncMaster={syncMaster} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={previewRunId} onReplayStart={onReplayStart} />
+            <DemoSceneRenderer
+              panel={panel}
+              mode={mode}
+              currentTime={currentTime}
+              onTimeChange={onTimeChange}
+              syncMaster={syncMaster}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              previewRunId={previewRunId}
+              onReplayStart={onReplayStart}
+              sharedPlaybackState={sharedPlaybackState}
+              onPlaybackStateChange={onPlaybackStateChange}
+            />
           </div>
         ) : (
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">

@@ -20,8 +20,15 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Raw GPS Pings",
-      description: "Black dots are raw GPS pings from one person's trip. Hover any ping to enlarge it and its revealed edge-connected tree, fade unrelated pings, and highlight the same ping on the timeline. That hover is being demonstrated now.",
+      title: "Inspect GPS Pings",
+      description: "Each dot is one GPS ping from the current agent. Hover a ping to enlarge it, show its time and status, and highlight the same ping on the timeline. Pings in the same detected stop remain emphasized while unrelated pings fade. Density algorithms also show the active distance threshold. That hover is being demonstrated now.",
+    },
+  },
+  {
+    element: "[data-tour='tour-map']",
+    popover: {
+      title: "Compare Two Pings",
+      description: "Click one ping to keep it selected, then click a second to draw a line between them and compare their distance and elapsed time. Click a selected ping again to remove it, click the map background to clear the comparison, or use Clear selection below the timeline.",
     },
   },
   {
@@ -29,17 +36,17 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("anchor-point"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Stops, Anchor Points, and Edges",
-      description: "Colored pings belong to detected stops. Larger colored circles with white outlines are anchor or core points, and connecting lines show which revealed pings are linked to them. The active anchor or core point and its connected tree are highlighted now.",
+      title: "Detected Stops and Algorithm Structure",
+      description: "Colored pings show revealed detected-stop assignments; pings shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. Hover a ping to focus its detected stop or hover an edge to isolate its connected component. An anchor is highlighted now.",
     },
   },
   {
-    element: "[data-tour='tour-map']",
+    element: "[data-tour='tour-layers']",
     onHighlightStarted: tourAction("ground-truth"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Ground-Truth Buildings and Routes",
-      description: "Ground Truth shows the real buildings visited and the route between them. The matching building lights up when you hover its ground-truth interval in the timeline; the tour is showing that building highlight now.",
+      title: "Toggle Reference and Detection Layers",
+      description: "Ground Truth controls the known visited-building intervals and routes. Detected Stops controls the algorithm's colored ping assignments, anchors, and edges. The known building for a ground-truth interval lights up when that interval is hovered on the timeline; the tour is showing that highlight now.",
     },
   },
   {
@@ -48,7 +55,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Hover Timeline Pings",
-      description: "Black vertical bars are GPS pings. Hover one to raise and outline it, fade the other bars, and highlight that ping plus its revealed connected tree on the map. The tour is demonstrating this now; future pings remain black until playback reveals their stop status.",
+      description: "Vertical bars are GPS pings. Hover one to raise and outline it, fade unrelated bars, and highlight that ping and its detected stop on the map. Timeline pings can also be clicked for the same two-ping comparison available on the map. The tour is demonstrating the hover now.",
     },
   },
   {
@@ -57,21 +64,28 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Read the Timeline Layers",
-      description: "Colored vertical bars mark core-point pings, translucent colored bands mark detected stops, and teal outline rectangles mark ground-truth time inside buildings. Completed intervals remain as faded boxes; during playback the current box glows and the next box is light teal. The cyan line marks playback time, and you can drag or scroll here to scrub.",
+      description: "Colored vertical bars mark core-point pings, translucent bands mark detected stops, and teal rectangles mark known time inside buildings. Completed intervals fade; during playback the current interval glows and the next is light teal. The cyan line marks playback time. Drag or scroll the timeline to scrub, and use the map's play or replay controls to animate the trip.",
     },
   },
   {
     element: "[data-tour='tour-params']",
     popover: {
-      title: "Pick an Algorithm & Tune It",
-      description: "Choose an algorithm from the dropdown, then adjust its parameters (e.g. distance and time thresholds) with the sliders. Click Visualize to rerun the trip with your changes, or New Trajectory to test a different person's trip.",
+      title: "Choose the Scenario, Algorithm, and Parameters",
+      description: "Changing the trajectory, algorithm, or any editable parameter automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+    },
+  },
+  {
+    element: "[data-tour='tour-metrics']",
+    popover: {
+      title: "Open Aggregated Metrics",
+      description: "Aggregated Metrics opens the parameter-sweep results for the current algorithm. From comparison mode it carries both supported algorithms into the side-by-side metrics view, where fixed notebook parameters are listed beside the charts.",
     },
   },
   {
     element: "[data-tour='tour-compare-toggle']",
     popover: {
       title: "Compare Two Algorithms",
-      description: "Click here to switch into side-by-side mode: pick Algorithm A and B with independent parameters, then watch both run on the same trip at once to see where they agree, split, merge, or miss a stop.",
+      description: "Switch to side-by-side mode, choose Left and Right algorithms with independent parameters, and run both on the same agent and trajectory. Their playback stays synchronized so you can see where they agree, split, merge, or miss a stop.",
     },
   },
 ]

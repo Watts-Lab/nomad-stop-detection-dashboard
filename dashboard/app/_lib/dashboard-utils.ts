@@ -84,12 +84,6 @@ export function paramInputValue(
   return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : defaultValue
 }
 
-export function parameterDisplayName(name: string) {
-  if (name === "delta_roam") return "delta roam"
-  if (name === "dt_max") return "dt max"
-  return name.replaceAll("_", " ")
-}
-
 export function darkenHex(hex: string, amount: number) {
   const color = hex.replace("#", "")
   const value = Number.parseInt(color, 16)

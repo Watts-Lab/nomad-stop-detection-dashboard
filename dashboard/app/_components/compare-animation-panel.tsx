@@ -1184,6 +1184,7 @@ function DemoSceneRenderer({
       return Math.max(minT, Math.min(maxT, timeMs / 1000))
     }
     const seekTo = (timestampSeconds: number) => {
+      selectedTimestampRef.current = timestampSeconds
       syncSequenceIndex(timestampSeconds)
       onTimeChange(timestampSeconds)
     }
@@ -1209,15 +1210,25 @@ function DemoSceneRenderer({
       window.addEventListener("mousemove", onPointerMove)
       window.addEventListener("mouseup", onPointerUp)
     }
+    let wheelStepSeconds = 120
+    let wheelDirection = 0
+    let lastWheelTime = 0
     const onTimelineWheel = (event: WheelEvent) => {
-      if (event.ctrlKey) return
+      if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
       window.clearTimeout(timer)
       paused = true
       const activeTime = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
       const span = chartData.timeSequence[chartData.timeSequence.length - 1] - chartData.timeSequence[0]
       const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
-      seekTo(Math.max(chartData.timeSequence[0], Math.min(chartData.timeSequence[chartData.timeSequence.length - 1], activeTime + Math.sign(delta) * Math.max(10, span / 360))))
+      const direction = Math.sign(delta)
+      const wheelTime = event.timeStamp
+      wheelStepSeconds = direction !== wheelDirection || wheelTime - lastWheelTime > 200
+        ? 120
+        : Math.min(wheelStepSeconds * 1.25, Math.max(120, span / 15))
+      wheelDirection = direction
+      lastWheelTime = wheelTime
+      seekTo(Math.max(chartData.timeSequence[0], Math.min(chartData.timeSequence[chartData.timeSequence.length - 1], activeTime + direction * wheelStepSeconds)))
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
     }
@@ -1333,7 +1344,7 @@ function DemoSceneRenderer({
           type: "inside",
           xAxisIndex: 0,
           filterMode: "none",
-          zoomOnMouseWheel: true,
+          zoomOnMouseWheel: "ctrl",
           moveOnMouseMove: true,
           moveOnMouseWheel: false,
           preventDefaultMouseMove: true,
@@ -1342,7 +1353,7 @@ function DemoSceneRenderer({
           type: "inside",
           yAxisIndex: 0,
           filterMode: "none",
-          zoomOnMouseWheel: true,
+          zoomOnMouseWheel: "ctrl",
           moveOnMouseMove: true,
           moveOnMouseWheel: false,
           preventDefaultMouseMove: true,
@@ -1916,7 +1927,8 @@ function DemoSceneRenderer({
     timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.on("click", onTimelineClick)
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
-    timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false })
+    mapEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
+    timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
     const pulseTimer = window.setInterval(() => {
       if (previewing) return
@@ -1966,7 +1978,8 @@ function DemoSceneRenderer({
       timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.off("click", onTimelineClick)
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
-      timelineEl.removeEventListener("wheel", onTimelineWheel)
+      mapEl.removeEventListener("wheel", onTimelineWheel, true)
+      timelineEl.removeEventListener("wheel", onTimelineWheel, true)
       renderSceneRef.current = null
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction

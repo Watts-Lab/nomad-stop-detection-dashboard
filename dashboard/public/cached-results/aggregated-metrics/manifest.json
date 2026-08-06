@@ -1,0 +1,1841 @@
+{
+  "version": 1,
+  "source_cache": "cached-results/stop-detection-cache",
+  "metrics": [
+    "precision",
+    "recall",
+    "f1",
+    "missed_fraction",
+    "merged_fraction",
+    "split_fraction"
+  ],
+  "defaults": {
+    "mode": "single",
+    "left_algorithm": "lachesis",
+    "right_algorithm": "sequential_centroid"
+  },
+  "algorithms": {
+    "lachesis": {
+      "dashboard_id": "lachesis",
+      "display_name": "Lachesis",
+      "parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min"
+      ],
+      "sweep_parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min"
+      ],
+      "defaults": {
+        "dt_max": 60,
+        "dur_min": 5
+      }
+    },
+    "sequential_centroid": {
+      "dashboard_id": "sequential-centroid",
+      "display_name": "Sequential (Centroid)",
+      "parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min",
+        "method"
+      ],
+      "sweep_parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min"
+      ],
+      "defaults": {
+        "dt_max": 60,
+        "dur_min": 5,
+        "method": "centroid"
+      }
+    },
+    "sequential_first": {
+      "dashboard_id": "sequential-first",
+      "display_name": "Sequential (First)",
+      "parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min",
+        "method"
+      ],
+      "sweep_parameters": [
+        "delta_roam",
+        "dt_max",
+        "dur_min"
+      ],
+      "defaults": {
+        "dt_max": 60,
+        "dur_min": 5,
+        "method": "sliding"
+      }
+    },
+    "gridbased": {
+      "dashboard_id": "gridbased",
+      "display_name": "Grid-Based",
+      "parameters": [
+        "cell_size",
+        "min_time",
+        "min_cluster_size"
+      ],
+      "sweep_parameters": [
+        "cell_size",
+        "min_time"
+      ],
+      "defaults": {
+        "min_time": 5,
+        "min_cluster_size": 2
+      }
+    },
+    "st_dbscan": {
+      "dashboard_id": "dbscan",
+      "display_name": "ST-DBSCAN",
+      "parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "remove_overlaps"
+      ],
+      "sweep_parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts"
+      ],
+      "defaults": {
+        "time_thresh": 60,
+        "min_pts": 3,
+        "remove_overlaps": true
+      }
+    },
+    "dbstop": {
+      "dashboard_id": "dbstop",
+      "display_name": "DBSTOP",
+      "parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "back_merge"
+      ],
+      "sweep_parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min"
+      ],
+      "defaults": {
+        "time_thresh": 60,
+        "min_pts": 3,
+        "dur_min": 5,
+        "back_merge": false
+      }
+    },
+    "seqscan": {
+      "dashboard_id": "seqscan",
+      "display_name": "SeqScan",
+      "parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "back_merge"
+      ],
+      "sweep_parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min"
+      ],
+      "defaults": {
+        "time_thresh": 60,
+        "min_pts": 3,
+        "dur_min": 5,
+        "back_merge": false
+      }
+    },
+    "hdbscan": {
+      "dashboard_id": "hdbscan",
+      "display_name": "HDBSCAN",
+      "parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min",
+        "min_cluster_size"
+      ],
+      "sweep_parameters": [
+        "dist_thresh",
+        "time_thresh",
+        "min_pts",
+        "dur_min"
+      ],
+      "defaults": {
+        "time_thresh": 60,
+        "min_pts": 3,
+        "dur_min": 5,
+        "min_cluster_size": 1
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "two-stop",
+      "label": "Two stops",
+      "users": 250,
+      "algorithms": {
+        "lachesis": {
+          "path": "two-stop/lachesis.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ]
+          }
+        },
+        "sequential_centroid": {
+          "path": "two-stop/sequential_centroid.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "centroid"
+            ]
+          }
+        },
+        "sequential_first": {
+          "path": "two-stop/sequential_first.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "sliding"
+            ]
+          }
+        },
+        "gridbased": {
+          "path": "two-stop/gridbased.parquet",
+          "records": 4500,
+          "configs": 18,
+          "users": 250,
+          "parameter_values": {
+            "cell_size": [
+              25.0,
+              37.5,
+              50.0,
+              75.0,
+              100.0,
+              175.0,
+              250.0,
+              375.0,
+              500.0
+            ],
+            "min_time": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              2.0
+            ]
+          }
+        },
+        "st_dbscan": {
+          "path": "two-stop/st_dbscan.parquet",
+          "records": 21000,
+          "configs": 84,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "remove_overlaps": [
+              true
+            ]
+          }
+        },
+        "dbstop": {
+          "path": "two-stop/dbstop.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "seqscan": {
+          "path": "two-stop/seqscan.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "hdbscan": {
+          "path": "two-stop/hdbscan.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              1.0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "four-stop-low-ha",
+      "label": "Four stops \u00b7 low home attachment",
+      "users": 50,
+      "algorithms": {
+        "lachesis": {
+          "path": "four-stop-low-ha/lachesis.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ]
+          }
+        },
+        "sequential_centroid": {
+          "path": "four-stop-low-ha/sequential_centroid.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "centroid"
+            ]
+          }
+        },
+        "sequential_first": {
+          "path": "four-stop-low-ha/sequential_first.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "sliding"
+            ]
+          }
+        },
+        "gridbased": {
+          "path": "four-stop-low-ha/gridbased.parquet",
+          "records": 900,
+          "configs": 18,
+          "users": 50,
+          "parameter_values": {
+            "cell_size": [
+              25.0,
+              37.5,
+              50.0,
+              75.0,
+              100.0,
+              175.0,
+              250.0,
+              375.0,
+              500.0
+            ],
+            "min_time": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              2.0
+            ]
+          }
+        },
+        "st_dbscan": {
+          "path": "four-stop-low-ha/st_dbscan.parquet",
+          "records": 4200,
+          "configs": 84,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "remove_overlaps": [
+              true
+            ]
+          }
+        },
+        "dbstop": {
+          "path": "four-stop-low-ha/dbstop.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "seqscan": {
+          "path": "four-stop-low-ha/seqscan.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "hdbscan": {
+          "path": "four-stop-low-ha/hdbscan.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              1.0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "four-stop-high-ha",
+      "label": "Four stops \u00b7 high home attachment",
+      "users": 50,
+      "algorithms": {
+        "lachesis": {
+          "path": "four-stop-high-ha/lachesis.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ]
+          }
+        },
+        "sequential_centroid": {
+          "path": "four-stop-high-ha/sequential_centroid.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "centroid"
+            ]
+          }
+        },
+        "sequential_first": {
+          "path": "four-stop-high-ha/sequential_first.parquet",
+          "records": 9400,
+          "configs": 188,
+          "users": 50,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "sliding"
+            ]
+          }
+        },
+        "gridbased": {
+          "path": "four-stop-high-ha/gridbased.parquet",
+          "records": 900,
+          "configs": 18,
+          "users": 50,
+          "parameter_values": {
+            "cell_size": [
+              25.0,
+              37.5,
+              50.0,
+              75.0,
+              100.0,
+              175.0,
+              250.0,
+              375.0,
+              500.0
+            ],
+            "min_time": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              2.0
+            ]
+          }
+        },
+        "st_dbscan": {
+          "path": "four-stop-high-ha/st_dbscan.parquet",
+          "records": 4200,
+          "configs": 84,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "remove_overlaps": [
+              true
+            ]
+          }
+        },
+        "dbstop": {
+          "path": "four-stop-high-ha/dbstop.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "seqscan": {
+          "path": "four-stop-high-ha/seqscan.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "hdbscan": {
+          "path": "four-stop-high-ha/hdbscan.parquet",
+          "records": 8400,
+          "configs": 168,
+          "users": 50,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              1.0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "commute-return",
+      "label": "Commute and return",
+      "users": 250,
+      "algorithms": {
+        "lachesis": {
+          "path": "commute-return/lachesis.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ]
+          }
+        },
+        "sequential_centroid": {
+          "path": "commute-return/sequential_centroid.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "centroid"
+            ]
+          }
+        },
+        "sequential_first": {
+          "path": "commute-return/sequential_first.parquet",
+          "records": 47000,
+          "configs": 188,
+          "users": 250,
+          "parameter_values": {
+            "delta_roam": [
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0,
+              52.5,
+              55.0,
+              57.5,
+              60.0,
+              62.5,
+              65.0,
+              67.5,
+              70.0,
+              72.5,
+              75.0,
+              77.5,
+              80.0,
+              82.5,
+              85.0,
+              87.5,
+              90.0,
+              92.5,
+              95.0,
+              97.5,
+              100.0,
+              102.5,
+              105.0,
+              107.5,
+              110.0,
+              112.5,
+              115.0,
+              117.5,
+              120.0
+            ],
+            "dt_max": [
+              60.0,
+              120.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "method": [
+              "sliding"
+            ]
+          }
+        },
+        "gridbased": {
+          "path": "commute-return/gridbased.parquet",
+          "records": 4500,
+          "configs": 18,
+          "users": 250,
+          "parameter_values": {
+            "cell_size": [
+              25.0,
+              37.5,
+              50.0,
+              75.0,
+              100.0,
+              175.0,
+              250.0,
+              375.0,
+              500.0
+            ],
+            "min_time": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              2.0
+            ]
+          }
+        },
+        "st_dbscan": {
+          "path": "commute-return/st_dbscan.parquet",
+          "records": 21000,
+          "configs": 84,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "remove_overlaps": [
+              true
+            ]
+          }
+        },
+        "dbstop": {
+          "path": "commute-return/dbstop.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "seqscan": {
+          "path": "commute-return/seqscan.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "back_merge": [
+              false
+            ]
+          }
+        },
+        "hdbscan": {
+          "path": "commute-return/hdbscan.parquet",
+          "records": 42000,
+          "configs": 168,
+          "users": 250,
+          "parameter_values": {
+            "dist_thresh": [
+              0.0,
+              2.5,
+              5.0,
+              7.5,
+              10.0,
+              12.5,
+              15.0,
+              17.5,
+              20.0,
+              22.5,
+              25.0,
+              27.5,
+              30.0,
+              32.5,
+              35.0,
+              37.5,
+              40.0,
+              42.5,
+              45.0,
+              47.5,
+              50.0
+            ],
+            "time_thresh": [
+              60.0,
+              240.0
+            ],
+            "min_pts": [
+              2.0,
+              3.0
+            ],
+            "dur_min": [
+              5.0,
+              10.0
+            ],
+            "min_cluster_size": [
+              1.0
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

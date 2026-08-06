@@ -375,7 +375,7 @@ def label_sequential_centroid(sparse_df, params, key):
         dt_max=params["dmx"],
         dur_min=params["dmn"],
         method="centroid",
-        return_anchor_points=True,
+        return_anchors=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -388,7 +388,7 @@ def label_sequential_first(sparse_df, params, key):
         dt_max=params["dmx"],
         dur_min=params["dmn"],
         method="sliding",
-        return_anchor_points=True,
+        return_anchors=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -419,7 +419,7 @@ def label_seqscan(sparse_df, params, key):
         min_pts=params["mp"],
         dur_min=params["dmn"],
         back_merge=False,
-        return_core_points=True,
+        return_cores=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -432,7 +432,7 @@ def label_st_dbscan(sparse_df, params, key):
         time_thresh=params["tt"],
         min_pts=params["mp"],
         remove_overlaps=params["ro"],
-        return_core_points=True,
+        return_cores=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -446,7 +446,7 @@ def label_dbstop(sparse_df, params, key):
         min_pts=params["mp"],
         dur_min=params["dmn"],
         back_merge=False,
-        return_core_points=True,
+        return_cores=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -460,7 +460,7 @@ def label_hdbscan(sparse_df, params, key):
         min_pts=params["mp"],
         min_cluster_size=1,
         dur_min=params["dmn"],
-        return_core_points=True,
+        return_cores=True,
         config_key=key,
         traj_cols=TRAJ_COLS,
     )
@@ -578,18 +578,28 @@ def compact_core_points(frame):
     return frame
 
 
-def split_label_result(result):
-    if isinstance(result, tuple):
-        labels, core_points = result
-        core_points = core_points.rename(columns={
+def split_label_result(result, sparse_df):
+    labels = (
+        sparse_df.loc[:, ["user_id", "timestamp"]]
+        .merge(
+            result.loc[:, ["user_id", "timestamp", "label"]].drop_duplicates(
+                ["user_id", "timestamp"]
+            ),
+            on=["user_id", "timestamp"],
+            how="left",
+        )["label"].set_axis(sparse_df.index)
+    )
+    core_points = (
+        result.loc[
+            result["role"] != 0,
+            ["user_id", "timestamp", "role", "start_timestamp", "label"],
+        ]
+        .rename(columns={
             "start_timestamp": "source_timestamp",
             "label": "cluster",
         })
-        return labels, core_points.drop(columns=["config_key"])
-    raise RuntimeError(
-        "Installed NOMAD did not return core plotting data. "
-        "Install NOMAD from the cores_refactor branch before regenerating the cache."
     )
+    return labels, core_points
 
 
 def compute_metrics(stops_df, truth_df, key, config_id):
@@ -625,7 +635,7 @@ def run_config_job(job):
         user_sparse = user_sparse.copy()
         result = spec["labeler"](user_sparse, params, key)
         if spec.get("core_points", True):
-            labels, core_points = split_label_result(result)
+            labels, core_points = split_label_result(result, user_sparse)
         else:
             labels = result
             core_points = pd.DataFrame(columns=CORE_POINT_COLUMNS)

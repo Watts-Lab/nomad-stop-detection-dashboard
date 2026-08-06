@@ -287,7 +287,26 @@ export function MetricsView({
   useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
 
   if (!manifest || !leftAlgorithm || !rightAlgorithm || !scenario) {
-    return <div className="nomad-page-frame flex min-h-0 flex-1 items-center justify-center"><Skeleton className="h-96 w-full" />{metricsError && <p className="text-sm text-red-500">{metricsError}</p>}</div>
+    return (
+      <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
+        <div className={`${revealClass()} shrink-0 space-y-1`}>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">Loading cached metrics...</p>
+        </div>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+          <Card className="h-full min-h-0" />
+          <Card className="min-h-0 overflow-hidden py-0">
+            <CardHeader className="shrink-0 px-5 py-3"><CardTitle className="text-lg font-semibold">Aggregated Metrics</CardTitle></CardHeader>
+            <CardContent>{metricsError && <p className="text-xs text-red-500">{metricsError}</p>}</CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (

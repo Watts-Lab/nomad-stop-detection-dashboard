@@ -53,6 +53,7 @@ function NomadDashboard() {
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
+  const [metricsDemoAgentLocked, setMetricsDemoAgentLocked] = useState(false)
 
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
     const params = new URLSearchParams(searchParamString)
@@ -178,6 +179,7 @@ function NomadDashboard() {
       setMetricsRightAlgorithm(rightMetricsAlgorithm)
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
+    setMetricsDemoAgentLocked(true)
     setActiveView("metrics")
     syncUrl("metrics")
   }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
@@ -210,6 +212,7 @@ function NomadDashboard() {
   }, [compareMode, syncUrl])
 
   const navigateTo = (view: DashboardView) => {
+    if (view === "metrics") setMetricsDemoAgentLocked(false)
     setActiveView(view)
     syncUrl(view)
   }
@@ -340,6 +343,7 @@ function NomadDashboard() {
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
           selectedUserId={compareApiData?.left.scene?.user_id}
+          selectedDemoAgentLocked={metricsDemoAgentLocked}
           trajectory={demoTrajectory}
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
@@ -347,6 +351,7 @@ function NomadDashboard() {
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
           setTrajectory={setDemoTrajectory}
+          lockSelectedDemoAgent={() => setMetricsDemoAgentLocked(true)}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />

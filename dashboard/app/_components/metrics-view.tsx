@@ -71,10 +71,11 @@ function PinnedAgentCard({
           </Button>
         </div>
       ) : (
-        <p className="rounded-md border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
-          Click a red circle to keep that agent&apos;s trajectory on the chart; click it again to release.
-        </p>
+        <p className="text-xs text-muted-foreground">No agent selected.</p>
       )}
+      <p className="rounded-md border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+        Click a red circle to select an agent; click the selected red circle again to unselect it.
+      </p>
     </div>
   )
 }
@@ -191,6 +192,7 @@ export function MetricsView({
   metricsLeftParameter,
   metricsRightParameter,
   selectedUserId,
+  selectedDemoAgentLocked,
   trajectory,
   setMetricsCompareMode,
   setMetricsLeftAlgorithm,
@@ -198,6 +200,7 @@ export function MetricsView({
   setMetricsLeftParameter,
   setMetricsRightParameter,
   setTrajectory,
+  lockSelectedDemoAgent,
   openPinnedAgent,
   startTour,
 }: {
@@ -207,6 +210,7 @@ export function MetricsView({
   metricsLeftParameter: string
   metricsRightParameter: string
   selectedUserId?: string
+  selectedDemoAgentLocked: boolean
   trajectory: string
   setMetricsCompareMode: (value: boolean) => void
   setMetricsLeftAlgorithm: (algorithm: string) => void
@@ -214,6 +218,7 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
   setTrajectory: (trajectory: string) => void
+  lockSelectedDemoAgent: () => void
   openPinnedAgent: (pinned: MetricsPoint) => void
   startTour: () => void
 }) {
@@ -259,7 +264,7 @@ export function MetricsView({
     Object.entries(algorithm.defaults)
       .filter(([name]) => name !== parameter)
       .forEach(([name, value]) => params.append("fixed", `${name}=${value}`))
-    if (selectedUserId) params.set("user", selectedUserId)
+    if (selectedDemoAgentLocked && selectedUserId) params.set("user", selectedUserId)
     if (legend) params.set("legend", legend)
     return publicPath("/echarts-prototype/index.html") + "?" + params.toString()
   }
@@ -355,12 +360,15 @@ export function MetricsView({
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">Trajectory</label>
               <Select value={trajectory} onValueChange={setTrajectory}>
-                <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {manifest.scenarios.map((item) => <SelectItem key={item.id} value={item.id}>{item.label} ({item.users} users)</SelectItem>)}
+                  {manifest.scenarios.map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            <Button variant="outline" size="sm" onClick={lockSelectedDemoAgent} disabled={!selectedUserId} className="w-full">
+              Open agent selected in Demo
+            </Button>
             <Button
               variant={metricsCompareMode ? "default" : "outline"}
               size="sm"

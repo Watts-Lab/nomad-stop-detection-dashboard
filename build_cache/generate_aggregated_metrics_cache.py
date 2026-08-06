@@ -209,7 +209,7 @@ def main():
     args = parse_args()
     cache_dir = Path(args.cache_dir)
     output_dir = Path(args.output_dir)
-    root_manifest = load_json(cache_dir / "manifest.json")
+    root_manifest = load_json(cache_dir / SCENARIOS[0][0] / "manifest.json")
 
     if output_dir.exists():
         shutil.rmtree(output_dir)

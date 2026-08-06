@@ -29,6 +29,7 @@
         "dur_min"
       ],
       "defaults": {
+        "delta_roam": 25,
         "dt_max": 60,
         "dur_min": 5
       }
@@ -48,6 +49,7 @@
         "dur_min"
       ],
       "defaults": {
+        "delta_roam": 25,
         "dt_max": 60,
         "dur_min": 5,
         "method": "centroid"
@@ -68,6 +70,7 @@
         "dur_min"
       ],
       "defaults": {
+        "delta_roam": 25,
         "dt_max": 60,
         "dur_min": 5,
         "method": "sliding"
@@ -86,6 +89,7 @@
         "min_time"
       ],
       "defaults": {
+        "cell_size": 100,
         "min_time": 5,
         "min_cluster_size": 2
       }
@@ -105,6 +109,7 @@
         "min_pts"
       ],
       "defaults": {
+        "dist_thresh": 50,
         "time_thresh": 60,
         "min_pts": 3,
         "remove_overlaps": true
@@ -127,6 +132,7 @@
         "dur_min"
       ],
       "defaults": {
+        "dist_thresh": 10,
         "time_thresh": 60,
         "min_pts": 3,
         "dur_min": 5,
@@ -150,6 +156,7 @@
         "dur_min"
       ],
       "defaults": {
+        "dist_thresh": 10,
         "time_thresh": 60,
         "min_pts": 3,
         "dur_min": 5,
@@ -173,6 +180,7 @@
         "dur_min"
       ],
       "defaults": {
+        "dist_thresh": 10,
         "time_thresh": 60,
         "min_pts": 3,
         "dur_min": 5,

@@ -6,19 +6,41 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { parameterDisplayName, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
-import type { MetricsParameterNote } from "../_lib/types"
+import { publicPath } from "../_lib/public-path"
 
-type PinnedAgent = {
+type MetricsAlgorithm = {
+  dashboard_id: string
+  display_name: string
+  sweep_parameters: string[]
+  defaults: Record<string, string | number | boolean>
+}
+
+type MetricsScenario = {
+  id: string
+  label: string
+  users: number
+  algorithms: Record<string, { path: string }>
+}
+
+type MetricsManifest = {
+  algorithms: Record<string, MetricsAlgorithm>
+  defaults: { left_algorithm: string; right_algorithm: string }
+  scenarios: MetricsScenario[]
+}
+
+export type MetricsPoint = {
   algoId: string
   userId: string
   param: string
   value: number
   recall: number
   fixed: Record<string, string>
+  scenario: string
 }
+
+type PinnedAgent = Omit<MetricsPoint, "scenario">
 
 function PinnedAgentCard({
   pinned,
@@ -57,25 +79,16 @@ function PinnedAgentCard({
   )
 }
 
-function MetricsParameterRows({
-  algorithm,
-  note,
-}: {
-  algorithm: string
-  note: MetricsParameterNote | undefined
-}) {
-  const rows = [
-    ...(note?.fixed_parameters ?? []).map((param) => {
-      const [name, ...valueParts] = param.split("=")
-      return [name, valueParts.join("=") || "fixed"]
-    }),
-  ]
+function MetricsParameterRows({ algorithm, parameter }: { algorithm: MetricsAlgorithm; parameter: string }) {
+  const rows = Object.entries(algorithm.defaults)
+    .filter(([name]) => name !== parameter)
+    .map(([name, value]) => [name, String(value)])
 
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
       {rows.map(([name, value]) => (
-        <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+        <div key={`${algorithm.display_name}-${name}-${value}`} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-mono text-muted-foreground">{name}</span>
             <span className="text-xs font-mono text-foreground">{value}</span>
@@ -173,49 +186,85 @@ function MetricsFrame({
 
 export function MetricsView({
   metricsCompareMode,
-  metricsAlgorithms,
   metricsLeftAlgorithm,
   metricsRightAlgorithm,
   metricsLeftParameter,
   metricsRightParameter,
   selectedUserId,
-  leftParameterNote,
-  rightParameterNote,
-  metricsError,
+  trajectory,
   setMetricsCompareMode,
   setMetricsLeftAlgorithm,
   setMetricsRightAlgorithm,
   setMetricsLeftParameter,
   setMetricsRightParameter,
+  setTrajectory,
   openPinnedAgent,
   startTour,
 }: {
   metricsCompareMode: boolean
-  metricsAlgorithms: string[]
   metricsLeftAlgorithm: string
   metricsRightAlgorithm: string
   metricsLeftParameter: string
   metricsRightParameter: string
   selectedUserId?: string
-  leftParameterNote: MetricsParameterNote | undefined
-  rightParameterNote: MetricsParameterNote | undefined
-  metricsError: string | null
+  trajectory: string
   setMetricsCompareMode: (value: boolean) => void
   setMetricsLeftAlgorithm: (algorithm: string) => void
   setMetricsRightAlgorithm: (algorithm: string) => void
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
-  openPinnedAgent: (pinned: PinnedAgent) => void
+  setTrajectory: (trajectory: string) => void
+  openPinnedAgent: (pinned: MetricsPoint) => void
   startTour: () => void
 }) {
+  const [manifest, setManifest] = useState<MetricsManifest | null>(null)
+  const [metricsError, setMetricsError] = useState<string | null>(null)
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
   const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
+  const algorithms = manifest ? Object.values(manifest.algorithms) : []
+  const leftAlgorithm = algorithms.find((algorithm) => algorithm.display_name === metricsLeftAlgorithm)
+  const rightAlgorithm = algorithms.find((algorithm) => algorithm.display_name === metricsRightAlgorithm)
+  const scenario = manifest?.scenarios.find((item) => item.id === trajectory)
 
-  const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  useEffect(() => {
+    const loadManifest = async () => {
+      try {
+        const response = await fetch(publicPath("/cached-results/aggregated-metrics/manifest.json"))
+        if (!response.ok) throw new Error("Failed to load aggregated metrics manifest")
+        setManifest(await response.json() as MetricsManifest)
+      } catch (err) {
+        setMetricsError(err instanceof Error ? err.message : "Failed to load aggregated metrics manifest")
+      }
+    }
+    void loadManifest()
+  }, [])
+
+  useEffect(() => {
+    if (!manifest) return
+    if (!leftAlgorithm) setMetricsLeftAlgorithm(manifest.algorithms[manifest.defaults.left_algorithm].display_name)
+    if (!rightAlgorithm) setMetricsRightAlgorithm(manifest.algorithms[manifest.defaults.right_algorithm].display_name)
+  }, [leftAlgorithm, manifest, rightAlgorithm, setMetricsLeftAlgorithm, setMetricsRightAlgorithm])
+
+  useEffect(() => {
+    if (leftAlgorithm && !leftAlgorithm.sweep_parameters.includes(metricsLeftParameter)) setMetricsLeftParameter(leftAlgorithm.sweep_parameters[0])
+    if (rightAlgorithm && !rightAlgorithm.sweep_parameters.includes(metricsRightParameter)) setMetricsRightParameter(rightAlgorithm.sweep_parameters[0])
+  }, [leftAlgorithm, metricsLeftParameter, metricsRightParameter, rightAlgorithm, setMetricsLeftParameter, setMetricsRightParameter])
+
+  const chartSrc = (algorithm: MetricsAlgorithm | undefined, parameter: string, frame: string, legend = "") => {
+    if (!algorithm || !scenario) return ""
+    const algorithmKey = Object.entries(manifest?.algorithms ?? {}).find(([, item]) => item.display_name === algorithm.display_name)?.[0]
+    const file = algorithmKey ? scenario.algorithms[algorithmKey] : null
+    if (!file) return ""
+    const params = new URLSearchParams({ x: parameter, field: parameter, data: publicPath("/cached-results/aggregated-metrics/") + file.path, algo: algorithm.dashboard_id, frame })
+    Object.entries(algorithm.defaults)
+      .filter(([name]) => name !== parameter)
+      .forEach(([name, value]) => params.append("fixed", `${name}=${value}`))
+    if (selectedUserId) params.set("user", selectedUserId)
+    if (legend) params.set("legend", legend)
+    return publicPath("/echarts-prototype/index.html") + "?" + params.toString()
+  }
+  const leftMetricsPrototypeSrc = chartSrc(leftAlgorithm, metricsLeftParameter, "left", metricsCompareMode ? "space" : "")
+  const rightMetricsPrototypeSrc = chartSrc(rightAlgorithm, metricsRightParameter, "right")
 
   useEffect(() => {
     const handlePinChange = (event: MessageEvent) => {
@@ -236,6 +285,10 @@ export function MetricsView({
   // Each chart reloads (and drops its pin) whenever its src changes.
   useEffect(() => setPinnedLeftAgent(null), [leftMetricsPrototypeSrc])
   useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
+
+  if (!manifest || !leftAlgorithm || !rightAlgorithm || !scenario) {
+    return <div className="nomad-page-frame flex min-h-0 flex-1 items-center justify-center"><Skeleton className="h-96 w-full" />{metricsError && <p className="text-sm text-red-500">{metricsError}</p>}</div>
+  }
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
@@ -280,6 +333,15 @@ export function MetricsView({
             </CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-muted-foreground">Trajectory</label>
+              <Select value={trajectory} onValueChange={setTrajectory}>
+                <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {manifest.scenarios.map((item) => <SelectItem key={item.id} value={item.id}>{item.label} ({item.users} users)</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               variant={metricsCompareMode ? "default" : "outline"}
               size="sm"
@@ -296,17 +358,17 @@ export function MetricsView({
                 value={metricsLeftAlgorithm}
                 onValueChange={(algorithm) => {
                   setMetricsLeftAlgorithm(algorithm)
-                  setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                  setMetricsLeftParameter(algorithms.find((item) => item.display_name === algorithm)?.sweep_parameters[0] ?? "dist_thresh")
                 }}
               >
                 <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
+                  {algorithms.map((algorithm) => <SelectItem key={algorithm.display_name} value={algorithm.display_name}>{algorithm.display_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
-            <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />
+            {leftAlgorithm && <MetricsParameterRows algorithm={leftAlgorithm} parameter={metricsLeftParameter} />}
+            <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={(pinned) => openPinnedAgent({ ...pinned, scenario: trajectory })} />
 
             {metricsCompareMode && (
               <>
@@ -316,17 +378,17 @@ export function MetricsView({
                     value={metricsRightAlgorithm}
                     onValueChange={(algorithm) => {
                       setMetricsRightAlgorithm(algorithm)
-                      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                      setMetricsRightParameter(algorithms.find((item) => item.display_name === algorithm)?.sweep_parameters[0] ?? "dist_thresh")
                     }}
                   >
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {metricsAlgorithms.map((algo) => <SelectItem key={algo} value={algo}>{algo}</SelectItem>)}
+                      {algorithms.map((algorithm) => <SelectItem key={algorithm.display_name} value={algorithm.display_name}>{algorithm.display_name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
-                <PinnedAgentCard pinned={pinnedRightAgent} openDemo={openPinnedAgent} />
+                {rightAlgorithm && <MetricsParameterRows algorithm={rightAlgorithm} parameter={metricsRightParameter} />}
+                <PinnedAgentCard pinned={pinnedRightAgent} openDemo={(pinned) => openPinnedAgent({ ...pinned, scenario: trajectory })} />
               </>
             )}
 

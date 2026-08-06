@@ -131,11 +131,6 @@ function metricsTourFocus(step: DriveStep | undefined) {
 function broadcastMetricsTourFocus(step?: DriveStep) {
   const mode = metricsTourFocus(step)
   window.dispatchEvent(new CustomEvent(METRICS_TOUR_FOCUS_EVENT, { detail: mode }))
-  document.querySelectorAll("iframe[src*='/echarts-prototype/']").forEach((iframe) => {
-    if (iframe instanceof HTMLIFrameElement) {
-      iframe.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode }, window.location.origin)
-    }
-  })
 }
 
 /**

@@ -1,5 +1,5 @@
 import { publicPath } from "./public-path"
-import type { DashboardView, DataPoint, MetricsParameterNote, TimeSegment } from "./types"
+import type { DashboardView, DataPoint, TimeSegment } from "./types"
 
 export type ParameterConstraint = {
   min: number
@@ -21,50 +21,6 @@ export const LEARN_FAMILIES = [
   { id: "sequential", title: "Sequential Algorithms" },
   { id: "density", title: "Density-Based Algorithms" },
 ]
-
-export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
-  Lachesis: {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "delta_roam",
-    sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
-    fixed_parameters: ["dt_max=60", "dur_min=5"],
-  },
-  "Sequential (Centroid)": {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "delta_roam",
-    fixed_parameters: ["dt_max=60", "method='centroid'", "dur_min=5"],
-  },
-  "Sequential (First)": {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "delta_roam",
-    fixed_parameters: ["dt_max=60", "method='sliding'", "dur_min=5"],
-  },
-  SeqScan: {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "dist_thresh",
-    fixed_parameters: ["time_thresh=60", "min_pts=2", "back_merge=False", "dur_min=5"],
-  },
-  "ST-DBSCAN": {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "dist_thresh",
-    fixed_parameters: ["time_thresh=60", "min_pts=2", "remove_overlaps=True"],
-  },
-  DBSTOP: {
-    source: "Generated stop-detection cache",
-    sweep_parameter: "dist_thresh",
-    fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "back_merge=False"],
-  },
-  HDBSCAN: {
-    source: "cached_results/stop-detection-cache/hdbscan",
-    sweep_parameter: "dist_thresh",
-    fixed_parameters: ["time_thresh=60", "min_pts=2", "dur_min=5", "min_cluster_size=1"],
-  },
-  "Grid-Based": {
-    source: "cached_results/stop-detection-cache/gridbased",
-    sweep_parameter: "cell_size",
-    fixed_parameters: ["min_time=5", "min_cluster_size=2"],
-  },
-}
 
 export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
@@ -172,10 +128,6 @@ export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   gridbased: "Grid-Based",
 }
 
-export const DEMO_ID_BY_METRICS_ALGORITHM: Record<string, string> = Object.fromEntries(
-  Object.entries(METRICS_ALGORITHM_BY_DEMO_ID).map(([demoId, metricsName]) => [metricsName, demoId]),
-)
-
 // Maps notebook/metrics parameter names to the demo's editable-param keys where they differ.
 export const DEMO_PARAM_ALIASES: Record<string, Record<string, string>> = {
   dbscan: {
@@ -183,51 +135,6 @@ export const DEMO_PARAM_ALIASES: Record<string, Record<string, string>> = {
     time_thresh: "T_max",
     min_pts: "minPts",
   },
-}
-
-export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
-  DBSTOP: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  Lachesis: [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Sequential (Centroid)": [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Sequential (First)": [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  SeqScan: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "ST-DBSCAN": [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-  ],
-  HDBSCAN: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Grid-Based": [
-    { value: "cell_size", label: "cell_size", min: 0, max: 500 },
-    { value: "min_time", label: "min_time", min: 0, max: 180 },
-  ],
-}
-
-export const METRICS_RESULTS_FILE: Record<string, string> = {
-  Lachesis: "lachesis_results.parquet",
-  "Sequential (Centroid)": "sequential_centroid_results.parquet",
-  "Sequential (First)": "sequential_first_results.parquet",
-  SeqScan: "seqscan_results.parquet",
-  "ST-DBSCAN": "st_dbscan_results.parquet",
-  DBSTOP: "dbstop_results.parquet",
-  HDBSCAN: "hdbscan_results.parquet",
-  "Grid-Based": "gridbased_results.parquet",
 }
 
 export const algorithms = [

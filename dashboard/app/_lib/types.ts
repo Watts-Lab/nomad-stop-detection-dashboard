@@ -77,23 +77,6 @@ export type CompareScene = {
   } | null
 }
 
-export type MetricsOptionsResponse = {
-  algorithms: string[]
-  parameter_notes?: Record<string, {
-    source: string
-    sweep_parameter: string
-    sweep_note?: string
-    fixed_parameters: string[]
-  }>
-  defaults: {
-    mode: "single" | "compare"
-    left_algorithm: string
-    right_algorithm: string
-  }
-}
-
-export type MetricsParameterNote = NonNullable<MetricsOptionsResponse["parameter_notes"]>[string]
-
 export type EChartsParams = {
   seriesId?: string
   data: number[] | { value: number[] }

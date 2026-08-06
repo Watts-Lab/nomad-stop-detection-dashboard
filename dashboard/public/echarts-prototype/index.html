@@ -51,7 +51,7 @@
     const demoAlgoId = params.get("algo") || "";
     const frameId = params.get("frame") || "left";
     const initialUserId = params.get("user");
-    const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
+    const DATA_URL = params.get("data") || "./lachesis_results.parquet";
 
     const chart = echarts.init(document.getElementById("chart"));
     const parameterLabel = (value) => value === "delta_roam" ? "{delta|Δ}{sub|roam}" : value;

@@ -31,42 +31,42 @@ ALGORITHM_PROFILES = {
     "lachesis": {
         "dashboard_id": "lachesis",
         "display_name": "Lachesis",
-        "defaults": {"dt_max": 60, "dur_min": 5},
+        "defaults": {"delta_roam": 25, "dt_max": 60, "dur_min": 5},
     },
     "sequential_centroid": {
         "dashboard_id": "sequential-centroid",
         "display_name": "Sequential (Centroid)",
-        "defaults": {"dt_max": 60, "dur_min": 5, "method": "centroid"},
+        "defaults": {"delta_roam": 25, "dt_max": 60, "dur_min": 5, "method": "centroid"},
     },
     "sequential_first": {
         "dashboard_id": "sequential-first",
         "display_name": "Sequential (First)",
-        "defaults": {"dt_max": 60, "dur_min": 5, "method": "sliding"},
+        "defaults": {"delta_roam": 25, "dt_max": 60, "dur_min": 5, "method": "sliding"},
     },
     "gridbased": {
         "dashboard_id": "gridbased",
         "display_name": "Grid-Based",
-        "defaults": {"min_time": 5, "min_cluster_size": 2},
+        "defaults": {"cell_size": 100, "min_time": 5, "min_cluster_size": 2},
     },
     "st_dbscan": {
         "dashboard_id": "dbscan",
         "display_name": "ST-DBSCAN",
-        "defaults": {"time_thresh": 60, "min_pts": 3, "remove_overlaps": True},
+        "defaults": {"dist_thresh": 50, "time_thresh": 60, "min_pts": 3, "remove_overlaps": True},
     },
     "dbstop": {
         "dashboard_id": "dbstop",
         "display_name": "DBSTOP",
-        "defaults": {"time_thresh": 60, "min_pts": 3, "dur_min": 5, "back_merge": False},
+        "defaults": {"dist_thresh": 10, "time_thresh": 60, "min_pts": 3, "dur_min": 5, "back_merge": False},
     },
     "seqscan": {
         "dashboard_id": "seqscan",
         "display_name": "SeqScan",
-        "defaults": {"time_thresh": 60, "min_pts": 3, "dur_min": 5, "back_merge": False},
+        "defaults": {"dist_thresh": 10, "time_thresh": 60, "min_pts": 3, "dur_min": 5, "back_merge": False},
     },
     "hdbscan": {
         "dashboard_id": "hdbscan",
         "display_name": "HDBSCAN",
-        "defaults": {"time_thresh": 60, "min_pts": 3, "dur_min": 5, "min_cluster_size": 1},
+        "defaults": {"dist_thresh": 10, "time_thresh": 60, "min_pts": 3, "dur_min": 5, "min_cluster_size": 1},
     },
 }
 
@@ -116,6 +116,17 @@ def validate_defaults(algorithm, defaults, values):
             raise ValueError(f"{algorithm} default {name}={value!r} is not present in the cache")
 
 
+def validate_sweeps(algorithm, configs, parameter_columns, defaults):
+    for parameter in parameter_columns:
+        values = configs[parameter].dropna().drop_duplicates()
+        if not pd.api.types.is_numeric_dtype(values) or len(values) < 2:
+            continue
+        fixed = {name: value for name, value in defaults.items() if name != parameter}
+        selected = configs.loc[(configs[list(fixed)] == pd.Series(fixed)).all(axis=1)]
+        if selected["config_id"].nunique() != len(values):
+            raise ValueError(f"{algorithm} defaults do not define one configuration per {parameter} value")
+
+
 def write_scenario(cache_dir, output_dir, scenario, scenario_label, root_manifest):
     scenario_dir = cache_dir / scenario
     manifest = load_json(scenario_dir / "manifest.json")
@@ -131,6 +142,7 @@ def write_scenario(cache_dir, output_dir, scenario, scenario_label, root_manifes
         algorithm_configs = configs.loc[configs["algorithm"] == algorithm]
         values = parameter_values(algorithm_configs, parameter_columns)
         validate_defaults(algorithm, profile["defaults"], values)
+        validate_sweeps(algorithm, algorithm_configs, parameter_columns, profile["defaults"])
         metrics = merge_metrics(scenario_dir / file_spec["metrics"], configs, algorithm, parameter_columns)
         metrics["algorithm"] = profile["display_name"]
         columns = [column for column in BASE_COLUMNS if column in metrics] + parameter_columns

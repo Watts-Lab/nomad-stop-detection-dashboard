@@ -1,29 +1,25 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DemoView } from "./_components/demo-view"
 import { HomeView } from "./_components/home-view"
 import { LearnView } from "./_components/learn-view"
 import { MetricsView } from "./_components/metrics-view"
+import type { MetricsPoint } from "./_components/metrics-view"
 import {
   DEMO_ALGORITHM_IDS,
   DEMO_PARAM_ALIASES,
-  FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
-  METRICS_SWEEP_PARAMETERS,
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
-import { publicPath } from "./_lib/public-path"
 import { loadCompareData } from "./_lib/static-cache"
 import { METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY, useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
   DashboardView,
   DemoMode,
-  MetricsOptionsResponse,
-  MetricsParameterNote,
 } from "./_lib/types"
 import { NomadNav } from "@/components/nomad-nav"
 
@@ -52,13 +48,11 @@ function NomadDashboard() {
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
   const compareRequestIdRef = useRef(0)
-  const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
-  const [metricsError, setMetricsError] = useState<string | null>(null)
 
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
     const params = new URLSearchParams(searchParamString)
@@ -161,23 +155,6 @@ function NomadDashboard() {
     void runCompareVisualization(nextSeed)
   }, [compareSeed, runCompareVisualization])
 
-  const loadMetricsOptions = useCallback(async () => {
-    try {
-      setMetricsError(null)
-      const res = await fetch(publicPath("/cached-results/algorithm-metrics/options.json"))
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || "Failed to load aggregated metrics options")
-      }
-      const data = (await res.json()) as MetricsOptionsResponse
-      setMetricsOptions(data)
-      setMetricsLeftAlgorithm(data.defaults.left_algorithm ?? "Lachesis")
-      setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential (Centroid)")
-    } catch (err) {
-      setMetricsError(err instanceof Error ? err.message : "Failed to load metrics options")
-    }
-  }, [])
-
   const handleLeftAlgorithmChange = useCallback((algorithmId: string) => {
     setLeftAlgorithm(algorithmId)
     setLeftParams({})
@@ -196,30 +173,22 @@ function NomadDashboard() {
 
     if (leftMetricsAlgorithm) {
       setMetricsLeftAlgorithm(leftMetricsAlgorithm)
-      setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[leftMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     if (rightMetricsAlgorithm) {
       setMetricsRightAlgorithm(rightMetricsAlgorithm)
-      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[rightMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
     setActiveView("metrics")
     syncUrl("metrics")
   }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
 
-  const handleMetricsPointSelect = useCallback((payload: {
-    algoId?: string
-    param?: string
-    value?: number
-    userId?: string
-    fixed?: Record<string, string>
-  }) => {
+  const handleMetricsPointSelect = useCallback((payload: MetricsPoint) => {
     const algoDef = algorithms.find((a) => a.id === payload.algoId)
-    if (!algoDef || !payload.userId || !payload.param || !Number.isFinite(payload.value)) return
+    if (!algoDef || !Number.isFinite(payload.value)) return
 
-    const aliasMap = DEMO_PARAM_ALIASES[payload.algoId as string] ?? {}
+    const aliasMap = DEMO_PARAM_ALIASES[payload.algoId] ?? {}
     const nextParams: Record<string, string> = {}
-    for (const [name, value] of Object.entries(payload.fixed ?? {})) {
+    for (const [name, value] of Object.entries(payload.fixed)) {
       nextParams[aliasMap[name] ?? name] = value
     }
     nextParams[aliasMap[payload.param] ?? payload.param] = String(payload.value)
@@ -228,20 +197,11 @@ function NomadDashboard() {
     setLeftParams(nextParams)
     setLeftParamErrors({})
     setRequestedUserId(payload.userId)
+    setDemoTrajectory(payload.scenario)
     setCompareMode(false)
     setActiveView("demo")
     syncUrl("demo", null, "single")
   }, [syncUrl])
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (event.data?.type !== "nomad-metrics-point-select") return
-      handleMetricsPointSelect(event.data)
-    }
-    window.addEventListener("message", handleMessage)
-    return () => window.removeEventListener("message", handleMessage)
-  }, [handleMetricsPointSelect])
 
   const handleCompareModeToggle = useCallback(() => {
     const nextMode: DemoMode = compareMode ? "single" : "compare"
@@ -280,12 +240,6 @@ function NomadDashboard() {
   const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
   const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
-  const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential (Centroid)"]
-  const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
-  const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
-  const rightParameterNote = parameterNotes[metricsRightAlgorithm]
-  const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
-  const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
   const prepareTour = useCallback(() => {
@@ -322,22 +276,6 @@ function NomadDashboard() {
       void runCompareVisualization(compareSeed)
     }
   }, [activeView, compareSeed, runCompareVisualization, leftAlgorithm, rightAlgorithm])
-
-  useEffect(() => {
-    void loadMetricsOptions()
-  }, [loadMetricsOptions])
-
-  useEffect(() => {
-    if (!leftSweepParameters.some((param) => param.value === metricsLeftParameter)) {
-      setMetricsLeftParameter(leftSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [leftSweepParameters, metricsLeftParameter])
-
-  useEffect(() => {
-    if (!rightSweepParameters.some((param) => param.value === metricsRightParameter)) {
-      setMetricsRightParameter(rightSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [rightSweepParameters, metricsRightParameter])
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
@@ -397,20 +335,18 @@ function NomadDashboard() {
       {activeView === "metrics" && (
         <MetricsView
           metricsCompareMode={metricsCompareMode}
-          metricsAlgorithms={metricsAlgorithms}
           metricsLeftAlgorithm={metricsLeftAlgorithm}
           metricsRightAlgorithm={metricsRightAlgorithm}
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
           selectedUserId={compareApiData?.left.scene?.user_id}
-          leftParameterNote={leftParameterNote}
-          rightParameterNote={rightParameterNote}
-          metricsError={metricsError}
+          trajectory={demoTrajectory}
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
+          setTrajectory={setDemoTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />

@@ -75,6 +75,7 @@ function DemoSceneRenderer({
   const sharedPlaybackStateRef = useRef(sharedPlaybackState)
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
   const selectedTimestampRef = useRef<number | null>(null)
+  const wheelStartsAtEndRef = useRef(true)
   const selectedPingIndexesRef = useRef<number[]>([])
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
@@ -1213,7 +1214,6 @@ function DemoSceneRenderer({
     let wheelStepSeconds = 120
     let wheelDirection = 0
     let lastWheelTime = 0
-    let wheelStartsAtEnd = selectedTimestampRef.current === null
     const onTimelineWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
@@ -1222,8 +1222,8 @@ function DemoSceneRenderer({
       const activeTime = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
       const minTime = chartData.timeSequence[0]
       const maxTime = chartData.timeSequence[chartData.timeSequence.length - 1]
-      const initializedAtEnd = wheelStartsAtEnd && activeTime === maxTime
-      wheelStartsAtEnd = false
+      const initializedAtEnd = wheelStartsAtEndRef.current && activeTime === maxTime
+      wheelStartsAtEndRef.current = false
       if (initializedAtEnd) {
         wheelStepSeconds = 120
         wheelDirection = 0
@@ -2019,6 +2019,7 @@ function DemoSceneRenderer({
   }, [previewRunId, syncMaster])
 
   useEffect(() => {
+    wheelStartsAtEndRef.current = true
     selectedPingIndexesRef.current = []
     setSelectedPingIndexes([])
   }, [chartData])
@@ -2030,6 +2031,7 @@ function DemoSceneRenderer({
 
   useEffect(() => {
     if (!chartData || currentTime === null) return
+    if (currentTime !== chartData.timeSequence[chartData.timeSequence.length - 1]) wheelStartsAtEndRef.current = false
     selectedTimestampRef.current = currentTime
     renderSceneRef.current?.(currentTime)
   }, [chartData, currentTime])

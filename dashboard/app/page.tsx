@@ -53,7 +53,8 @@ function NomadDashboard() {
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
-  const [metricsDemoAgentLocked, setMetricsDemoAgentLocked] = useState(false)
+  const [metricsSelectedUserId, setMetricsSelectedUserId] = useState<string | null>(null)
+  const metricsEntryFromDemoRef = useRef(false)
 
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
     const params = new URLSearchParams(searchParamString)
@@ -179,10 +180,18 @@ function NomadDashboard() {
       setMetricsRightAlgorithm(rightMetricsAlgorithm)
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
-    setMetricsDemoAgentLocked(true)
+    metricsEntryFromDemoRef.current = true
+    setMetricsSelectedUserId(compareApiData?.left.scene?.user_id ?? null)
     setActiveView("metrics")
     syncUrl("metrics")
-  }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
+  }, [compareApiData, compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
+
+  const openSelectedDemoAgent = useCallback(() => {
+    const userId = compareApiData?.left.scene?.user_id
+    if (!userId) return
+    setDemoTrajectory(compareApiData.trajectory)
+    setMetricsSelectedUserId(userId)
+  }, [compareApiData])
 
   const handleMetricsPointSelect = useCallback((payload: MetricsPoint) => {
     const algoDef = algorithms.find((a) => a.id === payload.algoId)
@@ -212,7 +221,7 @@ function NomadDashboard() {
   }, [compareMode, syncUrl])
 
   const navigateTo = (view: DashboardView) => {
-    if (view === "metrics") setMetricsDemoAgentLocked(false)
+    if (view === "metrics") setMetricsSelectedUserId(null)
     setActiveView(view)
     syncUrl(view)
   }
@@ -261,6 +270,8 @@ function NomadDashboard() {
 
   useEffect(() => {
     const nextRoute = dashboardRouteState(searchParamString)
+    if (nextRoute.activeView === "metrics" && !metricsEntryFromDemoRef.current) setMetricsSelectedUserId(null)
+    metricsEntryFromDemoRef.current = false
     setActiveView(nextRoute.activeView)
     setExpandedAlgorithm(nextRoute.expandedAlgorithm)
     setCompareMode(nextRoute.compareMode)
@@ -342,16 +353,19 @@ function NomadDashboard() {
           metricsRightAlgorithm={metricsRightAlgorithm}
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
-          selectedUserId={compareApiData?.left.scene?.user_id}
-          selectedDemoAgentLocked={metricsDemoAgentLocked}
+          selectedUserId={metricsSelectedUserId ?? undefined}
+          selectedDemoAgentAvailable={Boolean(compareApiData?.left.scene?.user_id)}
           trajectory={demoTrajectory}
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
-          setTrajectory={setDemoTrajectory}
-          lockSelectedDemoAgent={() => setMetricsDemoAgentLocked(true)}
+          setTrajectory={(trajectory) => {
+            setDemoTrajectory(trajectory)
+            setMetricsSelectedUserId(null)
+          }}
+          openSelectedDemoAgent={openSelectedDemoAgent}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />

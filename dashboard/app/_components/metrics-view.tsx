@@ -192,7 +192,7 @@ export function MetricsView({
   metricsLeftParameter,
   metricsRightParameter,
   selectedUserId,
-  selectedDemoAgentLocked,
+  selectedDemoAgentAvailable,
   trajectory,
   setMetricsCompareMode,
   setMetricsLeftAlgorithm,
@@ -200,7 +200,7 @@ export function MetricsView({
   setMetricsLeftParameter,
   setMetricsRightParameter,
   setTrajectory,
-  lockSelectedDemoAgent,
+  openSelectedDemoAgent,
   openPinnedAgent,
   startTour,
 }: {
@@ -210,7 +210,7 @@ export function MetricsView({
   metricsLeftParameter: string
   metricsRightParameter: string
   selectedUserId?: string
-  selectedDemoAgentLocked: boolean
+  selectedDemoAgentAvailable: boolean
   trajectory: string
   setMetricsCompareMode: (value: boolean) => void
   setMetricsLeftAlgorithm: (algorithm: string) => void
@@ -218,7 +218,7 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
   setTrajectory: (trajectory: string) => void
-  lockSelectedDemoAgent: () => void
+  openSelectedDemoAgent: () => void
   openPinnedAgent: (pinned: MetricsPoint) => void
   startTour: () => void
 }) {
@@ -264,7 +264,7 @@ export function MetricsView({
     Object.entries(algorithm.defaults)
       .filter(([name]) => name !== parameter)
       .forEach(([name, value]) => params.append("fixed", `${name}=${value}`))
-    if (selectedDemoAgentLocked && selectedUserId) params.set("user", selectedUserId)
+    if (selectedUserId) params.set("user", selectedUserId)
     if (legend) params.set("legend", legend)
     return publicPath("/echarts-prototype/index.html") + "?" + params.toString()
   }
@@ -366,7 +366,7 @@ export function MetricsView({
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={lockSelectedDemoAgent} disabled={!selectedUserId} className="w-full">
+            <Button variant="outline" size="sm" onClick={openSelectedDemoAgent} disabled={!selectedDemoAgentAvailable} className="w-full">
               Open agent selected in Demo
             </Button>
             <Button

@@ -374,7 +374,6 @@ function NomadDashboard() {
           rightParamErrors={rightParamErrors}
           demoTrajectory={demoTrajectory}
           compareApiData={compareApiData}
-          compareLoading={compareLoading}
           compareError={compareError}
           demoTime={demoTime}
           setDemoTime={handleDemoTimeChange}

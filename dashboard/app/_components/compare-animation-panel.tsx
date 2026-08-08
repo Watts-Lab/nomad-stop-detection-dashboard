@@ -8,6 +8,7 @@ import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
 import { parameterDisplayName } from "../_lib/dashboard-utils"
@@ -2152,7 +2153,7 @@ export function CompareAnimationPanel({
     <Card className="h-full min-h-0 overflow-hidden py-0">
       <CardHeader className="py-3 px-4 shrink-0">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          {panel?.title ?? "Preparing visualization"}
+          {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
             <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
               <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>

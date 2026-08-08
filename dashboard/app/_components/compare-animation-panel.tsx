@@ -262,7 +262,7 @@ function DemoSceneRenderer({
     const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
       const building = row.location ? buildingById.get(row.location) : null
-      return building ? [{ ...row, destination: { id: row.location, center: building.center } }] : []
+      return building ? [{ ...row, location: building.id, destination: { id: building.id, center: building.center } }] : []
     })
     const segments = truthStops.slice(1).map((current, index) => {
       const previous = truthStops[index]

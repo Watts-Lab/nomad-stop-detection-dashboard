@@ -1256,18 +1256,18 @@ function DemoSceneRenderer({
       const timestampSeconds = chartData.timeSequence[sequenceIndex]
       const previousStopCount = detectedCountFor(chartData.timeSequence[Math.max(0, sequenceIndex - 1)])
       onTimeChange(timestampSeconds)
-      if (detectedCountFor(timestampSeconds) > previousStopCount) {
-        timer = window.setTimeout(advance, frameDelay)
-        return
-      }
-      if (sequenceIndex < chartData.timeSequence.length - 1) {
-        timer = window.setTimeout(advance, frameDelay)
-      } else {
+      if (sequenceIndex >= chartData.timeSequence.length - 1) {
         paused = true
         syncPlaybackState()
         renderScene(timestampSeconds)
         if (variant === "preview") onPreviewComplete?.()
+        return
       }
+      if (detectedCountFor(timestampSeconds) > previousStopCount) {
+        timer = window.setTimeout(advance, frameDelay)
+        return
+      }
+      timer = window.setTimeout(advance, frameDelay)
     }
     const replay = () => {
       window.clearTimeout(timer)

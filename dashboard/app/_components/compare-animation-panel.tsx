@@ -1154,6 +1154,12 @@ function DemoSceneRenderer({
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
+      if (event.key === " ") {
+        if (!syncMaster || variant !== "full" || event.repeat) return
+        event.preventDefault()
+        toggleRef.current()
+        return
+      }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return
       const selected = selectedPingIndexesRef.current

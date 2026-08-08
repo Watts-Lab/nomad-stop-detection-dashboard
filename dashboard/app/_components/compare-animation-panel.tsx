@@ -1155,6 +1155,7 @@ function DemoSceneRenderer({
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
+      if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
       if (event.key === " ") {
         if (!syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()
@@ -1163,7 +1164,6 @@ function DemoSceneRenderer({
         return
       }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return
       const selected = selectedPingIndexesRef.current
       if (selected.length !== 2) return
       const direction = event.key === "ArrowRight" ? 1 : -1

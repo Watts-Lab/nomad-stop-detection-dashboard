@@ -290,7 +290,7 @@ export function MetricsView({
             </Button>
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">
-                {metricsCompareMode ? "Left" : "Algorithm"}
+                {metricsCompareMode ? "Top" : "Algorithm"}
               </label>
               <Select
                 value={metricsLeftAlgorithm}
@@ -311,7 +311,7 @@ export function MetricsView({
             {metricsCompareMode && (
               <>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Right</label>
+                  <label className="text-sm font-medium text-muted-foreground">Bottom</label>
                   <Select
                     value={metricsRightAlgorithm}
                     onValueChange={(algorithm) => {

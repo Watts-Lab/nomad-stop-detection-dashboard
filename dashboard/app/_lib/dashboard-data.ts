@@ -1,5 +1,5 @@
 import { publicPath } from "./public-path"
-import type { DashboardView, DataPoint, MetricsParameterNote, TimeSegment } from "./types"
+import type { DashboardView, MetricsParameterNote } from "./types"
 
 export type ParameterConstraint = {
   min: number
@@ -358,25 +358,6 @@ export const algorithms = [
 ]
 
 export type AlgorithmDefinition = (typeof algorithms)[number]
-
-export const sampleDataPoints: DataPoint[] = [
-  { id: "1", x: 50, y: 110, time: "orange", color: "orange" }, { id: "2", x: 65, y: 100, time: "orange", color: "orange" },
-  { id: "3", x: 80, y: 115, time: "orange", color: "orange" }, { id: "4", x: 55, y: 140, time: "orange", color: "orange" },
-  { id: "5", x: 260, y: 130, time: "pink", color: "pink" }, { id: "6", x: 280, y: 145, time: "pink", color: "pink" },
-  { id: "7", x: 295, y: 155, time: "pink", color: "pink" }, { id: "8", x: 275, y: 170, time: "pink", color: "pink" },
-  { id: "9", x: 290, y: 185, time: "pink", color: "pink" }, { id: "10", x: 305, y: 160, time: "pink", color: "pink" },
-  { id: "11", x: 265, y: 200, time: "pink", color: "pink" }, { id: "12", x: 290, y: 295, time: "pink", color: "pink" },
-  { id: "13", x: 475, y: 100, time: "purple", color: "purple" }, { id: "14", x: 490, y: 135, time: "purple", color: "purple" },
-  { id: "15", x: 505, y: 150, time: "purple", color: "purple" }, { id: "16", x: 520, y: 115, time: "purple", color: "purple" },
-  { id: "17", x: 540, y: 130, time: "purple", color: "purple" }, { id: "18", x: 475, y: 250, time: "purple", color: "purple" },
-  { id: "19", x: 495, y: 270, time: "purple", color: "purple" }, { id: "20", x: 530, y: 255, time: "purple", color: "purple" },
-]
-
-export const timelineSegments: TimeSegment[] = [
-  { id: "orange", startPercent: 10, widthPercent: 8, color: "orange" },
-  { id: "pink", startPercent: 30, widthPercent: 25, color: "pink" },
-  { id: "purple", startPercent: 68, widthPercent: 20, color: "purple" },
-]
 
 export const DEMO_ALGORITHM_IDS = new Set(algorithms.map((algorithm) => algorithm.id))
 export const DASHBOARD_VIEWS = new Set<DashboardView>(["home", "learn", "demo", "metrics"])

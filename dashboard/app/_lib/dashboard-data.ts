@@ -1,14 +1,11 @@
 import { publicPath } from "./public-path"
-import type { DashboardView, DataPoint, MetricsParameterNote, TimeSegment } from "./types"
+import type { DashboardView, MetricsParameterNote } from "./types"
 
-export type ParameterConstraint = {
+export type DemoEditableParam = {
   min: number
   max: number
   step: number
   allowedValues?: number[]
-}
-
-export type DemoEditableParam = ParameterConstraint & {
   label?: string
 }
 
@@ -70,51 +67,6 @@ export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
 export const DUR_MIN_VALUES = [5, 10]
 export const CELL_SIZE_VALUES = [25, 37.5, 50, 75, 100, 175, 250, 375, 500]
-
-export const PARAMETER_CONSTRAINTS: Record<string, Record<string, ParameterConstraint>> = {
-  dbstop: {
-    dist_thresh: { min: 0, max: 50, step: 2.5 },
-    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
-    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  seqscan: {
-    dist_thresh: { min: 0, max: 50, step: 2.5 },
-    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
-    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  hdbscan: {
-    dist_thresh: { min: 0, max: 50, step: 2.5 },
-    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
-    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  dbscan: {
-    eps_spatial: { min: 0, max: 50, step: 2.5 },
-    T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
-    minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
-  },
-  lachesis: {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
-    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  "sequential-centroid": {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
-    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  "sequential-first": {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
-    dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
-    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-  gridbased: {
-    cell_size: { min: 25, max: 500, step: 12.5, allowedValues: CELL_SIZE_VALUES },
-    min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
-  },
-}
 
 export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
   dbstop: {
@@ -358,25 +310,6 @@ export const algorithms = [
 ]
 
 export type AlgorithmDefinition = (typeof algorithms)[number]
-
-export const sampleDataPoints: DataPoint[] = [
-  { id: "1", x: 50, y: 110, time: "orange", color: "orange" }, { id: "2", x: 65, y: 100, time: "orange", color: "orange" },
-  { id: "3", x: 80, y: 115, time: "orange", color: "orange" }, { id: "4", x: 55, y: 140, time: "orange", color: "orange" },
-  { id: "5", x: 260, y: 130, time: "pink", color: "pink" }, { id: "6", x: 280, y: 145, time: "pink", color: "pink" },
-  { id: "7", x: 295, y: 155, time: "pink", color: "pink" }, { id: "8", x: 275, y: 170, time: "pink", color: "pink" },
-  { id: "9", x: 290, y: 185, time: "pink", color: "pink" }, { id: "10", x: 305, y: 160, time: "pink", color: "pink" },
-  { id: "11", x: 265, y: 200, time: "pink", color: "pink" }, { id: "12", x: 290, y: 295, time: "pink", color: "pink" },
-  { id: "13", x: 475, y: 100, time: "purple", color: "purple" }, { id: "14", x: 490, y: 135, time: "purple", color: "purple" },
-  { id: "15", x: 505, y: 150, time: "purple", color: "purple" }, { id: "16", x: 520, y: 115, time: "purple", color: "purple" },
-  { id: "17", x: 540, y: 130, time: "purple", color: "purple" }, { id: "18", x: 475, y: 250, time: "purple", color: "purple" },
-  { id: "19", x: 495, y: 270, time: "purple", color: "purple" }, { id: "20", x: 530, y: 255, time: "purple", color: "purple" },
-]
-
-export const timelineSegments: TimeSegment[] = [
-  { id: "orange", startPercent: 10, widthPercent: 8, color: "orange" },
-  { id: "pink", startPercent: 30, widthPercent: 25, color: "pink" },
-  { id: "purple", startPercent: 68, widthPercent: 20, color: "purple" },
-]
 
 export const DEMO_ALGORITHM_IDS = new Set(algorithms.map((algorithm) => algorithm.id))
 export const DASHBOARD_VIEWS = new Set<DashboardView>(["home", "learn", "demo", "metrics"])

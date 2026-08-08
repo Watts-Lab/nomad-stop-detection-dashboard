@@ -830,7 +830,7 @@ function DemoSceneRenderer({
           { id: "past-truth-stops", data: showGroundTruth ? pastTruthStopData(timestampSeconds) : [] },
           { id: "next-truth-stop", data: showGroundTruth ? nextTruthStopData(timestampSeconds) : [] },
           { id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] },
-          { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
+          { id: "stop-bars", data: showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
       }, { lazyUpdate: true })

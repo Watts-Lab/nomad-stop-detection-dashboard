@@ -1157,7 +1157,8 @@ function DemoSceneRenderer({
       if (event.key === " ") {
         if (!syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()
-        toggleRef.current()
+        if (paused && sequenceIndex >= chartData.timeSequence.length - 1) replayRef.current()
+        else toggleRef.current()
         return
       }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
@@ -1217,7 +1218,7 @@ function DemoSceneRenderer({
       window.addEventListener("mousemove", onPointerMove)
       window.addEventListener("mouseup", onPointerUp)
     }
-    let wheelStepSeconds = 120
+    let wheelStepSeconds = 60
     let wheelDirection = 0
     let lastWheelTime = 0
     const onTimelineWheel = (event: WheelEvent) => {
@@ -1231,7 +1232,7 @@ function DemoSceneRenderer({
       const initializedAtEnd = wheelStartsAtEndRef.current && activeTime === maxTime
       wheelStartsAtEndRef.current = false
       if (initializedAtEnd) {
-        wheelStepSeconds = 120
+        wheelStepSeconds = 60
         wheelDirection = 0
         lastWheelTime = 0
         seekTo(minTime)
@@ -1240,8 +1241,8 @@ function DemoSceneRenderer({
         const direction = Math.sign(delta)
         const wheelTime = event.timeStamp
         wheelStepSeconds = direction !== wheelDirection || wheelTime - lastWheelTime > 200
-          ? 120
-          : Math.min(wheelStepSeconds * 1.25, Math.max(120, (maxTime - minTime) / 15))
+          ? 60
+          : Math.min(wheelStepSeconds * 1.2, Math.max(60, (maxTime - minTime) / 15))
         wheelDirection = direction
         lastWheelTime = wheelTime
         seekTo(Math.max(minTime, Math.min(maxTime, activeTime + direction * wheelStepSeconds)))

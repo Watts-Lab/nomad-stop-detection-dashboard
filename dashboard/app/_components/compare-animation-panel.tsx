@@ -8,6 +8,7 @@ import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
 import { parameterDisplayName } from "../_lib/dashboard-utils"
@@ -829,7 +830,7 @@ function DemoSceneRenderer({
           { id: "past-truth-stops", data: showGroundTruth ? pastTruthStopData(timestampSeconds) : [] },
           { id: "next-truth-stop", data: showGroundTruth ? nextTruthStopData(timestampSeconds) : [] },
           { id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] },
-          { id: "stop-bars", data: chartData.stopBars.slice(0, detectedStopCount) },
+          { id: "stop-bars", data: showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
       }, { lazyUpdate: true })
@@ -1154,6 +1155,7 @@ function DemoSceneRenderer({
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
+      if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
       if (event.key === " ") {
         if (!syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()
@@ -1162,7 +1164,6 @@ function DemoSceneRenderer({
         return
       }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return
       const selected = selectedPingIndexesRef.current
       if (selected.length !== 2) return
       const direction = event.key === "ArrowRight" ? 1 : -1
@@ -2152,7 +2153,7 @@ export function CompareAnimationPanel({
     <Card className="h-full min-h-0 overflow-hidden py-0">
       <CardHeader className="py-3 px-4 shrink-0">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          {panel?.title ?? "Preparing visualization"}
+          {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
             <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
               <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>

@@ -49,7 +49,6 @@ export function DemoView({
   rightParamErrors,
   demoTrajectory,
   compareApiData,
-  compareLoading,
   compareError,
   demoTime,
   setDemoTime,
@@ -81,7 +80,6 @@ export function DemoView({
   rightParamErrors: Record<string, string>
   demoTrajectory: string
   compareApiData: CompareApiResponse | null
-  compareLoading: boolean
   compareError: string | null
   demoTime: number | null
   setDemoTime: (timestamp: number) => void
@@ -167,7 +165,6 @@ export function DemoView({
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
-            {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
@@ -220,7 +217,6 @@ export function DemoView({
               <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
               <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>
-            {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden">

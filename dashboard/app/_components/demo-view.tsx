@@ -8,7 +8,7 @@ import { CompareAnimationPanel } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
-import { DEMO_TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
+import { TrajectorySelector } from "./trajectory-selector"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
 
@@ -79,44 +79,6 @@ export function DemoView({
 }) {
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-  const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
-  const trajectoryOptions = (
-    <div className="space-y-1.5">
-      {DEMO_TRAJECTORY_OPTIONS.map((trajectory) => {
-        const selected = demoTrajectory === trajectory.id
-        const showingInfo = trajectoryInfoId === trajectory.id
-        return (
-          <div key={trajectory.id} className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (trajectory.id !== demoTrajectory) setTrajectoryInfoId(null)
-                  setDemoTrajectory(trajectory.id)
-                }}
-                className={`h-9 flex-1 rounded-md border px-3 text-left text-sm font-medium transition hover:bg-muted ${selected ? "bg-muted text-muted-foreground opacity-95" : "bg-background"}`}
-              >
-                {trajectory.name}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border transition hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-                aria-label={`Show ${trajectory.name} trajectory info`}
-              >
-                <HelpCircle className="h-4 w-4" />
-              </button>
-            </div>
-            {showingInfo && (
-              <div className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed text-muted-foreground">
-                {trajectory.note}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
 
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
@@ -158,7 +120,7 @@ export function DemoView({
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Trajectory</h4>
-                {trajectoryOptions}
+                <TrajectorySelector trajectoryId={demoTrajectory} onTrajectoryChange={setDemoTrajectory} />
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Algorithm</h4>
@@ -211,7 +173,7 @@ export function DemoView({
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Trajectory</h4>
-                {trajectoryOptions}
+                <TrajectorySelector trajectoryId={demoTrajectory} onTrajectoryChange={setDemoTrajectory} />
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Left</h4>

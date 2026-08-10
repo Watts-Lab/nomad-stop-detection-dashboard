@@ -8,31 +8,9 @@ import { CompareAnimationPanel } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
+import { DEMO_TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
-
-const demoTrajectoryOptions = [
-  {
-    id: "two-stop",
-    name: "Two-stop trajectory",
-    note: "Ground-truth path with two stops in the destination diary.",
-  },
-  {
-    id: "four-stop-low-ha",
-    name: "Four-stop",
-    note: "Lower horizontal-accuracy radius keeps sampled pings closer to the simulated path, so this trajectory is less noisy.",
-  },
-  {
-    id: "four-stop-high-ha",
-    name: "Four-stop (noisier)",
-    note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
-  },
-  {
-    id: "commute-return",
-    name: "Commute return",
-    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
-  },
-]
 
 export function DemoView({
   compareMode,
@@ -104,7 +82,7 @@ export function DemoView({
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
   const trajectoryOptions = (
     <div className="space-y-1.5">
-      {demoTrajectoryOptions.map((trajectory) => {
+      {DEMO_TRAJECTORY_OPTIONS.map((trajectory) => {
         const selected = demoTrajectory === trajectory.id
         const showingInfo = trajectoryInfoId === trajectory.id
         return (

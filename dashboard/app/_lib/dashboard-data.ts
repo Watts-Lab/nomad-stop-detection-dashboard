@@ -22,6 +22,29 @@ export const LEARN_FAMILIES = [
   { id: "density", title: "Density-Based Algorithms" },
 ]
 
+export const DEMO_TRAJECTORY_OPTIONS = [
+  {
+    id: "two-stop",
+    name: "Two-stop trajectory",
+    note: "Ground-truth path with two stops in the destination diary.",
+  },
+  {
+    id: "four-stop-low-ha",
+    name: "Four-stop",
+    note: "Lower horizontal-accuracy radius keeps sampled pings closer to the simulated path, so this trajectory is less noisy.",
+  },
+  {
+    id: "four-stop-high-ha",
+    name: "Four-stop (noisier)",
+    note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
+  },
+  {
+    id: "commute-return",
+    name: "Commute return",
+    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
+  },
+]
+
 export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
 export const DUR_MIN_VALUES = [5, 10]

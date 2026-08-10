@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DEMO_TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 import { parameterDisplayName, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import { publicPath } from "../_lib/public-path"
@@ -358,7 +359,7 @@ export function MetricsView({
               <Select value={trajectory} onValueChange={setTrajectory}>
                 <SelectTrigger className="h-10 w-full text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {manifest.scenarios.map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}
+                  {manifest.scenarios.map((item) => <SelectItem key={item.id} value={item.id}>{DEMO_TRAJECTORY_OPTIONS.find((trajectory) => trajectory.id === item.id)?.name ?? item.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

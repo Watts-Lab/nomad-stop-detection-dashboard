@@ -192,7 +192,6 @@ export function MetricsView({
   metricsLeftParameter,
   metricsRightParameter,
   selectedUserId,
-  selectedDemoAgentAvailable,
   trajectory,
   setMetricsCompareMode,
   setMetricsLeftAlgorithm,
@@ -200,7 +199,6 @@ export function MetricsView({
   setMetricsLeftParameter,
   setMetricsRightParameter,
   setTrajectory,
-  openSelectedDemoAgent,
   openPinnedAgent,
   startTour,
 }: {
@@ -210,7 +208,6 @@ export function MetricsView({
   metricsLeftParameter: string
   metricsRightParameter: string
   selectedUserId?: string
-  selectedDemoAgentAvailable: boolean
   trajectory: string
   setMetricsCompareMode: (value: boolean) => void
   setMetricsLeftAlgorithm: (algorithm: string) => void
@@ -218,7 +215,6 @@ export function MetricsView({
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
   setTrajectory: (trajectory: string) => void
-  openSelectedDemoAgent: () => void
   openPinnedAgent: (pinned: MetricsPoint) => void
   startTour: () => void
 }) {
@@ -366,9 +362,6 @@ export function MetricsView({
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={openSelectedDemoAgent} disabled={!selectedDemoAgentAvailable} className="w-full">
-              Open agent selected in Demo
-            </Button>
             <Button
               variant={metricsCompareMode ? "default" : "outline"}
               size="sm"

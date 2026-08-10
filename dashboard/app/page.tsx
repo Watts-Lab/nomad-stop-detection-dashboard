@@ -186,13 +186,6 @@ function NomadDashboard() {
     syncUrl("metrics")
   }, [compareApiData, compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
 
-  const openSelectedDemoAgent = useCallback(() => {
-    const userId = compareApiData?.left.scene?.user_id
-    if (!userId) return
-    setDemoTrajectory(compareApiData.trajectory)
-    setMetricsSelectedUserId(userId)
-  }, [compareApiData])
-
   const handleMetricsPointSelect = useCallback((payload: MetricsPoint) => {
     const algoDef = algorithms.find((a) => a.id === payload.algoId)
     if (!algoDef || !Number.isFinite(payload.value)) return
@@ -354,7 +347,6 @@ function NomadDashboard() {
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
           selectedUserId={metricsSelectedUserId ?? undefined}
-          selectedDemoAgentAvailable={Boolean(compareApiData?.left.scene?.user_id)}
           trajectory={demoTrajectory}
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
@@ -365,7 +357,6 @@ function NomadDashboard() {
             setDemoTrajectory(trajectory)
             setMetricsSelectedUserId(null)
           }}
-          openSelectedDemoAgent={openSelectedDemoAgent}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />

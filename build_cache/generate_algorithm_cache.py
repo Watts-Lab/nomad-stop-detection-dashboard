@@ -363,7 +363,6 @@ def label_lachesis(sparse_df, params, key):
         dt_max=params["dmx"],
         delta_roam=params["dr"],
         dur_min=params["dmn"],
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -376,7 +375,6 @@ def label_sequential_centroid(sparse_df, params, key):
         dur_min=params["dmn"],
         method="centroid",
         return_anchors=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -389,7 +387,6 @@ def label_sequential_first(sparse_df, params, key):
         dur_min=params["dmn"],
         method="sliding",
         return_anchors=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -420,7 +417,6 @@ def label_seqscan(sparse_df, params, key):
         dur_min=params["dmn"],
         back_merge=False,
         return_cores=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -433,7 +429,6 @@ def label_st_dbscan(sparse_df, params, key):
         min_pts=params["mp"],
         remove_overlaps=params["ro"],
         return_cores=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -447,7 +442,6 @@ def label_dbstop(sparse_df, params, key):
         dur_min=params["dmn"],
         back_merge=False,
         return_cores=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 
@@ -461,7 +455,6 @@ def label_hdbscan(sparse_df, params, key):
         min_cluster_size=1,
         dur_min=params["dmn"],
         return_cores=True,
-        config_key=key,
         traj_cols=TRAJ_COLS,
     )
 

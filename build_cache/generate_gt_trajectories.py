@@ -61,8 +61,12 @@ def generate_trajectories(keys):
                 step_seed=par["seed_trajectory"][i],
             )
 
-            agent.sample_trajectory(
+            agent.set_beta_params(
+                beta_start=agent_value(par["beta_start"], i),
+                beta_durations=agent_value(par["beta_durations"], i),
                 beta_ping=agent_value(par["beta_ping"], i),
+            )
+            agent.sample_trajectory(
                 seed=par["seed_sparsity"][i],
                 ha=agent_value(par["ha"], i),
                 pareto_prior=False,

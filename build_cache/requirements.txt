@@ -1,1 +1,1 @@
-nomad @ git+https://github.com/Watts-Lab/nomad.git@cores_refactor
+nomad @ git+https://github.com/Watts-Lab/nomad.git@4770c09fd083e96ca81ddd96c7a95fcf8181a380

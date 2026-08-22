@@ -23,8 +23,6 @@ When generating a summary of your work, consider these points:
 
 - **Don't dismiss test failures as "unrelated to the latest changes."** such a claim is very dangerous and should only be made if the test was failing before the changes. Instead use adversarial skepticism. 
 
-- This library relies heavily on Pandas, GeoPandas and PySpark. Accordingly, a common cause for inefficiency is relying on Pandas-level for loops and iterators. Whenever possible, lean on vectorized operations and optimized objects. E.g. a Pandas Series with native multi-index operations might be a better choice than a dictionary, but a Numpy array might be better for speedups in demanding operations.
-
 - You must always lay out a clear plan, aligned with the rules described here, before editing the code. This plan should reference what will be changed, but should also emphasize the "why" and the strategy. When the implementation of this plan is straightforward, you can proceed with editing right away. If it seems broader, affecting many files, or potentially breaking things, wait for human feedback. 
 
 - Jupyter notebooks used in docs and in examples should have a paired .py file using Jupytext. These should be favored when refactoring or analyzing diffs.
@@ -33,8 +31,6 @@ When generating a summary of your work, consider these points:
 - **No type hints in function signatures.** Instead, the parameter types are in the docstring.
 - **All imports go in the file header and not inside functions.** Except in rare cases in which we want to avoid circular imports, in any case, it is worth flagging such cases for a human to review.
 - Always give a pass to similar methods or modules to get a sense of the code style and conventions before planning or refactoring. Even look at code in Jupyter notebooks or in the documentation.
-- This library maintains flexibility in column names, coordinate projections, and time formats, for several types of canonical inputs (pings, stops, contact tables, places of interest, visits), instead of requiring users to rename their columns. To aid with this purpose, there are several helper functions in nomad.io.base which parse column names, fall back to defaults, or resolve ambiguities. There are other helpers in nomad.filters which assist in reprojection of coordinates or going back and forward between temporal data types. Do not reimplement these methods. Instead, see how they are used in other parts of the codebase and use them similarly.
-- Despite this flexibility in input formats and names, the private methods of nomad do typically expect certain canonical columns and have default names for them, e.g. 'timestamp' for unix time in seconds, 'x', and 'y' for projected coordinates, 'user_id', etc. These can be found in constants.py and play an important role in managing inputs. 
 - Wrapper and helper functions require a good justification for existing, following design or style choices rather than vague notions of efficiency and organization. Excessive wrappers and helper functions make the code harder to review and should be avoided, maybe even moved to their own issue and PR. 
 
 ## Interaction preferences

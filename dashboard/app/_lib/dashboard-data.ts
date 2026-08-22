@@ -57,14 +57,14 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   "Grid-Based": {
     source: "cached_results/stop-detection-cache/gridbased",
     sweep_parameter: "cell_size",
-    fixed_parameters: ["min_time=5", "min_cluster_size=2"],
+    fixed_parameters: ["time_thresh=60", "dur_min=5", "min_cluster_size=2"],
   },
 }
 
 export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
 export const DUR_MIN_VALUES = [5, 10]
-export const CELL_SIZE_VALUES = [25, 37.5, 50, 75, 100, 175, 250, 375, 500]
+export const CELL_SIZE_VALUES = [8, 9, 10, 11, 12]
 
 export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
   dbstop: {
@@ -106,8 +106,9 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
-    cell_size: { min: 25, max: 500, step: 12.5, allowedValues: CELL_SIZE_VALUES },
-    min_time: { min: 5, max: 10, step: 5, allowedValues: [5, 10] },
+    cell_size: { min: 8, max: 12, step: 1, allowedValues: CELL_SIZE_VALUES },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
 }
 
@@ -155,8 +156,8 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   "Grid-Based": [
-    { value: "cell_size", label: "cell_size", min: 0, max: 500 },
-    { value: "min_time", label: "min_time", min: 0, max: 180 },
+    { value: "cell_size", label: "cell_size", min: 8, max: 12 },
+    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
 }
 
@@ -229,8 +230,9 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "cell_size", defaultValue: "100", description: "Grid cell size, in meters." },
-      { name: "min_time", defaultValue: "5", description: "Minimum dwell time inside a cell, in minutes." },
+      { name: "cell_size", defaultValue: "10", description: "H3 resolution used to tessellate the trajectory." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum gap between pings in the same cell, in minutes." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
     ],
   },
   {

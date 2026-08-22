@@ -38,7 +38,10 @@ def main():
         subprocess.run([sys.executable, str(CONFIG_DIR / "generate_configs.py"), config_key], check=True)
 
     if not args.skip_trajectories:
-        generate_trajectories([config_key for config_key, _, _ in SCENARIOS])
+        generate_trajectories(
+            [config_key for config_key, _, _ in SCENARIOS],
+            args.max_users,
+        )
 
     for config_key, output_dir, public_name in SCENARIOS:
         generate_cache(

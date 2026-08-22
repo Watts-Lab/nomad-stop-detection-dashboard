@@ -8,7 +8,6 @@ import { LearnView } from "./_components/learn-view"
 import { MetricsView } from "./_components/metrics-view"
 import {
   DEMO_ALGORITHM_IDS,
-  DEMO_PARAM_ALIASES,
   FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
   METRICS_SWEEP_PARAMETERS,
@@ -51,6 +50,7 @@ function NomadDashboard() {
   const [demoTime, setDemoTime] = useState<number | null>(null)
   const [showGroundTruth, setShowGroundTruth] = useState(true)
   const [showStops, setShowStops] = useState(true)
+  const [showXray, setShowXray] = useState(true)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
@@ -89,31 +89,6 @@ function NomadDashboard() {
     if (!leftAlgo || !rightAlgo) return
     const requestId = ++compareRequestIdRef.current
 
-    const parseParams = (algoId: string, normalized: Record<string, number>) => {
-      const out: Record<string, number> = { ...normalized }
-      if (algoId === "dbscan") {
-        out.dist_thresh = out.eps_spatial ?? 10
-        out.time_thresh = out.T_max ?? 60
-        out.min_pts = out.minPts ?? 3
-      }
-      if (algoId === "dbstop" || algoId === "seqscan" || algoId === "hdbscan") {
-        out.dist_thresh = out.dist_thresh ?? 10
-        out.time_thresh = out.time_thresh ?? 60
-        out.min_pts = out.min_pts ?? 3
-        out.dur_min = out.dur_min ?? 5
-      }
-      if (algoId === "gridbased") {
-        out.cell_size = out.cell_size ?? 100
-        out.min_time = out.min_time ?? 5
-      }
-      if (algoId === "lachesis" || algoId === "sequential-centroid" || algoId === "sequential-first") {
-        out.dt_max = out.dt_max ?? 60
-        out.delta_roam = out.delta_roam ?? 25
-        out.dur_min = out.dur_min ?? 5
-      }
-      return out
-    }
-
     const leftValidation = validateAlgorithmParams(leftAlgorithm, leftAlgo, leftParams)
     const rightValidation = validateAlgorithmParams(rightAlgorithm, rightAlgo, rightParams)
     setLeftParamErrors(leftValidation.errors)
@@ -125,8 +100,6 @@ function NomadDashboard() {
 
     setCompareLoading(true)
     setCompareError(null)
-    setCompareApiData(null)
-    setDemoTime(null)
     try {
       const data = await loadCompareData({
         seed,
@@ -134,16 +107,15 @@ function NomadDashboard() {
         trajectory: demoTrajectory,
         mode: compareMode ? "compare" : "single",
         left: {
-          algo: leftAlgorithm === "dbscan" ? "tadbscan" : leftAlgorithm,
-          params: parseParams(leftAlgorithm, leftValidation.normalized),
+          algo: leftAlgorithm,
+          params: leftValidation.normalized,
         },
         right: {
-          algo: rightAlgorithm === "dbscan" ? "tadbscan" : rightAlgorithm,
-          params: parseParams(rightAlgorithm, rightValidation.normalized),
+          algo: rightAlgorithm,
+          params: rightValidation.normalized,
         },
       })
       if (requestId !== compareRequestIdRef.current) return
-      setDemoTime(null)
       setCompareApiData(data)
     } catch (err) {
       if (requestId !== compareRequestIdRef.current) return
@@ -156,10 +128,8 @@ function NomadDashboard() {
 
   const handleNewTrajectory = useCallback(() => {
     setRequestedUserId(null)
-    const nextSeed = compareSeed + 1
-    setCompareSeed(nextSeed)
-    void runCompareVisualization(nextSeed)
-  }, [compareSeed, runCompareVisualization])
+    setCompareSeed((seed) => seed + 1)
+  }, [])
 
   const loadMetricsOptions = useCallback(async () => {
     try {
@@ -217,12 +187,11 @@ function NomadDashboard() {
     const algoDef = algorithms.find((a) => a.id === payload.algoId)
     if (!algoDef || !payload.userId || !payload.param || !Number.isFinite(payload.value)) return
 
-    const aliasMap = DEMO_PARAM_ALIASES[payload.algoId as string] ?? {}
     const nextParams: Record<string, string> = {}
     for (const [name, value] of Object.entries(payload.fixed ?? {})) {
-      nextParams[aliasMap[name] ?? name] = value
+      nextParams[name] = value
     }
-    nextParams[aliasMap[payload.param] ?? payload.param] = String(payload.value)
+    nextParams[payload.param] = String(payload.value)
 
     setLeftAlgorithm(algoDef.id)
     setLeftParams(nextParams)
@@ -291,6 +260,7 @@ function NomadDashboard() {
   const prepareTour = useCallback(() => {
     setShowGroundTruth(true)
     setShowStops(true)
+    setShowXray(true)
     const lastPing = compareApiData?.left?.scene?.pings.slice(-1)[0]
     if (lastPing) setDemoTime(lastPing.timestamp)
   }, [compareApiData])
@@ -322,6 +292,16 @@ function NomadDashboard() {
       void runCompareVisualization(compareSeed)
     }
   }, [activeView, compareSeed, runCompareVisualization, leftAlgorithm, rightAlgorithm])
+
+  useEffect(() => {
+    const pings = compareApiData?.left.scene.pings
+    if (!pings?.length) return
+    setDemoTime((current) => (
+      current !== null && pings.some((ping) => ping.timestamp === current)
+        ? current
+        : pings[pings.length - 1].timestamp
+    ))
+  }, [compareApiData])
 
   useEffect(() => {
     void loadMetricsOptions()
@@ -363,6 +343,7 @@ function NomadDashboard() {
           compareMode={compareMode}
           showGroundTruth={showGroundTruth}
           showStops={showStops}
+          showXray={showXray}
           leftAlgo={leftAlgo}
           rightAlgo={rightAlgo}
           demoAlgorithms={demoAlgorithms}
@@ -379,6 +360,7 @@ function NomadDashboard() {
           setDemoTime={handleDemoTimeChange}
           setShowGroundTruth={setShowGroundTruth}
           setShowStops={setShowStops}
+          setShowXray={setShowXray}
           setLeftParams={setLeftParams}
           setRightParams={setRightParams}
           setLeftParamErrors={setLeftParamErrors}

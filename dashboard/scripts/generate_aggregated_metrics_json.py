@@ -36,23 +36,22 @@ def load_manifest(cache_dir):
         return json.load(f)
 
 
-def load_configs(cache_dir, manifest):
-    # configs.json holds every algorithm's swept parameters (full names, already
-    # matching metrics/labels column names) plus the human-readable key, keyed by
-    # config_id so it can be joined onto each algorithm's metrics.parquet.
-    with open(cache_dir / manifest["shared_files"]["configs"], "r", encoding="utf-8") as f:
-        payload = json.load(f)
-    return pd.DataFrame(payload["configs"])
+def load_configs(cache_dir, file_spec):
+    with open(cache_dir / file_spec["configs"], "r", encoding="utf-8") as f:
+        rows = json.load(f)["configs"]
+    return pd.DataFrame([
+        {"config_id": row["config_id"], "key": row["key"], **row["params"]}
+        for row in rows
+    ])
 
 
 def output_name(algorithm):
     return f"{algorithm}_results.parquet"
 
 
-def load_metrics(cache_dir, file_spec, algorithm_key, configs):
+def load_metrics(cache_dir, file_spec, configs):
     metrics = pd.read_parquet(cache_dir / file_spec["metrics"])
-    algo_configs = configs.loc[configs["algorithm"] == algorithm_key, ["config_id", "key"] + file_spec["parameter_columns"]]
-    merged = metrics.merge(algo_configs, on="config_id", how="left")
+    merged = metrics.merge(configs, on="config_id", how="left")
     merged["algorithm"] = file_spec["display_name"]
     return merged
 
@@ -63,12 +62,14 @@ def ordered_columns(metrics, parameter_names):
     return base + params
 
 
-def write_algorithm_results(cache_dir, output_dir, algorithm_key, file_spec, configs):
-    metrics = load_metrics(cache_dir, file_spec, algorithm_key, configs)
-    metrics = metrics.loc[:, ordered_columns(metrics, file_spec["parameter_columns"])].sort_values(["key", "user_id"])
+def write_algorithm_results(cache_dir, output_dir, algorithm_key, file_spec):
+    configs = load_configs(cache_dir, file_spec)
+    parameter_names = [column for column in configs if column not in {"config_id", "key"}]
+    metrics = load_metrics(cache_dir, file_spec, configs)
+    metrics = metrics.loc[:, ordered_columns(metrics, parameter_names)].sort_values(["key", "user_id"])
     output_path = output_dir / output_name(algorithm_key)
     metrics.to_parquet(output_path, engine="pyarrow", compression="zstd", index=False)
-    return output_path, len(metrics), metrics["key"].nunique()
+    return output_path, len(metrics), len(configs)
 
 
 def main():
@@ -76,7 +77,6 @@ def main():
     cache_dir = Path(args.cache_dir)
     output_dir = Path(args.output_dir)
     manifest = load_manifest(cache_dir)
-    configs = load_configs(cache_dir, manifest)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -86,7 +86,6 @@ def main():
             output_dir,
             algorithm_key,
             manifest["algorithms"][algorithm_key],
-            configs,
         )
         rows.append({"algorithm": algorithm_key, "records": records, "configs": n_configs, "path": str(output_path)})
 

@@ -30,11 +30,9 @@ export function DemoParameterControls({
       {algo.parameters.map((param) => {
         const rule = editableRules[param.name]
         const value = Number(paramInputValue(values, param.name, param.defaultValue))
-        const label = rule?.label ?? (
-          param.name === "delta_roam"
-            ? <span className="inline-flex items-baseline gap-0.5 font-sans">Δ<sub className="text-[0.7em] leading-none">roam</sub></span>
-            : param.name
-        )
+        const label = param.name === "delta_roam"
+          ? <span className="inline-flex items-baseline gap-0.5 font-sans">Δ<sub className="text-[0.7em] leading-none">roam</sub></span>
+          : param.name
         const optionCount = rule ? Math.floor((rule.max - rule.min) / rule.step) + 1 : 0
         const discreteOptions = rule?.allowedValues ?? (
           rule && optionCount > 0 && optionCount <= 5

@@ -1,23 +1,14 @@
+export type AlignedStopResult =
+  | { kind: "labels"; cluster: number[] }
+  | { kind: "anchor"; cluster: number[]; aux_time: Array<number | null> }
+  | { kind: "density"; cluster: number[]; core: number[]; aux_time: Array<number | null> }
+
 export type ComparePanelResponse = {
   algo: string
   title: string
-  available: boolean
-  scene?: CompareScene | null
-  params?: Record<string, number>
-  labels?: number[]
-  corePoints?: Array<{
-    timestamp: number
-    role: number
-    sourceTimestamp: number
-    coreTimestamp: number
-    sourceCoreTimestamp: number
-    cluster: number
-    x: number
-    y: number
-    sourceX: number
-    sourceY: number
-  }>
-  configKey?: string | null
+  scene: CompareScene
+  params: Record<string, number>
+  result: AlignedStopResult
 }
 
 export type CompareApiResponse = {

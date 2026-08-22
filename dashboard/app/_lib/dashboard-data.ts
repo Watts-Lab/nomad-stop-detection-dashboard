@@ -6,7 +6,6 @@ export type DemoEditableParam = {
   max: number
   step: number
   allowedValues?: number[]
-  label?: string
 }
 
 export const SEQUENTIAL_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/sequential_algorithms_card.svg")
@@ -23,7 +22,6 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   Lachesis: {
     source: "Generated stop-detection cache",
     sweep_parameter: "delta_roam",
-    sweep_note: "UI sweep is scaled as 1.7 × value for Lachesis.",
     fixed_parameters: ["dt_max=60", "dur_min=5"],
   },
   "Sequential (Centroid)": {
@@ -87,39 +85,39 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
-  dbscan: {
-    eps_spatial: { min: 0, max: 50, step: 2.5, label: "dist_thresh" },
-    T_max: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES, label: "time_thresh" },
-    minPts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES, label: "min_pts" },
+  st_dbscan: {
+    dist_thresh: { min: 0, max: 50, step: 2.5 },
+    time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
+    min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
   },
   lachesis: {
     delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
-  "sequential-centroid": {
+  sequential_centroid: {
     delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
-  "sequential-first": {
+  sequential_first: {
     delta_roam: { min: 5, max: 120, step: 2.5 },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
     cell_size: { min: 25, max: 500, step: 12.5, allowedValues: CELL_SIZE_VALUES },
-    min_time: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
+    min_time: { min: 5, max: 10, step: 5, allowedValues: [5, 10] },
   },
 }
 
 export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
   dbstop: "DBSTOP",
   lachesis: "Lachesis",
-  "sequential-centroid": "Sequential (Centroid)",
-  "sequential-first": "Sequential (First)",
+  sequential_centroid: "Sequential (Centroid)",
+  sequential_first: "Sequential (First)",
   seqscan: "SeqScan",
-  dbscan: "ST-DBSCAN",
+  st_dbscan: "ST-DBSCAN",
   hdbscan: "HDBSCAN",
   gridbased: "Grid-Based",
 }
@@ -127,15 +125,6 @@ export const METRICS_ALGORITHM_BY_DEMO_ID: Record<string, string> = {
 export const DEMO_ID_BY_METRICS_ALGORITHM: Record<string, string> = Object.fromEntries(
   Object.entries(METRICS_ALGORITHM_BY_DEMO_ID).map(([demoId, metricsName]) => [metricsName, demoId]),
 )
-
-// Maps notebook/metrics parameter names to the demo's editable-param keys where they differ.
-export const DEMO_PARAM_ALIASES: Record<string, Record<string, string>> = {
-  dbscan: {
-    dist_thresh: "eps_spatial",
-    time_thresh: "T_max",
-    min_pts: "minPts",
-  },
-}
 
 export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
   DBSTOP: [
@@ -199,7 +188,7 @@ export const algorithms = [
     ],
   },
   {
-    id: "sequential-centroid",
+    id: "sequential_centroid",
     name: "Sequential (centroid-anchored)",
     family: "sequential",
     shortDesc: "Sequential stop detection anchored by the evolving candidate centroid.",
@@ -215,19 +204,19 @@ export const algorithms = [
     ],
   },
   {
-    id: "sequential-first",
+    id: "sequential_first",
     name: "Sequential (first-anchored)",
     family: "sequential",
     shortDesc: "Sequential stop detection anchored by the first ping in the candidate stop.",
     description: "The first-anchored sequential method scans pings chronologically and compares new pings with the first ping in the active candidate stop. This copy is provisional until the exact source language is added.",
-    source: "NOMAD sequential stop detection, method='first' (placeholder source)",
+    source: "NOMAD sequential stop detection, method='sliding' (placeholder source)",
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
       { name: "delta_roam", defaultValue: "25", description: "Maximum distance from the first ping in the candidate stop, in meters." },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
-      { name: "method", defaultValue: "first", description: "Anchoring rule for the candidate stop center." },
+      { name: "method", defaultValue: "sliding", description: "Anchoring rule for the candidate stop center." },
     ],
   },
   {
@@ -245,7 +234,7 @@ export const algorithms = [
     ],
   },
   {
-    id: "dbscan",
+    id: "st_dbscan",
     name: "ST-DBSCAN",
     family: "density",
     shortDesc: "Density-based clustering with spatial and temporal neighborhood thresholds.",
@@ -254,9 +243,9 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "eps_spatial", defaultValue: "50", description: "Spatial neighborhood radius, in meters." },
-      { name: "T_max", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage, in minutes." },
-      { name: "minPts", defaultValue: "3", description: "Minimum neighbors required for a core point." },
+      { name: "dist_thresh", defaultValue: "50", description: "Spatial neighborhood radius, in meters." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage, in minutes." },
+      { name: "min_pts", defaultValue: "3", description: "Minimum neighbors required for a core point." },
     ],
   },
   {

@@ -38,6 +38,7 @@ export function DemoView({
   compareMode,
   showGroundTruth,
   showStops,
+  showXray,
   leftAlgo,
   rightAlgo,
   demoAlgorithms,
@@ -54,6 +55,7 @@ export function DemoView({
   setDemoTime,
   setShowGroundTruth,
   setShowStops,
+  setShowXray,
   setLeftParams,
   setRightParams,
   setLeftParamErrors,
@@ -69,6 +71,7 @@ export function DemoView({
   compareMode: boolean
   showGroundTruth: boolean
   showStops: boolean
+  showXray: boolean
   leftAlgo: AlgorithmDefinition | undefined
   rightAlgo: AlgorithmDefinition | undefined
   demoAlgorithms: AlgorithmDefinition[]
@@ -85,6 +88,7 @@ export function DemoView({
   setDemoTime: (timestamp: number) => void
   setShowGroundTruth: (checked: boolean) => void
   setShowStops: (checked: boolean) => void
+  setShowXray: (checked: boolean) => void
   setLeftParams: ParamStateSetter
   setRightParams: ParamStateSetter
   setLeftParamErrors: ParamStateSetter
@@ -158,13 +162,17 @@ export function DemoView({
             <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
             Detected Stops
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <Checkbox checked={showXray} onCheckedChange={(checked) => setShowXray(checked === true)} />
+            X-ray
+          </label>
         </div>
       </div>
 
       {!compareMode ? (
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
-            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
@@ -214,8 +222,8 @@ export function DemoView({
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
+              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
+              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>

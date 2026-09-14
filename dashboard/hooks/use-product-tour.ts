@@ -68,10 +68,17 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     },
   },
   {
+    element: "[data-tour='tour-data']",
+    popover: {
+      title: "Choose the Scenario and Agent",
+      description: "Changing the trajectory automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+    },
+  },
+  {
     element: "[data-tour='tour-params']",
     popover: {
-      title: "Choose the Scenario, Algorithm, and Parameters",
-      description: "Changing the trajectory, algorithm, or any editable parameter automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+      title: "Choose the Algorithm and Parameters",
+      description: "Changing the algorithm or any editable parameter automatically reruns the visualization.",
     },
   },
   {

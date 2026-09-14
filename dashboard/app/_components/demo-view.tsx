@@ -83,7 +83,20 @@ export function DemoView({
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-  const trajectoryOptions = <TrajectoryOptions value={demoTrajectory} onChange={setDemoTrajectory} />
+  const dataPanel = (
+    <Card className="min-h-0 overflow-hidden bg-[#f8f9fc]" data-tour="tour-data">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
+          <TrajectoryOptions value={demoTrajectory} onChange={setDemoTrajectory} />
+        </div>
+        <Button onClick={handleNewTrajectory} size="lg" className="nomad-action mt-auto w-full">
+          <RefreshCw className="h-4 w-4" />
+          New Agent
+        </Button>
+      </CardContent>
+    </Card>
+  )
 
   // Apply reveal classes to the header and active panel layout.
   return (
@@ -116,7 +129,8 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+          {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
@@ -128,10 +142,6 @@ export function DemoView({
                   <Columns2 className="h-4 w-4" />
                   Compare Algorithms
                 </Button>
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
-                {trajectoryOptions}
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-[#3b1370]">Algorithm</h4>
@@ -169,16 +179,13 @@ export function DemoView({
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
                 </Button>
-                <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
-                  <RefreshCw className="h-4 w-4" />
-                  New Agent
-                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       ) : (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+          {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
               <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
@@ -193,10 +200,6 @@ export function DemoView({
                 <Square className="h-4 w-4" />
                 Single
               </Button>
-              </div>
-              <div className="space-y-2">
-              <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
-                {trajectoryOptions}
               </div>
               <div className="space-y-2">
               <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
@@ -258,10 +261,6 @@ export function DemoView({
                 <Button variant="outline" onClick={openMetricsFromDemo} size="lg" className="w-full">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
-                </Button>
-                <Button onClick={handleNewTrajectory} size="lg" className="nomad-action w-full">
-                  <RefreshCw className="h-4 w-4" />
-                  New Agent
                 </Button>
               </div>
             </CardContent>

@@ -34,6 +34,9 @@ const demoTrajectoryOptions = [
   },
 ]
 
+// Render single or comparison Demo panels and connect their controls
+// to parent-provided handlers. Keep trajectory-info visibility and
+// comparison replay/playback coordination local to this view.
 export function DemoView({
   compareMode,
   showGroundTruth,
@@ -97,9 +100,15 @@ export function DemoView({
   openMetricsFromDemo: () => void
   startTour: () => void
 }) {
+
+  // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+
+  // Track which trajectory description is open; null closes all descriptions.
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
+
+  // Build trajectory buttons with CSS hover styling and expandable descriptions.
   const trajectoryOptions = (
     <div className="space-y-1.5">
       {demoTrajectoryOptions.map((trajectory) => {
@@ -111,6 +120,8 @@ export function DemoView({
               <button
                 type="button"
                 onClick={() => {
+
+                  // Close the description when switching trajectories, then select the trajectory.
                   if (trajectory.id !== demoTrajectory) setTrajectoryInfoId(null)
                   setDemoTrajectory(trajectory.id)
                 }}
@@ -120,6 +131,8 @@ export function DemoView({
               </button>
               <button
                 type="button"
+
+                // Toggle this trajectory's description without changing the selected trajectory.
                 onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
                 className={`flex h-8 w-8 items-center justify-center rounded-full border transition hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 aria-label={`Show ${trajectory.name} trajectory info`}
@@ -138,12 +151,15 @@ export function DemoView({
     </div>
   )
 
+  // Apply reveal classes to the header and active panel layout.
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           {!compareMode && (
+
+            /* Start the Demo guided tour. */
             <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
               <HelpCircle className="h-4 w-4" />
             </Button>
@@ -151,6 +167,7 @@ export function DemoView({
         </div>
         <div className="flex flex-wrap items-center gap-4" data-tour="tour-layers">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+
             <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
             Ground Truth
           </label>

@@ -20,6 +20,8 @@ type PinnedAgent = {
   fixed: Record<string, string>
 }
 
+// Display the pinned agent's metrics and a button to open it in Demo;
+// show selection instructions when no agent is pinned.
 function PinnedAgentCard({
   pinned,
   openDemo,
@@ -57,6 +59,7 @@ function PinnedAgentCard({
   )
 }
 
+// Display the algorithm's fixed parameters as read-only rows.
 function MetricsParameterRows({
   algorithm,
   note,
@@ -86,6 +89,8 @@ function MetricsParameterRows({
   )
 }
 
+// Embed a metrics chart, show its loading placeholder,
+// and forward guided-tour focus messages when enabled.
 function MetricsFrame({
   src,
   title,
@@ -107,6 +112,8 @@ function MetricsFrame({
     // loading it before React hydrates and attaches the onLoad handler below, silently
     // missing that event. Poll contentDocument.readyState as a fallback for that race.
     let cancelled = false
+    // Check iframe readiness in case loading finished before React attached onLoad
+    // Hide the placeholder once the document is complete.
     const checkLoaded = () => {
       if (cancelled) return
       try {
@@ -128,10 +135,13 @@ function MetricsFrame({
   useEffect(() => {
     if (!showTourTargets) return
 
+    // Remember the current tour focus and send it to the embedded chart.
     const postTourFocus = (mode: string | null) => {
       tourFocusRef.current = mode
       iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode }, window.location.origin)
     }
+
+    // Forward the requested focus from a guided-tour event to the chart.
     const handleTourFocus = (event: Event) => {
       postTourFocus(event instanceof CustomEvent ? event.detail : null)
     }
@@ -171,6 +181,8 @@ function MetricsFrame({
   )
 }
 
+// Render single or comparison Metrics charts and their controls,
+// and maintain the selected-agent cards using messages from the charts.
 export function MetricsView({
   metricsCompareMode,
   metricsAlgorithms,
@@ -218,6 +230,9 @@ export function MetricsView({
   const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
 
   useEffect(() => {
+
+    // Receive same-origin pin updates and update the matching agent card.
+    // Clear the card when the message lacks a string agent ID or finite metrics.
     const handlePinChange = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
       if (event.data?.type !== "nomad-metrics-pin-change") return

@@ -86,7 +86,9 @@ function DemoSceneRenderer({
   const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
   const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
   
-  // Use algorithm labels only when they match the scene's ping count
+// Each ping needs a cluster label at the same array index
+// Return [] if the scene or labels are missing, or their counts differ
+// chartData checks this result and skips chart preparation for a nonempty scene
   const labels = useMemo(() => {
     if (!scene) return []
     if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
@@ -96,7 +98,12 @@ function DemoSceneRenderer({
   // Prepare map and timeline data, including pings, stops, buildings, 
   // routes, and algorithm-specific anchors and edges
   const chartData = useMemo(() => {
+
+    // Timeline bounds require an existing scene with at least one ping.
     if (!scene || scene.pings.length === 0) return null
+
+    // The labels memo returns [] for missing or mismatched labels;
+    // stop here unless every ping has a corresponding label.
     if (labels.length !== scene.pings.length) return null
 
     const pings = scene.pings.map((ping, index) => ({
@@ -353,6 +360,8 @@ function DemoSceneRenderer({
     verticalRunsByX.forEach((spans, x) => {
       mergeAxisRuns(spans).forEach(([minY, maxY]) => streetLanes.push([[x, minY], [x, maxY]]))
     })
+
+    // These lines make the empty-pings guard necessary
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])

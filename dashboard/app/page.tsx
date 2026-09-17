@@ -58,6 +58,7 @@ function NomadDashboard() {
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
+  const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
@@ -173,9 +174,10 @@ function NomadDashboard() {
       setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[rightMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
+    setMetricsTrajectory(demoTrajectory)
     setActiveView("metrics")
     syncUrl("metrics")
-  }, [compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
+  }, [compareMode, demoTrajectory, leftAlgorithm, rightAlgorithm, syncUrl])
 
   const handleMetricsPointSelect = useCallback((payload: {
     algoId?: string
@@ -197,10 +199,11 @@ function NomadDashboard() {
     setLeftParams(nextParams)
     setLeftParamErrors({})
     setRequestedUserId(payload.userId)
+    setDemoTrajectory(metricsTrajectory)
     setCompareMode(false)
     setActiveView("demo")
     syncUrl("demo", null, "single")
-  }, [syncUrl])
+  }, [metricsTrajectory, syncUrl])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -383,6 +386,7 @@ function NomadDashboard() {
           metricsRightAlgorithm={metricsRightAlgorithm}
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
+          metricsTrajectory={metricsTrajectory}
           selectedUserId={compareApiData?.left.scene?.user_id}
           leftParameterNote={leftParameterNote}
           rightParameterNote={rightParameterNote}
@@ -392,6 +396,7 @@ function NomadDashboard() {
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
           setMetricsLeftParameter={setMetricsLeftParameter}
           setMetricsRightParameter={setMetricsRightParameter}
+          setMetricsTrajectory={setMetricsTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}
         />

@@ -18,6 +18,29 @@ export const LEARN_FAMILIES = [
   { id: "density", title: "Density-Based Algorithms" },
 ]
 
+export const TRAJECTORY_OPTIONS = [
+  {
+    id: "two-stop",
+    name: "Two-stop trajectory",
+    note: "Ground-truth path with two stops in the destination diary.",
+  },
+  {
+    id: "four-stop-low-ha",
+    name: "Four-stop",
+    note: "Lower horizontal-accuracy radius keeps sampled pings closer to the simulated path, so this trajectory is less noisy.",
+  },
+  {
+    id: "four-stop-high-ha",
+    name: "Four-stop (noisier)",
+    note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
+  },
+  {
+    id: "commute-return",
+    name: "Commute return",
+    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
+  },
+]
+
 export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   Lachesis: {
     source: "Generated stop-detection cache",
@@ -56,7 +79,7 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   },
   "Grid-Based": {
     source: "cached_results/stop-detection-cache/gridbased",
-    sweep_parameter: "cell_size",
+    sweep_parameter: "h3_resolution",
     fixed_parameters: ["time_thresh=60", "dur_min=5", "min_cluster_size=2"],
   },
 }
@@ -64,7 +87,9 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
 export const TIME_THRESH_VALUES = [60, 240]
 export const MIN_PTS_VALUES = [2, 3]
 export const DUR_MIN_VALUES = [5, 10]
-export const CELL_SIZE_VALUES = [8, 9, 10, 11, 12]
+export const DELTA_ROAM_VALUES = Array.from({ length: 21 }, (_, index) => 5 + index * 5.75)
+export const H3_RESOLUTION_VALUES = [10, 11, 12, 13]
+export const HDBSCAN_DIST_THRESH_VALUES = Array.from({ length: 15 }, (_, index) => 5 + index * 2.5)
 
 export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditableParam>> = {
   dbstop: {
@@ -80,7 +105,7 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   hdbscan: {
-    dist_thresh: { min: 0, max: 50, step: 2.5 },
+    dist_thresh: { min: 5, max: 40, step: 2.5, allowedValues: HDBSCAN_DIST_THRESH_VALUES },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
@@ -91,22 +116,22 @@ export const DEMO_EDITABLE_PARAMS: Record<string, Record<string, DemoEditablePar
     min_pts: { min: 2, max: 3, step: 1, allowedValues: MIN_PTS_VALUES },
   },
   lachesis: {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
+    delta_roam: { min: 5, max: 120, step: 5.75, allowedValues: DELTA_ROAM_VALUES },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   sequential_centroid: {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
+    delta_roam: { min: 5, max: 120, step: 5.75, allowedValues: DELTA_ROAM_VALUES },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   sequential_first: {
-    delta_roam: { min: 5, max: 120, step: 2.5 },
+    delta_roam: { min: 5, max: 120, step: 5.75, allowedValues: DELTA_ROAM_VALUES },
     dt_max: { min: 60, max: 120, step: 60, allowedValues: [60, 120] },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
   gridbased: {
-    cell_size: { min: 8, max: 12, step: 1, allowedValues: CELL_SIZE_VALUES },
+    h3_resolution: { min: 10, max: 13, step: 1, allowedValues: H3_RESOLUTION_VALUES },
     time_thresh: { min: 60, max: 240, step: 180, allowedValues: TIME_THRESH_VALUES },
     dur_min: { min: 5, max: 10, step: 5, allowedValues: DUR_MIN_VALUES },
   },
@@ -133,15 +158,15 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   Lachesis: [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   "Sequential (Centroid)": [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   "Sequential (First)": [
-    { value: "delta_roam", label: "delta_roam", min: 0, max: 120 },
+    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   SeqScan: [
@@ -152,11 +177,11 @@ export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; lab
     { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
   ],
   HDBSCAN: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
+    { value: "dist_thresh", label: "dist_thresh", min: 5, max: 40 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
   "Grid-Based": [
-    { value: "cell_size", label: "cell_size", min: 8, max: 12 },
+    { value: "h3_resolution", label: "h3_resolution", min: 10, max: 13 },
     { value: "dur_min", label: "dur_min", min: 0, max: 180 },
   ],
 }
@@ -185,7 +210,7 @@ export const algorithms = [
     parameters: [
       { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
-      { name: "delta_roam", defaultValue: "25", description: "Maximum roaming distance for a candidate stop, in meters." },
+      { name: "delta_roam", defaultValue: "28", description: "Maximum roaming distance for a candidate stop, in meters." },
     ],
   },
   {
@@ -198,7 +223,7 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "delta_roam", defaultValue: "25", description: "Maximum distance from the candidate centroid, in meters." },
+      { name: "delta_roam", defaultValue: "28", description: "Maximum distance from the candidate centroid, in meters." },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
       { name: "method", defaultValue: "centroid", description: "Anchoring rule for the candidate stop center." },
@@ -214,7 +239,7 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "delta_roam", defaultValue: "25", description: "Maximum distance from the first ping in the candidate stop, in meters." },
+      { name: "delta_roam", defaultValue: "28", description: "Maximum distance from the first ping in the candidate stop, in meters." },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
       { name: "method", defaultValue: "sliding", description: "Anchoring rule for the candidate stop center." },
@@ -230,7 +255,7 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "cell_size", defaultValue: "10", description: "H3 resolution used to tessellate the trajectory." },
+      { name: "h3_resolution", defaultValue: "10", description: "H3 resolution used to tessellate the trajectory." },
       { name: "time_thresh", defaultValue: "60", description: "Maximum gap between pings in the same cell, in minutes." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
     ],
@@ -302,5 +327,7 @@ export const algorithms = [
 
 export type AlgorithmDefinition = (typeof algorithms)[number]
 
-export const DEMO_ALGORITHM_IDS = new Set(algorithms.map((algorithm) => algorithm.id))
+export const DEMO_ALGORITHM_IDS = new Set(
+  algorithms.filter((algorithm) => algorithm.id !== "hdbscan").map((algorithm) => algorithm.id),
+)
 export const DASHBOARD_VIEWS = new Set<DashboardView>(["home", "learn", "demo", "metrics"])

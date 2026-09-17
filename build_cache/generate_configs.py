@@ -127,7 +127,7 @@ def main():
     ######################################################################
     # Config family: four-stop
     ######################################################################
-    N_reps = 5
+    N_reps = 50
     sparsity_samples = 10
     N = N_reps * sparsity_samples
     beta_ping = np.repeat(np.linspace(4, 9, sparsity_samples), N_reps).tolist()
@@ -188,7 +188,7 @@ def main():
     ######################################################################
     registry["2_stops"] = {
         "dt": 0.2,
-        "N": 250,
+        "N": 500,
         "name_count": 2,
         "name_seed": 2025,
         "city_file": str(data_dir / "garden-city.gpkg"),
@@ -202,8 +202,8 @@ def main():
         "agent_params": {
             "agent_homes": "h-x14-y11",
             "agent_workplaces": "w-x17-y8",
-            "seed_trajectory": list(range(250)),
-            "seed_sparsity": list(range(250)),
+            "seed_trajectory": list(range(500)),
+            "seed_sparsity": list(range(500)),
             "beta_ping": 7,
             "beta_durations": None,
             "beta_start": None,
@@ -213,7 +213,7 @@ def main():
 
     registry["commute_return"] = {
         "dt": 0.2,
-        "N": 250,
+        "N": 500,
         "name_count": 2,
         "name_seed": 2025,
         "city_file": str(data_dir / "garden-city.gpkg"),
@@ -227,8 +227,8 @@ def main():
         "agent_params": {
             "agent_homes": "h-x14-y11",
             "agent_workplaces": "w-x17-y8",
-            "seed_trajectory": list(range(250)),
-            "seed_sparsity": list(range(250)),
+            "seed_trajectory": list(range(500)),
+            "seed_sparsity": list(range(500)),
             "beta_ping": 7,
             "beta_durations": None,
             "beta_start": None,

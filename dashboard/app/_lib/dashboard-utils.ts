@@ -26,12 +26,12 @@ export function parameterDisplayName(name: string) {
   return name === "delta_roam" ? "Δroam" : name
 }
 
-export function prototypeChartSrc(algorithm: string, sweepParameter: string, demoAlgorithmId?: string) {
+export function prototypeChartSrc(algorithm: string, sweepParameter: string, trajectory: string, demoAlgorithmId?: string) {
   const field = sweepParameter || "delta_roam"
   const params = new URLSearchParams({
     x: field,
     field,
-    data: METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet",
+    data: `${trajectory}/${METRICS_RESULTS_FILE[algorithm] ?? "lachesis_results.parquet"}`,
     ...(demoAlgorithmId ? { algo: demoAlgorithmId } : {}),
   })
   return publicPath("/echarts-prototype/index.html") + "?" + params.toString()

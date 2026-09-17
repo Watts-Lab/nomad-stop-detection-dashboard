@@ -3,7 +3,7 @@
 This file contains additional guidance for AI agents and other AI editors wanting to contribute to nomad. 
 
 ## AI Disclosure
-Every published summary or PR description, MUST include this disclosure: "This pull request includes code written with the assistance of AI. The code has not yet been reviewed by a human (remove this disclosure after human review).". Commit messages can say (co-authored by [AI name]) to differentiate from human-only contributions.
+Every published summary or PR description, MUST include this disclosure: "This pull request includes code written with the assistance of AI. The code has not yet been reviewed by a human (remove this disclosure after human review).". Commit messages can say (co-authored by [AI name]) to differentiate from human-only contributions. This is not required in regular chat exchanges.
 
 ## Generated Summaries
 

@@ -3,7 +3,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from tempfile import TemporaryDirectory
 
 from generate_algorithm_cache import DEFAULT_ALGORITHMS
 from generate_algorithm_cache import DEFAULT_WORKERS
@@ -42,6 +41,7 @@ def main():
             [config_key for config_key, _, _ in SCENARIOS],
             args.max_users,
         )
+        print("Synthetic trajectory generation complete.")
 
     for config_key, output_dir, public_name in SCENARIOS:
         generate_cache(
@@ -54,26 +54,9 @@ def main():
         )
         public_dir = PUBLIC_CACHE_DIR / public_name
         PUBLIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(
-            dir=PUBLIC_CACHE_DIR, prefix=f".{public_name}-"
-        ) as temp_dir:
-            staging_root = Path(temp_dir)
-            staging_dir = staging_root / "cache"
-            backup_dir = staging_root.with_name(
-                f"{staging_root.name}-previous"
-            )
-            shutil.copytree(output_dir, staging_dir)
-
-            if public_dir.exists():
-                public_dir.replace(backup_dir)
-            try:
-                staging_dir.replace(public_dir)
-            except BaseException:
-                if backup_dir.exists():
-                    backup_dir.replace(public_dir)
-                raise
-            if backup_dir.exists():
-                backup_dir.replace(staging_root / "previous")
+        if public_dir.exists():
+            shutil.rmtree(public_dir)
+        shutil.copytree(output_dir, public_dir)
 
 
 if __name__ == "__main__":

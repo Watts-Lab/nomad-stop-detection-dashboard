@@ -6,7 +6,6 @@
     "SeqScan",
     "ST-DBSCAN",
     "DBSTOP",
-    "HDBSCAN",
     "Grid-Based"
   ],
   "trajectories": [
@@ -92,9 +91,10 @@
     },
     "Grid-Based": {
       "source": "cached_results/stop-detection-cache/gridbased",
-      "sweep_parameter": "cell_size",
+      "sweep_parameter": "h3_resolution",
       "fixed_parameters": [
-        "min_time=5",
+        "time_thresh=60",
+        "dur_min=5",
         "min_cluster_size=2"
       ]
     }

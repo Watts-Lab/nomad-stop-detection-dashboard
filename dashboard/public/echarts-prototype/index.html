@@ -553,7 +553,7 @@
             fixed: fixedParameters,
           }, window.location.origin);
         });
-        window.addEventListener("resize", () => chart.resize());
+        new ResizeObserver(() => chart.resize()).observe(document.getElementById("chart"));
     })();
   </script>
 </body>

@@ -3,11 +3,12 @@ from concurrent.futures import ProcessPoolExecutor
 import json
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import shutil
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 import nomad.data as data_folder
 import nomad.filters as filters
@@ -37,15 +38,15 @@ DEFAULT_ALGORITHMS = [
     "st_dbscan",
     "dbstop",
     "seqscan",
-    "hdbscan",
 ]
-DELTA_ROAM_VALUES = [float(value) for value in np.arange(5, 120.1, 2.5)]
+DELTA_ROAM_VALUES = np.linspace(5, 120, 21).tolist()
 DIST_THRESH_VALUES = [float(value) for value in np.arange(0, 50.1, 2.5)]
+HDBSCAN_DIST_THRESH_VALUES = [float(value) for value in np.arange(5, 40.1, 2.5)]
 DUR_MIN_VALUES = [5, 10]
 TIME_THRESH_VALUES = [60, 240]
 DT_MAX_VALUES = [60, 120]
 MIN_PTS_VALUES = [2, 3]
-H3_RESOLUTION_VALUES = [8, 9, 10, 11, 12]
+H3_RESOLUTION_VALUES = [10, 11, 12, 13]
 TRAJ_COLS = {
     "user_id": "user_id",
     "timestamp": "timestamp",
@@ -319,11 +320,14 @@ def algorithm_specs():
             "display_name": "Grid-Based",
             "labeler": SEQUENTIAL.grid_based_labels,
             "result_kind": "labels",
+            "external_params": {
+                "h3_resolution": H3_RESOLUTION_VALUES,
+            },
             "params": {
-                "cell_size": H3_RESOLUTION_VALUES,
                 "time_thresh": TIME_THRESH_VALUES,
                 "dur_min": DUR_MIN_VALUES,
                 "min_cluster_size": 2,
+                "location_id": "tessellation",
             },
         },
         "st_dbscan": {
@@ -353,133 +357,134 @@ def algorithm_specs():
             "display_name": "HDBSCAN",
             "labeler": DENSITY.hdbscan_labels,
             "result_kind": "density",
-            "params": {**density_params, "min_cluster_size": 1},
+            "params": {
+                **density_params,
+                "dist_thresh": HDBSCAN_DIST_THRESH_VALUES,
+                "min_cluster_size": 1,
+            },
         },
     }
 
 
-def initialize_worker(sparse_df, diaries_df, algorithm_configurations):
+def initialize_worker(sparse_df, diaries_df, registry):
     global JOB_CONTEXT
-    JOB_CONTEXT = sparse_df, diaries_df, algorithm_configurations
+    JOB_CONTEXT = sparse_df, diaries_df, registry
 
 
 def run_user_job(user_id):
-    sparse_df, diaries_df, algorithm_configurations = JOB_CONTEXT
+    sparse_df, diaries_df, registry = JOB_CONTEXT
     user_sparse = sparse_df.loc[sparse_df.user_id == user_id]
     truth = diaries_df.loc[diaries_df.user_id == user_id]
     h3_inputs = {}
     output = {}
+    family_config_ids = {}
 
-    for family, configurations in algorithm_configurations.items():
-        result_rows = []
-        stops_frames = []
-        metric_rows = []
+    for algorithm in registry:
+        family = algorithm["family"]
+        config_id = family_config_ids.get(family, 0) + 1
+        family_config_ids[family] = config_id
+        family_output = output.setdefault(family, {"results": [], "metrics": []})
         call_kwargs = {"traj_cols": TRAJ_COLS}
         if family == "lachesis":
             call_kwargs["return_anchors"] = True
-        elif family == "gridbased":
-            call_kwargs["location_id"] = "tessellation"
         elif family in {"st_dbscan", "dbstop", "seqscan", "hdbscan"}:
             call_kwargs["return_cores"] = True
 
-        for algorithm, config_id in configurations:
-            detection_input = user_sparse
-            if family == "gridbased":
-                resolution = algorithm["params"]["cell_size"]
-                if resolution not in h3_inputs:
-                    grid_input = user_sparse.copy()
-                    grid_input["tessellation"] = filters.to_tessellation(
-                        grid_input,
-                        index="h3",
-                        res=resolution,
-                        data_crs="EPSG:3857",
-                        traj_cols=TRAJ_COLS,
-                    )
-                    h3_inputs[resolution] = grid_input
-                detection_input = h3_inputs[resolution]
+        detection_input = user_sparse
+        if family == "gridbased":
+            resolution = algorithm["params"]["h3_resolution"]
+            if resolution not in h3_inputs:
+                grid_input = user_sparse.copy()
+                grid_input["tessellation"] = filters.to_tessellation(
+                    grid_input,
+                    index="h3",
+                    res=resolution,
+                    data_crs="EPSG:3857",
+                    traj_cols=TRAJ_COLS,
+                )
+                h3_inputs[resolution] = grid_input
+            detection_input = h3_inputs[resolution]
 
-            result = algorithm["call"](detection_input, **call_kwargs)
-            if isinstance(result, pd.Series):
-                result = result.to_frame()
-            result = result.rename(columns={
-                "promotion_time": "aux_time",
-                "anchor_time": "aux_time",
-            })
+        result = registry.time_call(algorithm, detection_input, **call_kwargs)
+        if isinstance(result, pd.Series):
+            result = result.to_frame()
+        result = result.rename(columns={
+            "promotion_time": "aux_time",
+            "anchor_time": "aux_time",
+        })
 
-            result_row = {
-                "user_id": user_id,
-                "config_id": config_id,
-                "cluster": result["cluster"].to_numpy(dtype=np.int16),
-            }
-            if "core" in result:
-                result_row["core"] = result["core"].to_numpy(dtype=np.int16)
-            if "aux_time" in result:
-                aux_time = result["aux_time"].astype(object)
-                result_row["aux_time"] = aux_time.where(aux_time.notna(), None).tolist()
-            result_rows.append(result_row)
-
-            stops = STOP_UTILS.summarize_stops(
-                detection_input,
-                result["cluster"],
-                x="x",
-                y="y",
-                timestamp="timestamp",
-                keep_col_names=True,
-                passthrough_cols=["user_id", "location_id"],
-                passthrough_agg={
-                    "location_id": lambda values: values.mode().iat[0]
-                    if values.notna().any()
-                    else None,
-                },
-                traj_cols=TRAJ_COLS,
-            )
-            stops["config_id"] = config_id
-            stops_frames.append(stops)
-
-            metrics = compute_stop_detection_metrics(
-                stops=stops,
-                truth=truth,
-                user_id=user_id,
-                algorithm=family,
-                traj_cols={"location_id": "location_id"},
-                right_traj_cols={"location_id": "location"},
-                timestamp="timestamp",
-            )
-            metrics["config_id"] = config_id
-            metric_rows.append(metrics)
-
-        output[family] = {
-            "results": pd.DataFrame(result_rows),
-            "stops": pd.concat(stops_frames, ignore_index=True),
-            "metrics": pd.DataFrame(metric_rows),
+        result_row = {
+            "user_id": user_id,
+            "config_id": config_id,
+            "cluster": result["cluster"].to_numpy(dtype=np.int16),
         }
+        if "core" in result:
+            result_row["core"] = result["core"].to_numpy(dtype=np.int16)
+        if "aux_time" in result:
+            aux_time = result["aux_time"].astype(object)
+            result_row["aux_time"] = aux_time.where(aux_time.notna(), None).tolist()
+        family_output["results"].append(result_row)
+
+        stops = STOP_UTILS.summarize_stops(
+            detection_input,
+            result["cluster"],
+            x="x",
+            y="y",
+            timestamp="timestamp",
+            keep_col_names=True,
+            passthrough_cols=["user_id", "location_id"],
+            passthrough_agg={
+                "location_id": lambda values: values.mode().iat[0]
+                if values.notna().any()
+                else None,
+            },
+            traj_cols=TRAJ_COLS,
+        )
+        metrics = compute_stop_detection_metrics(
+            stops=stops,
+            truth=truth,
+            user_id=user_id,
+            algorithm=algorithm["algorithm"],
+            traj_cols={"location_id": "location_id"},
+            right_traj_cols={"location_id": "location", "timestamp": "timestamp"},
+            timestamp="timestamp",
+        )
+        metrics["config_id"] = config_id
+        family_output["metrics"].append(registry.annotate_metrics(metrics, algorithm))
+
+    for family_output in output.values():
+        for frame_name in family_output:
+            family_output[frame_name] = pd.DataFrame(family_output[frame_name])
 
     return output
 
 
-def run_jobs(users, sparse_df, diaries_df, algorithm_configurations, workers):
+def run_jobs(users, sparse_df, diaries_df, registry, workers):
     if workers == 1:
-        initialize_worker(sparse_df, diaries_df, algorithm_configurations)
+        initialize_worker(sparse_df, diaries_df, registry)
         yield from map(run_user_job, users)
         return
 
-    chunksize = max(1, len(users) // (workers * 4))
     with ProcessPoolExecutor(
         max_workers=workers,
         initializer=initialize_worker,
-        initargs=(sparse_df, diaries_df, algorithm_configurations),
+        initargs=(sparse_df, diaries_df, registry),
     ) as executor:
-        yield from executor.map(run_user_job, users, chunksize=chunksize)
+        yield from executor.map(run_user_job, users)
 
 
-def write_algorithm(algorithm, spec, frames, configs, output_dir):
+def write_algorithm(algorithm, spec, configurations, frames, output_dir):
     algorithm_dir = output_dir / algorithm
     algorithm_dir.mkdir(parents=True, exist_ok=True)
-    nonempty_stops = [frame for frame in frames["stops"] if not frame.empty]
-    stops_df = pd.concat(nonempty_stops, ignore_index=True) if nonempty_stops else pd.DataFrame(
-        columns=["user_id", "cluster", "timestamp", "duration", "x", "y", "location_id", "config_id"]
-    )
-    metrics_df = pd.concat(frames["metrics"], ignore_index=True).drop(columns=["algorithm"], errors="ignore")
+    configs = [
+        {
+            "config_id": config_id,
+            "key": item["algorithm"],
+            "params": item["params"],
+        }
+        for config_id, item in enumerate(configurations, start=1)
+    ]
+    metrics_df = pd.concat(frames["metrics"], ignore_index=True)
     results_df = (
         pd.concat(frames["results"], ignore_index=True)
         .sort_values(["user_id", "config_id"])
@@ -491,14 +496,6 @@ def write_algorithm(algorithm, spec, frames, configs, output_dir):
         algorithm_dir / "results.parquet",
         row_group_size=len(configs),
     )
-
-    stops_out = compact_coordinates(
-        stops_df.loc[:, ["user_id", "cluster", "timestamp", "duration", "x", "y", "config_id"]]
-    )
-    write_single_parquet(
-        stops_out,
-        algorithm_dir / "stops.parquet",
-    )
     metrics_df.to_parquet(
         algorithm_dir / "metrics.parquet",
         index=False,
@@ -507,15 +504,13 @@ def write_algorithm(algorithm, spec, frames, configs, output_dir):
     with open(algorithm_dir / "configs.json", "w", encoding="utf-8") as f:
         json.dump({"configs": configs}, f, ensure_ascii=False, separators=(",", ":"), default=json_value)
 
-    manifest_entry = {
+    return {
         "display_name": spec["display_name"],
         "result_kind": spec["result_kind"],
         "configs": f"{algorithm}/configs.json",
         "results": f"{algorithm}/results.parquet",
-        "stops": f"{algorithm}/stops.parquet",
         "metrics": f"{algorithm}/metrics.parquet",
     }
-    return manifest_entry
 
 
 def write_manifest(output_dir, config_key, files, users):
@@ -542,26 +537,12 @@ def generate_cache(config_key, output_dir, algorithms, max_users=None, scene_onl
     registry = AlgorithmRegistry()
     for algorithm in algorithms:
         spec = specs[algorithm]
-        registry.add_algorithm(spec["labeler"], family=algorithm, **spec["params"])
-
-    algorithm_configurations = {}
-    cache_configs = {}
-    for algorithm in algorithms:
-        registry_algorithms = list(registry.iter_algorithms(family=algorithm))
-        configurations = [
-            (item, config_id)
-            for config_id, item in enumerate(registry_algorithms, start=1)
-        ]
-        configs = [
-            {
-                "config_id": config_id,
-                "key": item["algorithm"],
-                "params": item["params"],
-            }
-            for item, config_id in configurations
-        ]
-        algorithm_configurations[algorithm] = configurations
-        cache_configs[algorithm] = configs
+        registry.add_algorithm(
+            spec["labeler"],
+            family=algorithm,
+            external_params=spec.get("external_params"),
+            **spec["params"],
+        )
 
     sparse_df, diaries_df, buildings_df, users = load_inputs(config, max_users)
     if scene_only:
@@ -570,57 +551,43 @@ def generate_cache(config_key, output_dir, algorithms, max_users=None, scene_onl
         write_routes_json(output_dir, diaries_df, config["city_file"], config_key)
         return
 
-    output_dir.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(
-        dir=output_dir.parent, prefix=f".{output_dir.name}-"
-    ) as temp_dir:
-        staging_root = Path(temp_dir)
-        staging_dir = staging_root / "cache"
-        backup_dir = staging_root.with_name(f"{staging_root.name}-previous")
-        staging_dir.mkdir()
-        write_shared_tables(staging_dir, sparse_df, diaries_df)
-        write_scene_json(staging_dir, sparse_df, buildings_df, config_key)
-        write_routes_json(
-            staging_dir, diaries_df, config["city_file"], config_key
-        )
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True)
+    write_shared_tables(output_dir, sparse_df, diaries_df)
+    write_scene_json(output_dir, sparse_df, buildings_df, config_key)
+    write_routes_json(output_dir, diaries_df, config["city_file"], config_key)
 
-        frames = {
-            algorithm: {"results": [], "stops": [], "metrics": []}
-            for algorithm in algorithms
-        }
-        for user_output in run_jobs(
+    frames = {
+        algorithm: {"results": [], "metrics": []}
+        for algorithm in algorithms
+    }
+    for user_output in tqdm(
+        run_jobs(
             users.tolist(),
             sparse_df,
             diaries_df,
-            algorithm_configurations,
+            registry,
             workers,
-        ):
-            for algorithm, output in user_output.items():
-                frames[algorithm]["results"].append(output["results"])
-                frames[algorithm]["stops"].append(output["stops"])
-                frames[algorithm]["metrics"].append(output["metrics"])
+        ),
+        total=len(users),
+        desc=f"{config_key}: stop detection and metrics",
+        unit="user",
+    ):
+        for algorithm, output in user_output.items():
+            frames[algorithm]["results"].append(output["results"])
+            frames[algorithm]["metrics"].append(output["metrics"])
 
-        files = {}
-        for algorithm in algorithms:
-            files[algorithm] = write_algorithm(
-                algorithm,
-                specs[algorithm],
-                frames[algorithm],
-                cache_configs[algorithm],
-                staging_dir,
-            )
-        write_manifest(staging_dir, config_key, files, users)
-
-        if output_dir.exists():
-            output_dir.replace(backup_dir)
-        try:
-            staging_dir.replace(output_dir)
-        except BaseException:
-            if backup_dir.exists():
-                backup_dir.replace(output_dir)
-            raise
-        if backup_dir.exists():
-            backup_dir.replace(staging_root / "previous")
+    files = {}
+    for algorithm in algorithms:
+        files[algorithm] = write_algorithm(
+            algorithm,
+            specs[algorithm],
+            list(registry.iter_algorithms(family=algorithm)),
+            frames[algorithm],
+            output_dir,
+        )
+    write_manifest(output_dir, config_key, files, users)
 
 
 def main():

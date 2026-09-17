@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
 import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
+import { TrajectoryOptions } from "./trajectory-options"
 import type { MetricsParameterNote } from "../_lib/types"
 
 type PinnedAgent = {
@@ -178,6 +179,7 @@ export function MetricsView({
   metricsRightAlgorithm,
   metricsLeftParameter,
   metricsRightParameter,
+  metricsTrajectory,
   selectedUserId,
   leftParameterNote,
   rightParameterNote,
@@ -187,6 +189,7 @@ export function MetricsView({
   setMetricsRightAlgorithm,
   setMetricsLeftParameter,
   setMetricsRightParameter,
+  setMetricsTrajectory,
   openPinnedAgent,
   startTour,
 }: {
@@ -196,6 +199,7 @@ export function MetricsView({
   metricsRightAlgorithm: string
   metricsLeftParameter: string
   metricsRightParameter: string
+  metricsTrajectory: string
   selectedUserId?: string
   leftParameterNote: MetricsParameterNote | undefined
   rightParameterNote: MetricsParameterNote | undefined
@@ -205,6 +209,7 @@ export function MetricsView({
   setMetricsRightAlgorithm: (algorithm: string) => void
   setMetricsLeftParameter: (parameter: string) => void
   setMetricsRightParameter: (parameter: string) => void
+  setMetricsTrajectory: (trajectory: string) => void
   openPinnedAgent: (pinned: PinnedAgent) => void
   startTour: () => void
 }) {
@@ -214,8 +219,8 @@ export function MetricsView({
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
 
   useEffect(() => {
     const handlePinChange = (event: MessageEvent) => {
@@ -288,6 +293,10 @@ export function MetricsView({
             >
               {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
             </Button>
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-medium text-muted-foreground">Ground truth diary</h4>
+              <TrajectoryOptions value={metricsTrajectory} onChange={setMetricsTrajectory} />
+            </div>
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">
                 {metricsCompareMode ? "Top" : "Algorithm"}

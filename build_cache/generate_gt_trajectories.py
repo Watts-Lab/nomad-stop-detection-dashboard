@@ -1,6 +1,7 @@
 import argparse
 import json
 from pathlib import Path
+import time
 
 import pandas as pd
 
@@ -59,6 +60,8 @@ def generate_trajectories(keys, max_users=None):
             agent_workplaces=par["agent_workplaces"],
         )
 
+        print(f"Generating {agent_count} agents for {key}...")
+        start_time = time.time()
         for i, agent in enumerate(population.roster.values()):
             agent.generate_trajectory(
                 destination_diary=destinations,
@@ -94,6 +97,11 @@ def generate_trajectories(keys, max_users=None):
                 if isinstance(par["ha"], list)
                 else par["ha"]
             ),
+        )
+        generation_time = time.time() - start_time
+        print(
+            f"Generated {agent_count} agents for {key} in {generation_time:.2f}s "
+            f"({generation_time / agent_count:.2f}s per agent)"
         )
 
 

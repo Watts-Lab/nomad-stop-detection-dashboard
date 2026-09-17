@@ -7,8 +7,13 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CACHE_DIR = REPO_ROOT / "cached_results" / "stop-detection-cache"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dashboard" / "public" / "echarts-prototype"
+CACHE_SCENARIOS = [
+    ("two-stop", REPO_ROOT / "cached_results" / "two-stop-cache"),
+    ("four-stop-low-ha", REPO_ROOT / "cached_results" / "four-stop-cache" / "low_ha"),
+    ("four-stop-high-ha", REPO_ROOT / "cached_results" / "four-stop-cache" / "high_ha"),
+    ("commute-return", REPO_ROOT / "cached_results" / "commute-return-cache"),
+]
 BASE_COLUMNS = [
     "precision",
     "recall",
@@ -26,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate ECharts aggregated metrics parquet files from the parquet cache."
     )
-    parser.add_argument("--cache-dir", default=str(DEFAULT_CACHE_DIR))
+    parser.add_argument("--cache-dir")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     return parser.parse_args()
 
@@ -51,7 +56,7 @@ def output_name(algorithm):
 
 def load_metrics(cache_dir, file_spec, configs):
     metrics = pd.read_parquet(cache_dir / file_spec["metrics"])
-    merged = metrics.merge(configs, on="config_id", how="left")
+    merged = metrics.merge(configs.loc[:, ["config_id", "key"]], on="config_id", how="left")
     merged["algorithm"] = file_spec["display_name"]
     return merged
 
@@ -74,20 +79,29 @@ def write_algorithm_results(cache_dir, output_dir, algorithm_key, file_spec):
 
 def main():
     args = parse_args()
-    cache_dir = Path(args.cache_dir)
     output_dir = Path(args.output_dir)
-    manifest = load_manifest(cache_dir)
-
     output_dir.mkdir(parents=True, exist_ok=True)
+    for stale_output in output_dir.glob("*_results.parquet"):
+        stale_output.unlink()
+
     rows = []
-    for algorithm_key in manifest["algorithm_keys"]:
-        output_path, records, n_configs = write_algorithm_results(
-            cache_dir,
-            output_dir,
-            algorithm_key,
-            manifest["algorithms"][algorithm_key],
-        )
-        rows.append({"algorithm": algorithm_key, "records": records, "configs": n_configs, "path": str(output_path)})
+    cache_scenarios = (
+        [(None, Path(args.cache_dir))]
+        if args.cache_dir
+        else CACHE_SCENARIOS
+    )
+    for scenario, cache_dir in cache_scenarios:
+        scenario_output_dir = output_dir / scenario if scenario else output_dir
+        scenario_output_dir.mkdir(parents=True, exist_ok=True)
+        manifest = load_manifest(cache_dir)
+        for algorithm_key in manifest["algorithm_keys"]:
+            output_path, records, n_configs = write_algorithm_results(
+                cache_dir,
+                scenario_output_dir,
+                algorithm_key,
+                manifest["algorithms"][algorithm_key],
+            )
+            rows.append({"scenario": scenario, "algorithm": algorithm_key, "records": records, "configs": n_configs, "path": str(output_path)})
 
     print(pd.DataFrame(rows).to_string(index=False))
 

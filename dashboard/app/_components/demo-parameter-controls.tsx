@@ -34,11 +34,13 @@ export function DemoParameterControls({
           ? <span className="inline-flex items-baseline gap-0.5 font-sans">Δ<sub className="text-[0.7em] leading-none">roam</sub></span>
           : param.name
         const optionCount = rule ? Math.floor((rule.max - rule.min) / rule.step) + 1 : 0
-        const discreteOptions = rule?.allowedValues ?? (
-          rule && optionCount > 0 && optionCount <= 5
+        const discreteOptions = rule?.allowedValues
+          ? rule.allowedValues.length <= 5
+            ? rule.allowedValues
+            : null
+          : rule && optionCount > 0 && optionCount <= 5
             ? Array.from({ length: optionCount }, (_, index) => rule.min + index * rule.step)
             : null
-        )
 
         if (!rule) {
           return (

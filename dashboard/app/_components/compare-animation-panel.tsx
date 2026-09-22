@@ -467,6 +467,8 @@ function DemoSceneRenderer({
     let nextPathVisible = false
     let pulsePhase = 0
     let pulseStrength = 0
+    let pingFloatPhase = 0
+    let pingFloatOffset = 0
     let previewing = false
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
@@ -563,6 +565,11 @@ function DemoSceneRenderer({
         else break
       }
       return index
+    }
+    const currentPingData = (timestampSeconds: number) => {
+      const index = latestPingIndexAt(timestampSeconds)
+      const ping = chartData.pingData[index]
+      return [[ping[0], ping[1], showStops ? ping[2] : -1, index, ping[4], associationOpacity(index), pingFloatOffset]]
     }
     const detectedCountFor = (timestampSeconds: number) => {
       let count = 0
@@ -781,7 +788,6 @@ function DemoSceneRenderer({
     // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
       previewing = false
-      const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
       const centroidAnchorFrames = centroidAnchorFramesAt(timestampSeconds)
@@ -847,7 +853,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
           { id: "anchor-edges-hit-area", data: showStops ? anchorEdges : [] },
           { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
-          { id: "current-ping", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4], associationOpacity(latestPingIndex)]] },
+          { id: "current-ping", data: currentPingData(timestampSeconds) },
           { id: "hover-distance-circle", data: hoveredDistanceCircleData() },
           { id: "selected-ping-line", data: selectedPingLineData() },
         ],
@@ -1829,16 +1835,34 @@ function DemoSceneRenderer({
           name: "Current ping",
           type: "custom",
           coordinateSystem: "cartesian2d",
-          z: 5,
+          z: 10,
           data: [],
           animationDurationUpdate: 0,
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const circle = pingCircle(api, 1.2)
+            const circle = pingCircle(api, 1.08)
+            const size = circle.radius * 2.8
             return {
-              type: "circle",
+              type: "group",
               z2: Number(api.value(3)) * 2,
-              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
-              style: { fill: "#67D3E3", stroke: "#202124", lineWidth: 1.2, opacity: Number(api.value(5)) },
+              y: Number(api.value(6)),
+              children: [
+                {
+                  type: "path",
+                  shape: {
+                    pathData: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
+                    x: circle.center[0] - size / 2,
+                    y: circle.center[1] - size,
+                    width: size,
+                    height: size,
+                  },
+                  style: { fill: "#67D3E3", stroke: "#202124", lineWidth: 1.2, opacity: Number(api.value(5)) },
+                },
+                {
+                  type: "circle",
+                  shape: { cx: circle.center[0], cy: circle.center[1] - size * 0.65, r: size * 0.13 },
+                  style: { fill: "#ffffff", stroke: "#202124", lineWidth: 0.9, opacity: Number(api.value(5)) },
+                },
+              ],
             }
           },
         },
@@ -2075,20 +2099,26 @@ function DemoSceneRenderer({
       if (previewing) return
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
-      if (ended && pulseStrength === 0) return
+      pingFloatPhase += 0.16
+      pingFloatOffset = -3 + Math.sin(pingFloatPhase) * 3
       pulsePhase = ended ? 0 : pulsePhase + 0.24
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({
         series: [
-          { id: "streets", data: chartData.streets.map((_, index) => index) },
-          { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
-          { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
-          { id: "building-glow", data: buildingGlowData(timestampSeconds) },
+          ...(ended ? [] : [
+            { id: "streets", data: chartData.streets.map((_, index) => index) },
+            { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
+            { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
+            { id: "building-glow", data: buildingGlowData(timestampSeconds) },
+          ]),
+          { id: "current-ping", data: currentPingData(timestampSeconds) },
         ],
       })
-      timelineChart.setOption({
-        series: [{ id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] }],
-      })
+      if (!ended) {
+        timelineChart.setOption({
+          series: [{ id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] }],
+        })
+      }
     }, 80)
 
     return () => {

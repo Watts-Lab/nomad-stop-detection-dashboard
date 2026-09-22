@@ -79,16 +79,21 @@ export function DemoView({
   openMetricsFromDemo: () => void
   startTour: () => void
 }) {
+
+  // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const trajectoryOptions = <TrajectoryOptions value={demoTrajectory} onChange={setDemoTrajectory} />
 
+  // Apply reveal classes to the header and active panel layout.
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           {!compareMode && (
+
+            /* Start the Demo guided tour. */
             <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
               <HelpCircle className="h-4 w-4" />
             </Button>

@@ -2,6 +2,9 @@ import { useState } from "react"
 import { HelpCircle } from "lucide-react"
 import { TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 
+// Render single or comparison Demo panels and connect their controls
+// to parent-provided handlers. Keep comparison replay/playback coordination
+// local to this view.
 export function TrajectoryOptions({
   value,
   onChange,

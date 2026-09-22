@@ -6,6 +6,9 @@ import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 
 export type ParamStateSetter = (value: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void
 
+// Render the selected algorithm's parameters as read-only values,
+// dropdowns, or sliders according to its editing rules.
+// Use parent-provided setters to update values and clear errors.
 export function DemoParameterControls({
   algo,
   algoId,
@@ -59,6 +62,8 @@ export function DemoParameterControls({
               <label className="text-sm font-mono">{label}</label>
               <Select
                 value={String(Number.isFinite(value) ? value : param.defaultValue)}
+
+                // Save the dropdown selection and clear this parameter's previous error.
                 onValueChange={(next) => {
                   setValues((prev) => ({ ...prev, [param.name]: next }))
                   setErrors((prev) => {
@@ -94,6 +99,8 @@ export function DemoParameterControls({
               max={rule.max}
               step={rule.step}
               value={[Number.isFinite(value) ? value : Number(param.defaultValue)]}
+
+              // Save the slider value as a string and clear this parameter's previous error.
               onValueChange={([next]) => {
                 setValues((prev) => ({ ...prev, [param.name]: String(next) }))
                 setErrors((prev) => {

@@ -28,12 +28,15 @@ const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
 type PlaybackState = "playing" | "paused" | "complete"
 
+// Format elapsed seconds as minutes and seconds for the ping-comparison tooltip
 const elapsedTimeLabel = (seconds: number) => {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
   return minutes ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`
 }
 
+// Render and control the interactive map and timeline, 
+// including hover, selection, playback, and panel synchronization
 function DemoSceneRenderer({
   panel,
   mode,
@@ -84,7 +87,9 @@ function DemoSceneRenderer({
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
   const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
+  // Prepare scene-derived map and timeline data shared across algorithm and config results.
   const sceneData = useMemo(() => {
+    // Timeline generation below reads the first and last ping.
     if (scene.pings.length === 0) return null
     const pings = scene.pings.map((ping, index) => ({
       i: index,
@@ -166,6 +171,8 @@ function DemoSceneRenderer({
         ...(down || up ? [[[centerX, down ? minStreetY : centerY], [centerX, up ? maxStreetY : centerY]]] : []),
       ]
     })
+    // Merge each contiguous run of same-street cells into one continuous line so the dash pattern
+    // carries through the whole block instead of restarting (and visually doubling up) at every grid seam.
     const mergeAxisRuns = (spans: [number, number][]): [number, number][] => {
       const sorted = [...spans].sort((a, b) => a[0] - b[0])
       const merged: [number, number][] = []
@@ -214,7 +221,8 @@ function DemoSceneRenderer({
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
   }, [scene.buildings, scene.pings, scene.routes, scene.truth])
-
+  // Combine the scene with the selected algorithm result to build chart-ready stops,
+  // cluster assignments, anchors, density metadata, and focus bounds.
   const resultData = useMemo(() => {
     if (!sceneData) return null
     const result = panel.result
@@ -376,9 +384,8 @@ function DemoSceneRenderer({
   }, [resultData])
 
   useEffect(() => {
-    const initialData = resultDataRef.current
-    if (!initialData || !mapRef.current || !timelineRef.current) return
-    let chartData = initialData
+    let chartData = resultDataRef.current
+    if (!chartData || !mapRef.current || !timelineRef.current) return
 
     const mapEl = mapRef.current
     const timelineEl = timelineRef.current
@@ -459,6 +466,8 @@ function DemoSceneRenderer({
     const startDelay = variant === "preview" ? 150 : 300
     const initialDelay = variant === "preview" ? 1000 : 300
     const toggleDelay = variant === "preview" ? 80 : 160
+
+    // Derive playing, paused, or complete state and report it to React and the parent callback
     const syncPlaybackState = () => {
       const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
       const nextState = atEnd && paused ? "complete" : paused ? "paused" : "playing"
@@ -468,6 +477,7 @@ function DemoSceneRenderer({
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
     const isDensityAlgorithm = chartData.result.kind === "density"
+    const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
     const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
@@ -542,11 +552,11 @@ function DemoSceneRenderer({
       return count
     }
     const anchorFramesAt = (timestampSeconds: number) => {
-      const framesByCluster = new Map<number, (typeof chartData.anchorFrames)[number]>()
+      const framesByStop = new Map<number, (typeof chartData.anchorFrames)[number]>()
       chartData.anchorFrames.forEach((frame) => {
-        if (frame.t <= timestampSeconds) framesByCluster.set(frame.cluster, frame)
+        if (frame.t <= timestampSeconds) framesByStop.set(frame.cluster, frame)
       })
-      return Array.from(framesByCluster.values())
+      return Array.from(framesByStop.values())
     }
     const styledScatterPoint = (point: number[]) => ({
       value: point,
@@ -604,6 +614,7 @@ function DemoSceneRenderer({
       const buildingIndex = chartData.buildings.findIndex((building) => building.id === buildingId)
       return buildingIndex >= 0 ? [[buildingIndex, cluster]] : []
     }
+    // For density-based algorithms, show the dist_thresh neighborhood radius around the hovered point.
     const distanceCircleData = (
       timestampSeconds: number,
       anchorFrames: (typeof chartData.anchorFrames),
@@ -663,13 +674,18 @@ function DemoSceneRenderer({
       const last = points[points.length - 1]
       return [last[0], last[1], last[0] + last[0] - previous[0], last[1] + last[1] - previous[1]]
     }
+
+    // Cancel the route-glow animation and clear its chart series
     const stopRouteGlow = () => {
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       routeGlowFrame = 0
       mapChart.setOption({ series: [{ id: "route-glow", data: [] }] }, { lazyUpdate: true })
     }
+
+    // Allow route glow when ground truth is visible and panel's playback conditions permit it
     const routeGlowAllowed = () =>
       layerStateRef.current.showGroundTruth && paused && (syncMaster || (mode === "compare" && sharedPlaybackStateRef.current !== "playing"))
+    // Animate a repeating marker along the revealed route while route glow is allowed
     const startRouteGlow = () => {
       if (routeGlowFrame || !routeGlowAllowed()) return
       routeGlowStartedAt = performance.now()
@@ -705,16 +721,22 @@ function DemoSceneRenderer({
       }
       routeGlowFrame = window.requestAnimationFrame(step)
     }
+
+    // Start or stop route glow to match the current playback and visibility conditions
     const syncRouteGlow = () => {
       if (routeGlowAllowed()) startRouteGlow()
       else stopRouteGlow()
     }
+
+    // Cancel the upcoming-path animation and clear its chart series
     const stopNextPathFlow = () => {
       if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
       nextPathFrame = 0
       nextPathStopIndex = -1
       mapChart.setOption({ series: [{ id: "next-path", data: [] }] }, { lazyUpdate: true })
     }
+
+    // Repeatedly reveal route to next destination while that path remains visible
     const startNextPathFlow = () => {
       if (nextPathFrame || !nextPathVisible) return
       nextPathStartedAt = performance.now()
@@ -739,10 +761,15 @@ function DemoSceneRenderer({
       }
       nextPathFrame = window.requestAnimationFrame(step)
     }
+
+    // Start or stop upcoming-path animation according to its visibility
     const syncNextPathFlow = () => {
       if (nextPathVisible) startNextPathFlow()
       else stopNextPathFlow()
     }
+
+    // Redraw map and timeline layers for the active time, visibility settings, hover, and selection
+    // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
@@ -840,6 +867,9 @@ function DemoSceneRenderer({
         ],
       }, { lazyUpdate: true })
     }
+
+    // Reveal the requested number of pings 
+    // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
       const previewPings = chartData.pingData.slice(0, pingCount)
       nextPathVisible = false
@@ -879,6 +909,9 @@ function DemoSceneRenderer({
         ],
       }, { lazyUpdate: true })
     }
+
+    // Animate the ping reveal in timed steps
+    // Invoke the supplied completion callback
     const playTrajectoryPreview = (onComplete: () => void) => {
       previewing = true
       const frames = 18
@@ -896,6 +929,9 @@ function DemoSceneRenderer({
       timer = window.setTimeout(step, 20)
     }
     const activeTimestamp = () => selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
+    
+    // Update the hovered ping and its ground-truth building, 
+    // Redraw highlights and reposition tooltips
     const setHoveredPing = (pingIndex: number | null) => {
       const ping = pingIndex === null ? null : chartData.pings[pingIndex]
       const buildingId = ping ? groundTruthAt(ping.t).current?.location ?? "" : ""
@@ -906,6 +942,9 @@ function DemoSceneRenderer({
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
+
+    // Update the hovered edge, clear ping/building hover
+    // Redraw the connected-ping highligh
     const setHoveredEdge = (endpoints: [number, number] | null) => {
       const same = hoverEdgeEndpoints !== null && endpoints !== null &&
         hoverEdgeEndpoints[0] === endpoints[0] && hoverEdgeEndpoints[1] === endpoints[1]
@@ -917,6 +956,8 @@ function DemoSceneRenderer({
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
+
+    // Highlight a building while clearing ping and edge hover
     const setHoveredBuilding = (buildingId: string) => {
       if (hoverPingIndex === null && hoverEdgeEndpoints === null && hoverBuildingId === buildingId) return
       hoverPingIndex = null
@@ -925,6 +966,9 @@ function DemoSceneRenderer({
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
+
+    // Calculate selection coordinates and candidate tooltip positions,
+    // checking for overlap with points, selection lines, and other tooltips.
     const selectedPingPixels = () => selectedPingIndexesRef.current.map((pingIndex) => {
       const ping = chartData.pings[pingIndex]
       return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
@@ -997,6 +1041,9 @@ function DemoSceneRenderer({
         ]),
       ].map(clamp)
     }
+
+    // Position the selection tooltip without covering selected pings, their connecting line, 
+    // the pointer, or the hover tooltip; hide it if no position fits
     const positionComparisonTooltip = () => {
       const selected = selectedPingIndexesRef.current
       const tooltip = comparisonTooltipRef.current
@@ -1028,6 +1075,9 @@ function DemoSceneRenderer({
         return { left: position[0], top: position[1], visibility: "visible" }
       })
     }
+
+    // Hide and reposition tooltips after chart or interaction changes
+    // Restore the hovered ping's tooltip
     const refreshTooltipLayout = () => {
       mapChart.dispatchAction({ type: "hideTip" })
       if (comparisonTooltipRef.current) comparisonTooltipRef.current.style.visibility = "hidden"
@@ -1038,6 +1088,9 @@ function DemoSceneRenderer({
         })
       })
     }
+
+    // Toggle ping selection; allow two selected pings
+    // Start a new selection when a third is clicked
     const selectPing = (pingIndex: number) => {
       const selected = selectedPingIndexesRef.current
       const next = selected.includes(pingIndex)
@@ -1048,6 +1101,8 @@ function DemoSceneRenderer({
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
+
+    // Clear selected pings and redraw the scene without selection highlighting
     const clearSelectedPings = () => {
       selectedPingIndexesRef.current = []
       setSelectedPingIndexes([])
@@ -1056,6 +1111,8 @@ function DemoSceneRenderer({
     const tourCorePingIndexes = new Set(chartData.coreTimelineData.map((point) => point[2]))
     const tourTimelinePingIndex = chartData.pings.find((ping) => !tourCorePingIndexes.has(ping.i))?.i ?? 0
     const tourAnchorPingIndex = chartData.anchorFrames[0]?.point[3] ?? chartData.densityCorePointData[0]?.[3] ?? tourTimelinePingIndex
+    // Apply or clear guided-tour highlights for example pings, anchors, 
+    // and ground-truth buildings in single mode
     const onTourAction: EventListener = (event) => {
       if (mode !== "single") return
       const action = (event as CustomEvent).detail
@@ -1069,6 +1126,8 @@ function DemoSceneRenderer({
       if (action === "anchor-point") setHoveredPing(tourAnchorPingIndex)
       if (action === "ground-truth") setHoveredBuilding(chartData.truthStops[0]?.location ?? "")
     }
+
+    // Route map hover events to the matching ping, anchor, or connection-edge highlight
     const onMapMouseOver = (params: echarts.ECElementEvent) => {
       if (params.seriesId === "anchor-edges-hit-area" || params.seriesId === "promotion-edges-hit-area") {
         const value = paramsValue(params)
@@ -1087,16 +1146,23 @@ function DemoSceneRenderer({
         setHoveredPing(paramsValue(params)[3])
       }
     }
+
+    // Track the pointer position and move the comparison tooltip out of its way
     const onMapPointerMove: (event: { offsetX: number; offsetY: number }) => void = (event) => {
       mapMousePosition = [event.offsetX, event.offsetY]
       if (selectedPingIndexesRef.current.length) positionComparisonTooltip()
     }
+
+    // Record where the pointer press begins so background clicks can be distinguished from drags
     const onMapSelectionPointerDown: (event: PointerEvent) => void = (event) => {
       if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
       mapPingClickHandled = false
       const rect = mapEl.getBoundingClientRect()
       mapPointerDown = [event.clientX - rect.left, event.clientY - rect.top]
     }
+
+    // Clear selection after a short background click inside the map, 
+    // preserving selection after drags or ping clicks
     const onMapSelectionPointerUp: (event: PointerEvent) => void = (event) => {
       if (!mapPointerDown) return
       const start = mapPointerDown
@@ -1111,15 +1177,21 @@ function DemoSceneRenderer({
         backgroundClearFrame = 0
       })
     }
+
+    // Reset background-click tracking when the pointer interaction is cancelled
     const onMapSelectionPointerCancel = () => {
       mapPointerDown = null
       mapPingClickHandled = false
     }
+
+    // Clear map hover when leaving an item or the chart, unless a tour highlight is active
     const onMapMouseOut = () => {
       mapMousePosition = null
       if (!tourActionActive) setHoveredEdge(null)
       else positionComparisonTooltip()
     }
+
+    // Select a clicked map ping or anchor and prevent the click from being treated as a background click
     const onMapClick = (params: echarts.ECElementEvent) => {
       if (
         params.seriesId === "ghost-pings" ||
@@ -1134,10 +1206,14 @@ function DemoSceneRenderer({
         selectPing(Number(paramsValue(params)[3]))
       }
     }
+
+    // Ask ECharts to show the tooltip for the specified ping's hit area
     const showMapPingTip = (pingIndex: number) => {
       if (pingHitAreaSeriesIndex < 0) return
       mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex: pingIndex })
     }
+
+    // Link timeline hover to the corresponding map ping, core point, or ground-truth building
     const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
       mapMousePosition = null
       const value = paramsValue(params)
@@ -1153,17 +1229,24 @@ function DemoSceneRenderer({
       if (params.seriesId === "current-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[3])].location)
       if (params.seriesId === "next-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
     }
+
+    // Clear timeline-driven hover and hide the ping tooltip unless a tour highlight is active
     const onTimelineMouseOut = () => {
       if (!tourActionActive) {
         setHoveredPing(null)
         mapChart.dispatchAction({ type: "hideTip" })
       }
     }
+
+    // Select the ping represented by a clicked timeline tick or core-point tick
     const onTimelineClick = (params: echarts.ECElementEvent) => {
       const value = paramsValue(params)
       if (params.seriesId === "ping-ticks") selectPing(Number(value[0]))
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
+
+    // Use Space for playback/replay and arrow keys to move the second selected ping
+    // Ignore keyboard input on interactive controls
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
       if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
       if (event.key === " ") {
@@ -1187,6 +1270,8 @@ function DemoSceneRenderer({
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
+
+    // Align the playback sequence index with the supplied timestamp
     const syncSequenceIndex = (timestampSeconds: number) => {
       let index = 0
       for (let candidate = 0; candidate < chartData.timeSequence.length; candidate += 1) {
@@ -1195,6 +1280,8 @@ function DemoSceneRenderer({
       }
       sequenceIndex = index
     }
+
+    // Convert a timeline pointer position into a timestamp clamped to the scene's time range
     const timestampFromOffset = (offsetX: number, offsetY: number) => {
       const point = timelineChart.convertFromPixel({ gridIndex: 0 }, [offsetX, offsetY])
       const timeMs = Array.isArray(point) ? point[0] : point
@@ -1202,22 +1289,30 @@ function DemoSceneRenderer({
       const maxT = chartData.timeSequence[chartData.timeSequence.length - 1]
       return Math.max(minT, Math.min(maxT, timeMs / 1000))
     }
+
+    // Update the local timestamp and sequence index, then report the new time to the parent
     const seekTo = (timestampSeconds: number) => {
       selectedTimestampRef.current = timestampSeconds
       syncSequenceIndex(timestampSeconds)
       onTimeChange(timestampSeconds)
     }
     let dragging = false
+
+    // Seek continuously as the pointer drags across the timeline
     const onPointerMove = (event: MouseEvent) => {
       if (!dragging || !timelineRef.current) return
       const rect = timelineRef.current.getBoundingClientRect()
       seekTo(timestampFromOffset(event.clientX - rect.left, event.clientY - rect.top))
     }
+
+    // End timeline dragging and remove its temporary mouse listeners
     const onPointerUp = () => {
       dragging = false
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
     }
+
+    // Pause playback, seek to the pressed timeline position, and attach drag listeners
     const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent }) => {
       event.event?.preventDefault()
       window.clearTimeout(timer)
@@ -1232,6 +1327,9 @@ function DemoSceneRenderer({
     let wheelStepSeconds = 60
     let wheelDirection = 0
     let lastWheelTime = 0
+
+    // Pause and scrub time by scrolling
+    // First scroll from the initial end view returns to the start, repeated scrolling accelerates
     const onTimelineWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
@@ -1261,6 +1359,9 @@ function DemoSceneRenderer({
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
     }
+
+    // Advance playback on the controlling panel, report shared time, and stop at the end
+    // Notify preview completion when applicable
     const advance = () => {
       if (paused || !syncMaster) return
       sequenceIndex = Math.min(sequenceIndex + 1, chartData.timeSequence.length - 1)
@@ -1275,6 +1376,9 @@ function DemoSceneRenderer({
       }
       timer = window.setTimeout(advance, frameDelay)
     }
+
+    // Restart with a trajectory reveal, notify the other panel
+    // Begin playback from the first timestamp
     const replay = () => {
       window.clearTimeout(timer)
       paused = false
@@ -1289,6 +1393,9 @@ function DemoSceneRenderer({
         if (syncMaster) timer = window.setTimeout(advance, startDelay)
       })
     }
+
+    // Run the following panel's trajectory reveal
+    // Restore the scene at the shared time
     const playLocalPreview = () => {
       window.clearTimeout(timer)
       stopRouteGlow()
@@ -1299,18 +1406,25 @@ function DemoSceneRenderer({
         renderScene(activeTimestamp())
       })
     }
+
+    // Toggle paused/playing state and schedule playback advancement on the controlling panel
     const toggle = () => {
       paused = !paused
       syncPlaybackState()
       renderScene(activeTimestamp())
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
+
+    // Resize both charts, recalculate map bounds, and reposition tooltips
     const resize = () => {
       mapChart.resize()
       applyMapBounds()
       timelineChart.resize()
       refreshTooltipLayout()
     }
+
+    // Position the hover tooltip within the chart while avoiding the hovered point, 
+    // selection, and comparison tooltip
     const pingTooltipPosition: TooltipComponentPositionCallback = (point, _params, element, _rect, size) => {
       const padding = 8
       const gap = 16
@@ -2168,6 +2282,8 @@ function DemoSceneRenderer({
   )
 }
 
+// Wrap the scene renderer with the algorithm title, 
+// Learn link, agent details, and loading placeholders
 export function CompareAnimationPanel({
   panel,
   mode = "compare",
@@ -2251,6 +2367,8 @@ export function CompareAnimationPanel({
   )
 }
 
+// Reuse the scene renderer for automatic preview playback 
+// and forward its completion callback
 export function StopRunPreview({
   panel,
   currentTime,

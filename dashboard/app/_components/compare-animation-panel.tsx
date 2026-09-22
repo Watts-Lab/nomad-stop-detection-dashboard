@@ -23,7 +23,6 @@ const DEMO_CLUSTER_COLORS = [
   "#e377c2", "#9467bd", "#2ca02c", "#d62728", "#17becf", "#bcbd22", "#8c564b", "#ff6f91", "#6b8e23", "#00b894",
   "#0984e3", "#6c5ce7", "#e17055", "#d63031", "#008080", "#c44569", "#4a69bd", "#f19066", "#b33771", "#218c74",
 ]
-const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
@@ -46,6 +45,7 @@ function DemoSceneRenderer({
   syncMaster,
   showGroundTruth,
   showStops,
+  showXray,
   variant = "full",
   onPreviewComplete,
   previewRunId = 0,
@@ -60,6 +60,7 @@ function DemoSceneRenderer({
   syncMaster: boolean
   showGroundTruth: boolean
   showStops: boolean
+  showXray: boolean
   variant?: "full" | "preview"
   onPreviewComplete?: () => void
   previewRunId?: number
@@ -78,6 +79,7 @@ function DemoSceneRenderer({
   const onReplayStartRef = useRef(onReplayStart)
   const sharedPlaybackStateRef = useRef(sharedPlaybackState)
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange)
+  const layerStateRef = useRef({ showGroundTruth, showStops, showXray })
   const selectedTimestampRef = useRef<number | null>(null)
   const wheelStartsAtEndRef = useRef(true)
   const selectedPingIndexesRef = useRef<number[]>([])
@@ -85,44 +87,17 @@ function DemoSceneRenderer({
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
   const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
-  
-// Each ping needs a cluster label at the same array index
-// Return [] if the scene or labels are missing, or their counts differ
-// chartData checks this result and skips chart preparation for a nonempty scene
-  const labels = useMemo(() => {
-    if (!scene) return []
-    if (panel.labels && panel.labels.length === scene.pings.length) return panel.labels
-    return []
-  }, [panel.labels, scene])
-
-  // Prepare map and timeline data, including pings, stops, buildings, 
-  // routes, and algorithm-specific anchors and edges
-  const chartData = useMemo(() => {
-
-    // Timeline bounds require an existing scene with at least one ping.
-    if (!scene || scene.pings.length === 0) return null
-
-    // The labels memo returns [] for missing or mismatched labels;
-    // stop here unless every ping has a corresponding label.
-    if (labels.length !== scene.pings.length) return null
-
+  // Prepare scene-derived map and timeline data shared across algorithm and config results.
+  const sceneData = useMemo(() => {
+    // Timeline generation below reads the first and last ping.
+    if (scene.pings.length === 0) return null
     const pings = scene.pings.map((ping, index) => ({
       i: index,
       x: ping.x,
       y: ping.y,
       t: ping.timestamp,
       time: new Date(ping.timestamp * 1000).toISOString().slice(11, 19),
-      cluster: labels[index],
     }))
-    const pingIndexByTimestamp = new Map(pings.map((ping) => [ping.t, ping.i]))
-    const pingData = pings.map((ping) => [ping.x, ping.y, ping.cluster, ping.i, ping.t])
-    const clusterMembers = new Map<number, number[]>()
-    pings.forEach((ping) => {
-      if (ping.cluster < 0) return
-      const members = clusterMembers.get(ping.cluster)
-      if (members) members.push(ping.i)
-      else clusterMembers.set(ping.cluster, [ping.i])
-    })
     const buildings = scene.buildings.flatMap((building) =>
       building.rings.map((ring) => {
         const xs = ring.map(([x]) => x)
@@ -148,20 +123,6 @@ function DemoSceneRenderer({
       building.maxX - building.minX,
       building.maxY - building.minY,
     ]).filter((span) => span > 0))
-    const destinationFor = (x: number, y: number) => {
-      const containing = buildings.find((building) =>
-        x >= building.minX && x <= building.maxX && y >= building.minY && y <= building.maxY
-      )
-      const destination = containing ?? buildings.reduce((best, building) =>
-        Math.hypot(x - building.center[0], y - building.center[1]) < Math.hypot(x - best.center[0], y - best.center[1])
-          ? building
-          : best
-      )
-      return {
-        id: destination.type === "building" ? null : destination.id,
-        center: destination.center,
-      }
-    }
     const routeBetween = (start: number[], end: number[]) => [
       start,
       [(start[0] + end[0]) / 2, start[1]],
@@ -169,142 +130,24 @@ function DemoSceneRenderer({
       end,
     ].filter((point, index, route) => index === 0 || point[0] !== route[index - 1][0] || point[1] !== route[index - 1][1])
     const routeByPair = new Map(scene.routes?.routes.map((route) => [`${route.from}->${route.to}`, route.path]) ?? [])
-    const routeFor = (
-      start: { id: string | null; center: number[] },
-      end: { id: string | null; center: number[] },
-    ) => {
-      const cached = start.id && end.id ? routeByPair.get(`${start.id}->${end.id}`) : null
-      return {
-        points: cached ?? routeBetween(start.center, end.center),
-        isFallback: !cached,
-      }
-    }
-    const revealDelay = Math.max(0, Number(panel.params?.dur_min ?? panel.params?.min_time ?? 5)) * 60
-    const stops = stopsFromLabels(scene.pings, labels).map((stop) => ({
-      ...stop,
-      destination: destinationFor(stop.x, stop.y),
-      radius: Math.max(
-        stop.diameter / 2,
-        Number(panel.params?.delta_roam ?? panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0),
-      ),
-      label: `Stop ${stop.cluster}`,
-      startTime: new Date(stop.start * 1000).toISOString().slice(11, 16),
-      endTime: new Date(stop.end * 1000).toISOString().slice(11, 16),
-    }))
-    const sequentialGroups = panel.algo.startsWith("sequential-")
-      ? stops.map((stop) => pings.filter((ping) => ping.cluster === stop.cluster))
-      : []
-    const firstAnchorData = panel.algo === "sequential-first" ? sequentialGroups.map((members, stopIndex) => {
-      const anchor = members[0]
-      return [anchor.x, anchor.y, anchor.cluster, anchor.i, stopIndex, anchor.t]
-    }) : []
-    const firstAnchorEdges = panel.algo === "sequential-first" ? sequentialGroups.flatMap((members, stopIndex) => {
-      const anchor = members[0]
-      return members.slice(1).map((ping) => ({
-        coords: [[anchor.x, anchor.y], [ping.x, ping.y]],
-        value: [anchor.cluster, anchor.i, ping.i, stopIndex, ping.t],
-      }))
-    }) : []
-    const centroidAnchorFrames = panel.algo === "sequential-centroid" ? sequentialGroups.flatMap((members, stopIndex) => {
-      let sumX = 0
-      let sumY = 0
-      return members.map((ping, index) => {
-        sumX += ping.x
-        sumY += ping.y
-        const centroid = [sumX / (index + 1), sumY / (index + 1)]
-        return {
-          stopIndex,
-          t: ping.t,
-          point: [centroid[0], centroid[1], ping.cluster, ping.i, stopIndex, ping.t],
-          edges: members.slice(0, index + 1).map((member) => ({
-            coords: [centroid, [member.x, member.y]],
-            value: [ping.cluster, ping.i, member.i, stopIndex, ping.t],
-          })),
-        }
-      })
-    }) : []
-    const lachesisDiameterFrames = panel.algo === "lachesis" ? stops.flatMap((stop, stopIndex) => {
-      const members = pings.filter((ping) => ping.cluster === stop.cluster)
-      if (members.length < 2) return []
-      let bestStart = members[0]
-      let bestEnd = members[1]
-      let bestDistance = bestStart && bestEnd ? Math.hypot(bestEnd.x - bestStart.x, bestEnd.y - bestStart.y) : 0
-      return members.slice(1).map((ping, index) => {
-        for (const previous of members.slice(0, index + 1)) {
-          const distance = Math.hypot(ping.x - previous.x, ping.y - previous.y)
-          if (distance > bestDistance) {
-            bestStart = previous
-            bestEnd = ping
-            bestDistance = distance
-          }
-        }
-        return {
-          stopIndex,
-          t: ping.t,
-          edge: {
-            coords: [[bestStart.x, bestStart.y], [bestEnd.x, bestEnd.y]],
-            value: [stop.cluster, bestStart.i, bestEnd.i, stopIndex, ping.t],
-          },
-        }
-      })
-    }) : []
-    const cachedCorePointKeys = new Set<string>()
-    const cachedCorePointData = (panel.corePoints ?? []).flatMap((point) => {
-      const pingIndex = pingIndexByTimestamp.get(point.timestamp)
-      const roleIsCore = point.role === 1
-      if (pingIndex === undefined || !roleIsCore) return []
-      const key = `${point.timestamp}|${point.cluster}|${point.role}`
-      if (cachedCorePointKeys.has(key)) return []
-      cachedCorePointKeys.add(key)
-      return [[point.x, point.y, point.cluster, pingIndex, point.cluster, point.coreTimestamp]]
-    })
-    const cachedCoreEdges = (panel.corePoints ?? []).flatMap((point) => {
-      const pingIndex = pingIndexByTimestamp.get(point.timestamp)
-      const sourceIndex = pingIndexByTimestamp.get(point.sourceTimestamp)
-      if (pingIndex === undefined || sourceIndex === undefined || point.timestamp === point.sourceTimestamp) return []
-      const visibleAt = Math.max(point.timestamp, point.sourceCoreTimestamp)
-      return [{
-        coords: [[point.sourceX, point.sourceY], [point.x, point.y]],
-        value: [point.cluster, sourceIndex, pingIndex, point.cluster, visibleAt],
-      }]
-    })
-    const coreTimelineData = DENSITY_ALGORITHMS.includes(panel.algo)
-      ? cachedCorePointData.map((point) => [point[5] * 1000, point[2], point[3]])
-      : []
-    const useCachedCorePoints = Boolean(panel.corePoints?.length) && panel.algo !== "sequential-centroid"
-    const anchorPointData = useCachedCorePoints ? cachedCorePointData : firstAnchorData
-    const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
-    const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
       const building = row.location ? buildingById.get(row.location) : null
       return building ? [{ ...row, location: building.id, destination: { id: building.id, center: building.center } }] : []
     })
     const segments = truthStops.slice(1).map((current, index) => {
       const previous = truthStops[index]
+      const cached = previous.destination.id && current.destination.id
+        ? routeByPair.get(`${previous.destination.id}->${current.destination.id}`)
+        : null
       return {
         stopIndex: index,
         cluster: index,
         start: previous.timestamp + previous.duration * 60,
         end: current.timestamp,
-        ...routeFor(previous.destination, current.destination),
+        points: cached ?? routeBetween(previous.destination.center, current.destination.center),
+        isFallback: !cached,
       }
     }).filter((segment) => segment.end > segment.start && segment.points.length > 1)
-    const focusBuildings = [
-      ...truthStops.flatMap((stop) => stop.location ? buildingById.get(stop.location) ?? [] : []),
-      ...stops.flatMap((stop) => stop.destination.id ? buildingById.get(stop.destination.id) ?? [] : []),
-    ]
-    const focusPoints = [
-      ...pings.map((ping) => [ping.x, ping.y]),
-      ...segments.flatMap((segment) => segment.points),
-    ]
-    const focusXs = [
-      ...focusPoints.map(([x]) => x),
-      ...focusBuildings.flatMap((building) => [building.minX, building.maxX]),
-    ]
-    const focusYs = [
-      ...focusPoints.map(([, y]) => y),
-      ...focusBuildings.flatMap((building) => [building.minY, building.maxY]),
-    ]
     const streets = scene.routes?.streets ?? []
     const streetIds = new Set(streets.map((street) => street.id))
     const streetLaneSegments = streets.flatMap((street) => {
@@ -360,46 +203,189 @@ function DemoSceneRenderer({
     verticalRunsByX.forEach((spans, x) => {
       mergeAxisRuns(spans).forEach(([minY, maxY]) => streetLanes.push([[x, minY], [x, maxY]]))
     })
-
-    // These lines make the empty-pings guard necessary
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
     for (let timestamp = start; timestamp <= end; timestamp += 30) times.add(timestamp)
 
     return {
-      streets,
-      streetLanes,
-      buildings,
-      blockSide,
       pings,
-      pingData,
-      clusterMembers,
-      stops,
-      anchorPointData,
-      anchorEdgeData,
-      coreTimelineData,
-      centroidAnchorFrames: visibleCentroidAnchorFrames,
-      lachesisDiameterFrames,
-      anchorPointMode: panel.algo,
+      pingIndexByTimestamp: new Map(pings.map((ping) => [ping.t, ping.i])),
+      buildings,
+      buildingById,
+      blockSide,
       truthStops,
       segments,
+      streets,
+      streetLanes,
+      timeSequence: Array.from(times).sort((a, b) => a - b),
+    }
+  }, [scene.buildings, scene.pings, scene.routes, scene.truth])
+  // Combine the scene with the selected algorithm result to build chart-ready stops,
+  // cluster assignments, anchors, density metadata, and focus bounds.
+  const resultData = useMemo(() => {
+    if (!sceneData) return null
+    const result = panel.result
+
+    const pings = sceneData.pings.map((ping, index) => ({
+      ...ping,
+      cluster: result.cluster[index],
+    }))
+    const pingData = pings.map((ping) => [ping.x, ping.y, ping.cluster, ping.i, ping.t])
+    const clusterMembers = new Map<number, number[]>()
+    pings.forEach((ping) => {
+      if (ping.cluster < 0) return
+      const members = clusterMembers.get(ping.cluster)
+      if (members) members.push(ping.i)
+      else clusterMembers.set(ping.cluster, [ping.i])
+    })
+    const destinationFor = (x: number, y: number) => {
+      const containing = sceneData.buildings.find((building) =>
+        x >= building.minX && x <= building.maxX && y >= building.minY && y <= building.maxY
+      )
+      const destination = containing ?? sceneData.buildings.reduce((best, building) =>
+        Math.hypot(x - building.center[0], y - building.center[1]) < Math.hypot(x - best.center[0], y - best.center[1])
+          ? building
+          : best
+      )
+      return {
+        id: destination.type === "building" ? null : destination.id,
+        center: destination.center,
+      }
+    }
+    const stops = stopsFromLabels(scene.pings, result.cluster).map((stop) => ({
+      ...stop,
+      destination: destinationFor(stop.x, stop.y),
+      radius: Math.max(
+        stop.diameter / 2,
+        Number(panel.params.delta_roam ?? panel.params.dist_thresh ?? 0),
+      ),
+      label: `Stop ${stop.cluster}`,
+      startTime: new Date(stop.start * 1000).toISOString().slice(11, 16),
+      endTime: new Date(stop.end * 1000).toISOString().slice(11, 16),
+    }))
+    const sequentialGroups = panel.algo.startsWith("sequential_")
+      ? stops.map((stop) => (clusterMembers.get(stop.cluster) ?? []).map((pingIndex) => pings[pingIndex]))
+      : []
+    const anchorFrames = panel.algo === "sequential_first" ? sequentialGroups.flatMap((members) => {
+      const anchor = members[0]
+      return members.map((ping) => ({
+        cluster: ping.cluster,
+        t: ping.t,
+        point: [anchor.x, anchor.y, ping.cluster, anchor.i, ping.t],
+        edges: anchor.i === ping.i ? [] : [{
+          coords: [[anchor.x, anchor.y], [ping.x, ping.y]],
+          value: [ping.cluster, anchor.i, ping.i, ping.t],
+        }],
+      }))
+    }) : panel.algo === "sequential_centroid" ? sequentialGroups.flatMap((members) => {
+      let sumX = 0
+      let sumY = 0
+      return members.map((ping, index) => {
+        sumX += ping.x
+        sumY += ping.y
+        const centroid = [sumX / (index + 1), sumY / (index + 1)]
+        return {
+          cluster: ping.cluster,
+          t: ping.t,
+          point: [centroid[0], centroid[1], ping.cluster, ping.i, ping.t],
+          edges: index === 0 ? [] : [{
+            coords: [centroid, [ping.x, ping.y]],
+            value: [ping.cluster, ping.i, ping.i, ping.t],
+          }],
+        }
+      })
+    }) : panel.algo === "lachesis" && result.kind === "anchor" ? pings.flatMap((ping) => {
+      const auxTime = result.aux_time[ping.i]
+      if (ping.cluster < 0 || auxTime == null) return []
+      const anchorIndex = sceneData.pingIndexByTimestamp.get(auxTime)
+      if (anchorIndex === undefined) return []
+      const anchor = pings[anchorIndex]
+      if (anchor.cluster !== ping.cluster) return []
+      return [{
+        cluster: ping.cluster,
+        t: ping.t,
+        point: [anchor.x, anchor.y, ping.cluster, anchor.i, ping.t],
+        edges: anchor.i === ping.i ? [] : [{
+          coords: [[anchor.x, anchor.y], [ping.x, ping.y]],
+          value: [ping.cluster, anchor.i, ping.i, ping.t],
+        }],
+      }]
+    }) : []
+    const densityCorePointData = result.kind === "density" ? pings.flatMap((ping) => (
+      ping.cluster >= 0 && result.core[ping.i] >= 0
+        ? [[ping.x, ping.y, ping.cluster, ping.i, Math.max(ping.t, result.aux_time[ping.i] ?? ping.t)]]
+        : []
+    )) : []
+    const densityPromotionEdges = result.kind === "density" ? pings.flatMap((ping) => {
+      const auxTime = result.aux_time[ping.i]
+      if (ping.cluster < 0 || auxTime == null) return []
+      const sourceIndex = sceneData.pingIndexByTimestamp.get(auxTime)
+      if (sourceIndex === undefined || sourceIndex === ping.i) return []
+      const source = pings[sourceIndex]
+      if (source.cluster !== ping.cluster || result.core[sourceIndex] < 0) return []
+      return [{
+        coords: [[source.x, source.y], [ping.x, ping.y]],
+        value: [ping.cluster, source.i, ping.i, Math.max(ping.t, auxTime)],
+      }]
+    }) : []
+    const coreTimelineData = densityCorePointData.map((point) => [point[4] * 1000, point[2], point[3]])
+    const focusBuildings = [
+      ...sceneData.truthStops.flatMap((stop) => stop.location ? sceneData.buildingById.get(stop.location) ?? [] : []),
+      ...stops.flatMap((stop) => stop.destination.id ? sceneData.buildingById.get(stop.destination.id) ?? [] : []),
+    ]
+    const focusPoints = [
+      ...pings.map((ping) => [ping.x, ping.y]),
+      ...sceneData.segments.flatMap((segment) => segment.points),
+    ]
+    const focusXs = [
+      ...focusPoints.map(([x]) => x),
+      ...focusBuildings.flatMap((building) => [building.minX, building.maxX]),
+    ]
+    const focusYs = [
+      ...focusPoints.map(([, y]) => y),
+      ...focusBuildings.flatMap((building) => [building.minY, building.maxY]),
+    ]
+    return {
+      streets: sceneData.streets,
+      streetLanes: sceneData.streetLanes,
+      buildings: sceneData.buildings,
+      blockSide: sceneData.blockSide,
+      pings,
+      pingData,
+      result,
+      clusterMembers,
+      stops,
+      densityCorePointData,
+      densityPromotionEdges,
+      anchorFrames,
+      coreTimelineData,
+      truthStops: sceneData.truthStops,
+      segments: sceneData.segments,
       focusBounds: {
         minX: Math.min(...focusXs),
         minY: Math.min(...focusYs),
         maxX: Math.max(...focusXs),
         maxY: Math.max(...focusYs),
       },
-      stopData: stops.map((stop) => [stop.x, stop.y, stop.cluster, stop.index, stop.nPings, stop.duration]),
       stopBars: stops.map((stop) => [stop.start * 1000, stop.end * 1000, stop.cluster, stop.index]),
       stopEndTimes: stops.map((stop) => stop.end),
-      durMinSec: revealDelay,
-      timeSequence: Array.from(times).sort((a, b) => a - b),
+      distanceThreshold: Number(panel.params.delta_roam ?? panel.params.dist_thresh ?? 0),
+      timeSequence: sceneData.timeSequence,
     }
-  }, [labels, panel.algo, panel.corePoints, panel.params, scene])
+  }, [panel.algo, panel.params, panel.result, scene.pings, sceneData])
+
+  const resultDataRef = useRef(resultData)
+  const updateResultRef = useRef<(data: NonNullable<typeof resultData>) => void>(() => {})
 
   useEffect(() => {
-    if (!scene || !chartData || !mapRef.current || !timelineRef.current) return
+    resultDataRef.current = resultData
+    if (resultData) updateResultRef.current(resultData)
+  }, [resultData])
+
+  useEffect(() => {
+    let chartData = resultDataRef.current
+    if (!chartData || !mapRef.current || !timelineRef.current) return
 
     const mapEl = mapRef.current
     const timelineEl = timelineRef.current
@@ -407,8 +393,8 @@ function DemoSceneRenderer({
     const previousTimelineTouchAction = timelineEl.style.touchAction
     mapEl.style.touchAction = "none"
     timelineEl.style.touchAction = "none"
-    const mapChart = echarts.init(mapEl, null, { renderer: "canvas" })
-    const timelineChart = echarts.init(timelineEl, null, { renderer: "canvas" })
+    const mapChart = echarts.getInstanceByDom(mapEl) ?? echarts.init(mapEl, null, { renderer: "canvas" })
+    const timelineChart = echarts.getInstanceByDom(timelineEl) ?? echarts.init(timelineEl, null, { renderer: "canvas" })
     const minX = chartData.focusBounds.minX
     const minY = chartData.focusBounds.minY
     const maxX = chartData.focusBounds.maxX
@@ -442,8 +428,6 @@ function DemoSceneRenderer({
     }
     const timeMin = scene.pings[0].timestamp * 1000
     const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
-    const noisePings = chartData.pingData.filter((point) => point[2] < 0)
-    const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -492,7 +476,7 @@ function DemoSceneRenderer({
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
-    const isDensityAlgorithm = DENSITY_ALGORITHMS.includes(panel.algo)
+    const isDensityAlgorithm = chartData.result.kind === "density"
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
@@ -555,25 +539,22 @@ function DemoSceneRenderer({
       }
       return index
     }
+    const pingClassifiedAt = (pingIndex: number, timestampSeconds: number) => {
+      const pingTime = chartData.pingData[pingIndex][4]
+      return pingTime <= timestampSeconds && (
+        chartData.result.kind !== "density" ||
+        Math.max(pingTime, chartData.result.aux_time[pingIndex] ?? pingTime) <= timestampSeconds
+      )
+    }
     const detectedCountFor = (timestampSeconds: number) => {
       let count = 0
       while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
       return count
     }
-    const anchorPointsAt = (timestampSeconds: number) => {
-      return chartData.anchorPointData.filter((point) => point[5] <= timestampSeconds)
-    }
-    const centroidAnchorFramesAt = (timestampSeconds: number) => {
-      const framesByStop = new Map<number, (typeof chartData.centroidAnchorFrames)[number]>()
-      chartData.centroidAnchorFrames.forEach((frame) => {
-        if (frame.t <= timestampSeconds) framesByStop.set(frame.stopIndex, frame)
-      })
-      return Array.from(framesByStop.values())
-    }
-    const lachesisDiameterFramesAt = (timestampSeconds: number) => {
-      const framesByStop = new Map<number, (typeof chartData.lachesisDiameterFrames)[number]>()
-      chartData.lachesisDiameterFrames.forEach((frame) => {
-        if (frame.t <= timestampSeconds) framesByStop.set(frame.stopIndex, frame)
+    const anchorFramesAt = (timestampSeconds: number) => {
+      const framesByStop = new Map<number, (typeof chartData.anchorFrames)[number]>()
+      chartData.anchorFrames.forEach((frame) => {
+        if (frame.t <= timestampSeconds) framesByStop.set(frame.cluster, frame)
       })
       return Array.from(framesByStop.values())
     }
@@ -584,7 +565,7 @@ function DemoSceneRenderer({
         opacity: associationOpacity(point[3]),
       },
     })
-    const styledAnchorPoint = (point: number[]) => ({
+    const styledXrayPoint = (point: number[]) => ({
       value: point,
       symbolSize: 15 * pingScale(point[3]),
       itemStyle: {
@@ -603,9 +584,9 @@ function DemoSceneRenderer({
       const truth = groundTruthAt(timestampSeconds)
       return chartData.buildings.map((building, index) => [
         index,
-        showGroundTruth && building.id === truth.current?.location
+        layerStateRef.current.showGroundTruth && building.id === truth.current?.location
           ? 1 + pulseStrength
-          : showGroundTruth && building.id === truth.next?.location
+          : layerStateRef.current.showGroundTruth && building.id === truth.next?.location
             ? 2
             : 0,
         hoverBuildingId !== "" && building.id !== hoverBuildingId ? 1 : 0,
@@ -622,8 +603,9 @@ function DemoSceneRenderer({
       ].filter((points) => points.length > 1).flatMap((points, index) => index === 0 ? points : points.slice(1))
     // While hovering a ping that belongs to a detected stop, outline the building the algorithm
     // assigned that stop to, in the stop's cluster color - alongside the (untouched) ground-truth glow.
-    const hoveredAssignedBuildingData = () => {
-      if (!showStops || hoverPingIndex === null) return []
+    const hoveredAssignedBuildingData = (timestampSeconds: number) => {
+      if (!layerStateRef.current.showStops || hoverPingIndex === null) return []
+      if (!pingClassifiedAt(hoverPingIndex, timestampSeconds)) return []
       const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
       if (cluster < 0) return []
       const stop = chartData.stops.find((candidate) => candidate.cluster === cluster)
@@ -633,8 +615,14 @@ function DemoSceneRenderer({
       return buildingIndex >= 0 ? [[buildingIndex, cluster]] : []
     }
     // For density-based algorithms, show the dist_thresh neighborhood radius around the hovered point.
-    const hoveredDistanceCircleData = () => {
-      if (!isDensityAlgorithm || hoverPingIndex === null) return []
+    const distanceCircleData = (
+      timestampSeconds: number,
+      anchorFrames: (typeof chartData.anchorFrames),
+    ) => {
+      if (!layerStateRef.current.showXray) return []
+      if (!isDensityAlgorithm) return anchorFrames.map((frame) => frame.point)
+      if (hoverPingIndex === null) return []
+      if (!pingClassifiedAt(hoverPingIndex, timestampSeconds)) return []
       const point = chartData.pingData[hoverPingIndex]
       return [[point[0], point[1], point[2]]]
     }
@@ -696,8 +684,7 @@ function DemoSceneRenderer({
 
     // Allow route glow when ground truth is visible and panel's playback conditions permit it
     const routeGlowAllowed = () =>
-      showGroundTruth && paused && (syncMaster || (mode === "compare" && sharedPlaybackStateRef.current !== "playing"))
-
+      layerStateRef.current.showGroundTruth && paused && (syncMaster || (mode === "compare" && sharedPlaybackStateRef.current !== "playing"))
     // Animate a repeating marker along the revealed route while route glow is allowed
     const startRouteGlow = () => {
       if (routeGlowFrame || !routeGlowAllowed()) return
@@ -756,7 +743,7 @@ function DemoSceneRenderer({
       const step = (now: number) => {
         const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
         const next = routeProgressAt(timestampSeconds).next
-        if (!showGroundTruth || !next) {
+        if (!layerStateRef.current.showGroundTruth || !next) {
           stopNextPathFlow()
           return
         }
@@ -786,16 +773,14 @@ function DemoSceneRenderer({
     const renderScene = (timestampSeconds: number) => {
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
+      const noisePings = chartData.pingData.filter((point) => point[2] < 0)
+      const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
       const route = routeProgressAt(timestampSeconds)
       const detectedStopCount = detectedCountFor(timestampSeconds)
-      const centroidAnchorFrames = centroidAnchorFramesAt(timestampSeconds)
-      const lachesisDiameterFrames = lachesisDiameterFramesAt(timestampSeconds)
-      nextPathVisible = showGroundTruth && Boolean(groundTruthAt(timestampSeconds).current && route.next)
-      const anchorEdges = [
-        ...chartData.anchorEdgeData.filter((edge) => edge.value[4] <= timestampSeconds),
-        ...centroidAnchorFrames.flatMap((frame) => frame.edges),
-        ...lachesisDiameterFrames.map((frame) => frame.edge),
-      ]
+      const anchorFrames = anchorFramesAt(timestampSeconds)
+      nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds).current && route.next)
+      const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
+      const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
       if (selectedPingIndexesRef.current.length === 2) {
         hoverPingIndexes = new Set(selectedPingIndexesRef.current)
         if (hoverPingIndex !== null) hoverPingIndexes.add(hoverPingIndex)
@@ -820,13 +805,21 @@ function DemoSceneRenderer({
         }
       } else if (hoverPingIndex !== null) {
         // Ping hover: reveal every ping in the same detected stop (or just itself for noise).
-        const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
-        const members = cluster >= 0 ? chartData.clusterMembers.get(cluster) : undefined
+        const cluster = pingClassifiedAt(hoverPingIndex, timestampSeconds)
+          ? chartData.pingData[hoverPingIndex]?.[2] ?? -1
+          : -1
+        const members = cluster >= 0
+          ? chartData.clusterMembers.get(cluster)?.filter((pingIndex) => pingClassifiedAt(pingIndex, timestampSeconds))
+          : undefined
         hoverPingIndexes = new Set(members ?? [hoverPingIndex])
       } else if (selectedPingIndexesRef.current.length) {
         hoverPingIndexes = new Set(selectedPingIndexesRef.current.flatMap((pingIndex) => {
-          const cluster = chartData.pingData[pingIndex]?.[2] ?? -1
-          return cluster >= 0 ? chartData.clusterMembers.get(cluster) ?? [pingIndex] : [pingIndex]
+          const cluster = pingClassifiedAt(pingIndex, timestampSeconds)
+            ? chartData.pingData[pingIndex]?.[2] ?? -1
+            : -1
+          return cluster >= 0
+            ? chartData.clusterMembers.get(cluster)?.filter((memberIndex) => pingClassifiedAt(memberIndex, timestampSeconds)) ?? [pingIndex]
+            : [pingIndex]
         }))
       } else {
         hoverPingIndexes = null
@@ -838,22 +831,25 @@ function DemoSceneRenderer({
           { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
           { id: "buildings", data: buildingsSeriesData(timestampSeconds) },
           { id: "building-glow", data: buildingGlowData(timestampSeconds) },
-          { id: "assigned-building-outline", data: hoveredAssignedBuildingData() },
-          { id: "completed-paths", data: showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
-          { id: "completed-fallback-paths", data: showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
-          { id: "active-path", data: showGroundTruth ? route.activeCached : [] },
-          { id: "active-fallback-path", data: showGroundTruth ? route.activeFallback : [] },
+          { id: "assigned-building-outline", data: hoveredAssignedBuildingData(timestampSeconds) },
+          { id: "completed-paths", data: layerStateRef.current.showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
+          { id: "completed-fallback-paths", data: layerStateRef.current.showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
+          { id: "active-path", data: layerStateRef.current.showGroundTruth ? route.activeCached : [] },
+          { id: "active-fallback-path", data: layerStateRef.current.showGroundTruth ? route.activeFallback : [] },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
           { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3]), itemStyle: { opacity: associatedWithHover(point[3]) ? 1 : 0.18 } })) },
-          { id: "noise-pings", data: showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
-          { id: "cluster-pings", data: showStops ? clusterPings.filter((point) => point[4] <= timestampSeconds).map((point) => [...point, associationOpacity(point[3])]) : [] },
-          { id: "detected-stops", data: [] },
-          { id: "anchor-edges", data: showStops ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
-          { id: "anchor-edges-hit-area", data: showStops ? anchorEdges : [] },
-          { id: "anchor-points", data: showStops ? [...anchorPointsAt(timestampSeconds), ...centroidAnchorFrames.map((frame) => frame.point)].map(styledAnchorPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], showStops ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
+          { id: "noise-pings", data: layerStateRef.current.showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
+          { id: "cluster-pings", data: layerStateRef.current.showStops ? clusterPings.filter((point) => pingClassifiedAt(point[3], timestampSeconds)).map((point) => [...point, associationOpacity(point[3])]) : [] },
+          { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
+          { id: "promotion-edges-hit-area", data: layerStateRef.current.showXray ? promotionEdges : [] },
+          { id: "core-points", data: layerStateRef.current.showXray ? chartData.densityCorePointData.filter((point) => point[4] <= timestampSeconds).map(styledXrayPoint) : [] },
+          { id: "anchor-edges", data: layerStateRef.current.showXray ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
+          { id: "anchor-edges-hit-area", data: layerStateRef.current.showXray ? anchorEdges : [] },
+          { id: "anchor-points", data: layerStateRef.current.showXray ? anchorFrames.map((frame) => frame.point).map(styledXrayPoint) : [] },
+          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
           { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
-          { id: "hover-distance-circle", data: hoveredDistanceCircleData() },
+          { id: "distance-circles", data: distanceCircleData(timestampSeconds, anchorFrames) },
+          { id: "ping-hit-area", data: chartData.pingData },
           { id: "selected-ping-line", data: selectedPingLineData() },
         ],
       }, { lazyUpdate: true })
@@ -862,11 +858,11 @@ function DemoSceneRenderer({
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: chartData.pingData.map((_, index) => [index]) },
-          { id: "core-point-ticks", data: showStops ? chartData.coreTimelineData : [] },
-          { id: "past-truth-stops", data: showGroundTruth ? pastTruthStopData(timestampSeconds) : [] },
-          { id: "next-truth-stop", data: showGroundTruth ? nextTruthStopData(timestampSeconds) : [] },
-          { id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] },
-          { id: "stop-bars", data: showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
+          { id: "core-point-ticks", data: layerStateRef.current.showXray ? chartData.coreTimelineData : [] },
+          { id: "past-truth-stops", data: layerStateRef.current.showGroundTruth ? pastTruthStopData(timestampSeconds) : [] },
+          { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds) : [] },
+          { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds) : [] },
+          { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
         ],
       }, { lazyUpdate: true })
@@ -889,12 +885,15 @@ function DemoSceneRenderer({
           { id: "ghost-pings", data: previewPings },
           { id: "noise-pings", data: [] },
           { id: "cluster-pings", data: [] },
-          { id: "detected-stops", data: [] },
+          { id: "promotion-edges", data: [] },
+          { id: "promotion-edges-hit-area", data: [] },
+          { id: "core-points", data: [] },
           { id: "anchor-edges", data: [] },
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
           { id: "current-ping-hole", data: [] },
+          { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData() },
         ],
       }, { lazyUpdate: true })
@@ -1111,8 +1110,7 @@ function DemoSceneRenderer({
     }
     const tourCorePingIndexes = new Set(chartData.coreTimelineData.map((point) => point[2]))
     const tourTimelinePingIndex = chartData.pings.find((ping) => !tourCorePingIndexes.has(ping.i))?.i ?? 0
-    const tourAnchorPingIndex = chartData.anchorPointData[0]?.[3] ?? tourTimelinePingIndex
-
+    const tourAnchorPingIndex = chartData.anchorFrames[0]?.point[3] ?? chartData.densityCorePointData[0]?.[3] ?? tourTimelinePingIndex
     // Apply or clear guided-tour highlights for example pings, anchors, 
     // and ground-truth buildings in single mode
     const onTourAction: EventListener = (event) => {
@@ -1131,7 +1129,7 @@ function DemoSceneRenderer({
 
     // Route map hover events to the matching ping, anchor, or connection-edge highlight
     const onMapMouseOver = (params: echarts.ECElementEvent) => {
-      if (params.seriesId === "anchor-edges-hit-area") {
+      if (params.seriesId === "anchor-edges-hit-area" || params.seriesId === "promotion-edges-hit-area") {
         const value = paramsValue(params)
         setHoveredEdge([Number(value[1]), Number(value[2])])
         return
@@ -1141,6 +1139,7 @@ function DemoSceneRenderer({
         params.seriesId === "cluster-pings" ||
         params.seriesId === "noise-pings" ||
         params.seriesId === "current-ping" ||
+        params.seriesId === "core-points" ||
         params.seriesId === "anchor-points" ||
         params.seriesId === "ping-hit-area"
       ) {
@@ -1199,6 +1198,7 @@ function DemoSceneRenderer({
         params.seriesId === "cluster-pings" ||
         params.seriesId === "noise-pings" ||
         params.seriesId === "current-ping" ||
+        params.seriesId === "core-points" ||
         params.seriesId === "anchor-points" ||
         params.seriesId === "ping-hit-area"
       ) {
@@ -1508,24 +1508,30 @@ function DemoSceneRenderer({
         position: pingTooltipPosition,
         formatter(params: EChartsParams) {
           const value = paramsValue(params)
-          if (params.seriesId === "detected-stops") {
-            const stop = chartData.stops[value[3]]
-            return `${stop.label}<br>${stop.startTime} - ${stop.endTime}<br>${stop.nPings} pings / ${stop.duration} min`
+          if (params.seriesId === "core-points") {
+            const ping = chartData.pings[value[3]]
+            return `Core point for Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}<br>Distance threshold: ${chartData.distanceThreshold}`
           }
           if (params.seriesId === "anchor-points") {
             const ping = chartData.pings[value[3]]
-            const label = chartData.anchorPointMode === "sequential-centroid"
+            const label = panel.algo === "sequential_centroid"
               ? "Centroid anchor for"
-              : chartData.anchorPointMode.startsWith("sequential-")
+              : panel.algo.startsWith("sequential_")
                 ? "Anchor for"
-                : "Core point for"
-            const distanceLine = isDensityAlgorithm ? `<br>Distance threshold: ${distThreshold}` : ""
-            return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}${distanceLine}`
+                : "Cached anchor for"
+            return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
           }
           if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
             const ping = chartData.pings[value[3]]
-            const cluster = ping.cluster < 0 ? "Noise" : `Cluster ${ping.cluster}`
-            const distanceLine = isDensityAlgorithm ? `<br>Distance threshold: ${distThreshold}` : ""
+            const classified = pingClassifiedAt(ping.i, activeTimestamp())
+            const cluster = !classified
+              ? "Unclassified"
+              : ping.cluster < 0
+                ? "Noise"
+                : isDensityAlgorithm && layerStateRef.current.showXray
+                  ? `${chartData.result.kind === "density" && chartData.result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
+                  : `Cluster ${ping.cluster}`
+            const distanceLine = classified && isDensityAlgorithm && layerStateRef.current.showXray ? `<br>Distance threshold: ${chartData.distanceThreshold}` : ""
             return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}${distanceLine}`
           }
           return ""
@@ -1759,15 +1765,37 @@ function DemoSceneRenderer({
           },
         },
         {
-          id: "detected-stops",
-          name: "Detected stops",
-          type: "scatter",
+          id: "promotion-edges",
+          name: "Density promotions",
+          type: "lines",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 7,
+          data: [],
+          symbol: "none",
+          lineStyle: { width: 1.8, opacity: 0.55 },
+        },
+        {
+          id: "promotion-edges-hit-area",
+          name: "Density promotions hit area",
+          type: "lines",
           coordinateSystem: "cartesian2d",
           z: 7,
           data: [],
-          symbol: "diamond",
-          symbolSize: 20,
-          itemStyle: { color: (params: EChartsParams) => clusterColor(paramsValue(params)[2]), borderColor: "#ffffff", borderWidth: 2, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.22)" },
+          symbol: "none",
+          silent: false,
+          tooltip: { show: false },
+          lineStyle: { width: 16, opacity: 0 },
+        },
+        {
+          id: "core-points",
+          name: "Core points",
+          type: "scatter",
+          coordinateSystem: "cartesian2d",
+          z: 8,
+          data: [],
+          symbolSize: 15,
+          itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
         },
         {
           id: "anchor-edges",
@@ -1840,7 +1868,7 @@ function DemoSceneRenderer({
           },
         },
         {
-          id: "hover-distance-circle",
+          id: "distance-circles",
           name: "Distance threshold radius",
           type: "custom",
           coordinateSystem: "cartesian2d",
@@ -1849,7 +1877,7 @@ function DemoSceneRenderer({
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const center = api.coord([api.value(0), api.value(1)])
-            const edge = api.coord([api.value(0) + distThreshold, api.value(1)])
+            const edge = api.coord([api.value(0) + chartData.distanceThreshold, api.value(1)])
             const radius = Math.abs(edge[0] - center[0])
             const color = clusterColor(Number(api.value(2)))
             return {
@@ -2040,6 +2068,12 @@ function DemoSceneRenderer({
       syncSequenceIndex(timestampSeconds)
       renderScene(timestampSeconds)
     }
+    updateResultRef.current = (data) => {
+      chartData = data
+      renderSceneRef.current?.(
+        selectedTimestampRef.current ?? data.timeSequence[data.timeSequence.length - 1],
+      )
+    }
     const initialTimestamp = variant === "preview"
       ? chartData.timeSequence[0]
       : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
@@ -2084,7 +2118,7 @@ function DemoSceneRenderer({
         ],
       })
       timelineChart.setOption({
-        series: [{ id: "current-truth-stop", data: showGroundTruth ? currentTruthStopData(timestampSeconds) : [] }],
+        series: [{ id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds) : [] }],
       })
     }, 80)
 
@@ -2106,6 +2140,7 @@ function DemoSceneRenderer({
       replayRef.current = () => {}
       previewRef.current = () => {}
       clearSelectionRef.current = () => {}
+      updateResultRef.current = () => {}
       mapChart.off("mouseover", onMapMouseOver)
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
@@ -2121,10 +2156,23 @@ function DemoSceneRenderer({
       renderSceneRef.current = null
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
-      mapChart.dispose()
-      timelineChart.dispose()
     }
-  }, [chartData, mode, onPreviewComplete, onTimeChange, scene, showGroundTruth, showStops, syncMaster, variant])
+  }, [mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+
+  useEffect(() => {
+    layerStateRef.current = { showGroundTruth, showStops, showXray }
+    const timestamp = selectedTimestampRef.current ?? resultDataRef.current?.timeSequence.at(-1)
+    if (timestamp !== undefined) renderSceneRef.current?.(timestamp)
+  }, [showGroundTruth, showStops, showXray])
+
+  useEffect(() => {
+    const mapEl = mapRef.current
+    const timelineEl = timelineRef.current
+    return () => {
+      if (mapEl) echarts.getInstanceByDom(mapEl)?.dispose()
+      if (timelineEl) echarts.getInstanceByDom(timelineEl)?.dispose()
+    }
+  }, [])
 
   useEffect(() => {
     onReplayStartRef.current = onReplayStart
@@ -2136,9 +2184,10 @@ function DemoSceneRenderer({
 
   useEffect(() => {
     sharedPlaybackStateRef.current = sharedPlaybackState
-    if (syncMaster) return
-    renderSceneRef.current?.(selectedTimestampRef.current ?? currentTime ?? 0)
-  }, [currentTime, sharedPlaybackState, syncMaster])
+    if (!syncMaster && selectedTimestampRef.current !== null) {
+      renderSceneRef.current?.(selectedTimestampRef.current)
+    }
+  }, [sharedPlaybackState, syncMaster])
 
   useEffect(() => {
     if (!previewRunId || syncMaster) return
@@ -2146,29 +2195,22 @@ function DemoSceneRenderer({
   }, [previewRunId, syncMaster])
 
   useEffect(() => {
-    wheelStartsAtEndRef.current = true
-    selectedPingIndexesRef.current = []
-    setSelectedPingIndexes([])
-  }, [chartData])
+    if (!resultData || currentTime !== null) return
+    onTimeChange(variant === "preview" ? resultData.timeSequence[0] : resultData.timeSequence[resultData.timeSequence.length - 1])
+  }, [currentTime, onTimeChange, resultData, variant])
 
   useEffect(() => {
-    if (!chartData || currentTime !== null) return
-    onTimeChange(variant === "preview" ? chartData.timeSequence[0] : chartData.timeSequence[chartData.timeSequence.length - 1])
-  }, [chartData, currentTime, onTimeChange, variant])
-
-  useEffect(() => {
-    if (!chartData || currentTime === null) return
-    if (currentTime !== chartData.timeSequence[chartData.timeSequence.length - 1]) wheelStartsAtEndRef.current = false
+    const data = resultDataRef.current
+    if (!data || currentTime === null) return
+    if (currentTime !== data.timeSequence[data.timeSequence.length - 1]) wheelStartsAtEndRef.current = false
     selectedTimestampRef.current = currentTime
     renderSceneRef.current?.(currentTime)
-  }, [chartData, currentTime])
+  }, [currentTime])
 
-  if (!scene) return null
-
-  const selectedPings = selectedPingIndexes.length === 2 && chartData
-    ? selectedPingIndexes.map((pingIndex) => chartData.pings[pingIndex])
+  const selectedPings = selectedPingIndexes.length === 2 && resultData
+    ? selectedPingIndexes.map((pingIndex) => resultData.pings[pingIndex])
     : null
-  const selectedPing = selectedPingIndexes.length === 1 && chartData ? chartData.pings[selectedPingIndexes[0]] : null
+  const selectedPing = selectedPingIndexes.length === 1 && resultData ? resultData.pings[selectedPingIndexes[0]] : null
   const selectedPingDistance = selectedPings
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
@@ -2250,6 +2292,7 @@ export function CompareAnimationPanel({
   syncMaster = true,
   showGroundTruth,
   showStops,
+  showXray,
   previewRunId,
   onReplayStart,
   sharedPlaybackState,
@@ -2262,13 +2305,14 @@ export function CompareAnimationPanel({
   syncMaster?: boolean
   showGroundTruth: boolean
   showStops: boolean
+  showXray: boolean
   previewRunId?: number
   onReplayStart?: () => void
   sharedPlaybackState?: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
-  const sceneMetadata = panel?.scene ? `Agent: ${panel.scene.user_id}` : null
-  const learnAlgorithmId = panel?.algo === "tadbscan" ? "dbscan" : panel?.algo
+  const sceneMetadata = panel ? `Agent: ${panel.scene.user_id}` : null
+  const learnAlgorithmId = panel?.algo
 
   return (
     <Card className="h-full min-h-0 overflow-hidden py-0">
@@ -2283,7 +2327,7 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
-        {mode === "compare" && panel?.params && (
+        {mode === "compare" && panel && (
           <p className="text-xs text-white">{Object.entries(panel.params).map(([name, value]) => `${parameterDisplayName(name)}: ${value}`).join(" · ")}</p>
         )}
         {sceneMetadata && (
@@ -2291,9 +2335,10 @@ export function CompareAnimationPanel({
         )}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col p-5">
-        {panel?.scene ? (
+        {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer
+              key={`${panel.algo}:${panel.scene.source}:${panel.scene.user_id}`}
               panel={panel}
               mode={mode}
               currentTime={currentTime}
@@ -2301,6 +2346,7 @@ export function CompareAnimationPanel({
               syncMaster={syncMaster}
               showGroundTruth={showGroundTruth}
               showStops={showStops}
+              showXray={showXray}
               previewRunId={previewRunId}
               onReplayStart={onReplayStart}
               sharedPlaybackState={sharedPlaybackState}
@@ -2334,7 +2380,7 @@ export function StopRunPreview({
   onTimeChange: (timestamp: number) => void
   onComplete?: () => void
 }) {
-  if (!panel?.scene) {
+  if (!panel) {
     return (
       <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
         <Skeleton className="flex-1 rounded-none bg-[#202738]" />
@@ -2345,6 +2391,7 @@ export function StopRunPreview({
 
   return (
     <DemoSceneRenderer
+      key={`${panel.algo}:${panel.scene.source}:${panel.scene.user_id}`}
       panel={panel}
       mode="single"
       currentTime={currentTime}
@@ -2352,6 +2399,7 @@ export function StopRunPreview({
       syncMaster
       showGroundTruth
       showStops
+      showXray
       variant="preview"
       onPreviewComplete={onComplete}
     />

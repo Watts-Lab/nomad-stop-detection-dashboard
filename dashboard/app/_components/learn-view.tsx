@@ -3,7 +3,7 @@ import { Maximize2, Minimize2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import { LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
+import { DEMO_ALGORITHM_IDS, LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { DashboardView, DemoMode } from "../_lib/types"
 
@@ -165,14 +165,16 @@ export function LearnView({
 
               <div className="shrink-0 border-t border-border/70 px-5 py-4 md:px-8">
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <Button
-                    size="lg"
-                    onClick={() => openLearnDemo(expandedLearnAlgorithm.id)}
-                    className="nomad-action h-11 min-w-36 text-base"
-                  >
-                    <Play className="h-5 w-5 fill-current" />
-                    Demo
-                  </Button>
+                  {DEMO_ALGORITHM_IDS.has(expandedLearnAlgorithm.id) && (
+                    <Button
+                      size="lg"
+                      onClick={() => openLearnDemo(expandedLearnAlgorithm.id)}
+                      className="nomad-action h-11 min-w-36 text-base"
+                    >
+                      <Play className="h-5 w-5 fill-current" />
+                      Demo
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="lg"

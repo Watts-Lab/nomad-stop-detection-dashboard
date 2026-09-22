@@ -11,6 +11,7 @@ dashboard/next-env.d.ts
 # Local caches and generated dashboard results. Ignore everything nested, then
 # re-include only the small files the app needs: JSON, plus the labels matrix and
 # config map parquet the animation reads directly (keeps large parquet out of git).
+.cache-stash/
 cached_results/**
 !cached_results/.gitkeep
 !cached_results/**/

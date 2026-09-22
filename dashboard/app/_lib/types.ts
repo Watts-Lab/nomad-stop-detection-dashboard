@@ -1,6 +1,3 @@
-export type DataPoint = { id: string; x: number; y: number; time: string; color: "orange" | "pink" | "purple" }
-export type TimeSegment = { id: string; startPercent: number; widthPercent: number; color: "orange" | "pink" | "purple" }
-
 export type ComparePanelResponse = {
   algo: string
   title: string

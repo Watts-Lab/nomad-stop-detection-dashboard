@@ -12,6 +12,7 @@ import { TrajectorySelector } from "./trajectory-selector"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
 
+// Render Demo panels with shared trajectory controls and coordinate comparison playback.
 export function DemoView({
   compareMode,
   showGroundTruth,
@@ -27,7 +28,6 @@ export function DemoView({
   rightParamErrors,
   demoTrajectory,
   compareApiData,
-  compareLoading,
   compareError,
   demoTime,
   setDemoTime,
@@ -59,7 +59,6 @@ export function DemoView({
   rightParamErrors: Record<string, string>
   demoTrajectory: string
   compareApiData: CompareApiResponse | null
-  compareLoading: boolean
   compareError: string | null
   demoTime: number | null
   setDemoTime: (timestamp: number) => void
@@ -77,15 +76,20 @@ export function DemoView({
   openMetricsFromDemo: () => void
   startTour: () => void
 }) {
+
+  // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
 
+  // Apply reveal classes to the header and active panel layout.
   return (
     <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           {!compareMode && (
+
+            /* Start the Demo guided tour. */
             <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
               <HelpCircle className="h-4 w-4" />
             </Button>
@@ -93,6 +97,7 @@ export function DemoView({
         </div>
         <div className="flex flex-wrap items-center gap-4" data-tour="tour-layers">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+
             <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
             Ground Truth
           </label>
@@ -107,7 +112,6 @@ export function DemoView({
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
-            {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
@@ -160,7 +164,6 @@ export function DemoView({
               <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
               <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>
-            {compareLoading && <p className="text-xs text-muted-foreground">Running notebook algorithm code...</p>}
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden">

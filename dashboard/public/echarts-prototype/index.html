@@ -54,9 +54,15 @@
     const DATA_URL = params.get("data") || "./lachesis_results.parquet";
 
     const chart = echarts.init(document.getElementById("chart"));
+
+    // Format the parameter name for the chart axis, including the delta-roam subscript
     const parameterLabel = (value) => value === "delta_roam" ? "{delta|Δ}{sub|roam}" : value;
+
+    // Format the parameter name as plain text for tooltips
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
     const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread"]);
+
+    // Build agent, accuracy, and parameter details for maximum points and highlighted curves
     const pointTooltip = (event) => {
       if (!tooltipSeries.has(event.seriesName)) return "";
       const [pointX, recall, userId] = event.value;
@@ -133,6 +139,8 @@
         const highestAverageLine = [[axisMinX, highestMeanPoint[1]], [axisMaxX, highestMeanPoint[1]]];
         const averageUserMaxLine = [[axisMinX, averageUserMax], [axisMaxX, averageUserMax]];
         const emptyHighlight = [];
+
+        // Return chart styles for the requested tour focus, or the default styles when focus is cleared
         const tourFocusSeries = (mode) => {
           if (mode === "points") {
             return [
@@ -171,6 +179,8 @@
           ];
         };
         let activeTourFocus = null;
+
+        // Store the active tour focus and apply its chart styles
         const applyTourFocus = (mode) => {
           activeTourFocus = mode;
           chart.setOption({ series: tourFocusSeries(mode) });
@@ -471,10 +481,15 @@
         // green line survives mouse movement until it is unpinned or replaced.
         let hoveredPoint = null;
         let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
+
+        // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
+        // Get the selected agent's accuracy values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
+        // Draw hovered and pinned agent curves and emphasize their maximum points
+        // Restore tour styling when neither is active
         const renderHighlight = () => {
           // A pinned user stays drawn while hovering another one, so both spreads show at once.
           const hovered = hoveredPoint;
@@ -502,6 +517,7 @@
           });
         };
 
+        // Notify the parent Metrics view of the pinned agent and settings, or send null values when unpinned
         const postPinChange = () => {
           window.parent.postMessage({
             type: "nomad-metrics-pin-change",

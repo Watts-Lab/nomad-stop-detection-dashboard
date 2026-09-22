@@ -23,6 +23,9 @@ import type {
 } from "./_lib/types"
 import { NomadNav } from "@/components/nomad-nav"
 
+// Own dashboard's shared state & coordinate navigation, demo data
+// metrics configuration, and guided tours, pass state & action handlers
+// to individual view components
 function NomadDashboard() {
   const router = useRouter()
   const pathname = usePathname()
@@ -56,6 +59,10 @@ function NomadDashboard() {
   const [metricsSelectedUserId, setMetricsSelectedUserId] = useState<string | null>(null)
   const metricsEntryFromDemoRef = useRef(false)
 
+  // Update browser URL to reflect the selected view
+  // Include the algorithm for Learn & the single/compare mode for Demo
+  // Remove those parameters where they no longer apply
+  // Preserve unrelated query parameters and add a browser history entry
   const syncUrl = useCallback((view: DashboardView, algoId: string | null = null, demoMode?: DemoMode) => {
     const params = new URLSearchParams(searchParamString)
     if (view === "home") {
@@ -79,12 +86,20 @@ function NomadDashboard() {
     router.push(qs ? `${pathname}?${qs}` : pathname)
   }, [compareMode, pathname, router, searchParamString])
 
+// Validate the selected algorithms' parameters and load Demo visualization data.
+// Block loading if the left or right panels have errors while comparison mode active
+// Normalize parameter names/defaults before loading.
+// Clear  previous visualization & playback time, store returned data or error
+// Use request ID so old request cannot overwrite result or loading state of new one
   const runCompareVisualization = useCallback(async (seed: number) => {
     const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
     const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
     if (!leftAlgo || !rightAlgo) return
     const requestId = ++compareRequestIdRef.current
 
+    // Convert validated parameters into the names expected by the data loader
+    // Supply missing algorithm-specific defaults
+    // For DBSCAN, map eps_spatial, T_max, and minPts to the loader's field names
     const parseParams = (algoId: string, normalized: Record<string, number>) => {
       const out: Record<string, number> = { ...normalized }
       if (algoId === "dbscan") {
@@ -150,6 +165,9 @@ function NomadDashboard() {
     }
   }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, requestedUserId, demoTrajectory])
 
+  // Handle New Agent buttom by clearing explicitly requested agent
+  // incrementing seed & requesting visualization data with new seed
+  // Updating the seed triggers the Demo-loading effect below
   const handleNewTrajectory = useCallback(() => {
     setRequestedUserId(null)
     const nextSeed = compareSeed + 1
@@ -157,18 +175,25 @@ function NomadDashboard() {
     void runCompareVisualization(nextSeed)
   }, [compareSeed, runCompareVisualization])
 
+  // Change the left Demo algorithm and reset its parameter overrides and validation errors.
   const handleLeftAlgorithmChange = useCallback((algorithmId: string) => {
     setLeftAlgorithm(algorithmId)
     setLeftParams({})
     setLeftParamErrors({})
   }, [])
 
+  // Change the right Demo algorithm and clear its parameter overrides
+  // and validation errors so the new algorithm starts with its defaults.
+  // The Demo-loading effect responds to the updated state.
   const handleRightAlgorithmChange = useCallback((algorithmId: string) => {
     setRightAlgorithm(algorithmId)
     setRightParams({})
     setRightParamErrors({})
   }, [])
 
+  // Open Aggregated Metrics using the Metrics equivalents of the Demo algorithms.
+  // Enable Metrics comparison when Demo comparison is active and the right
+  // algorithm has a Metrics mapping, then update the active view and URL.
   const openMetricsFromDemo = useCallback(() => {
     const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
     const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
@@ -186,6 +211,7 @@ function NomadDashboard() {
     syncUrl("metrics")
   }, [compareApiData, compareMode, leftAlgorithm, rightAlgorithm, syncUrl])
 
+  // Open the selected Metrics agent and scenario in Demo with its fixed and swept parameters.
   const handleMetricsPointSelect = useCallback((payload: MetricsPoint) => {
     const algoDef = algorithms.find((a) => a.id === payload.algoId)
     if (!algoDef || !Number.isFinite(payload.value)) return
@@ -207,24 +233,31 @@ function NomadDashboard() {
     syncUrl("demo", null, "single")
   }, [syncUrl])
 
+  // Switch Demo mode and synchronize the browser URL.
   const handleCompareModeToggle = useCallback(() => {
     const nextMode: DemoMode = compareMode ? "single" : "compare"
     setCompareMode(nextMode === "compare")
     syncUrl("demo", null, nextMode)
   }, [compareMode, syncUrl])
 
+  // Switch to the requested dashboard view and update the browser URL.
   const navigateTo = (view: DashboardView) => {
     if (view === "metrics") setMetricsSelectedUserId(null)
     setActiveView(view)
     syncUrl(view)
   }
 
+  // Open Learn with the requested algorithm expanded,
+  // and include that algorithm in the browser URL.
   const openLearnAlgorithm = useCallback((algorithmId: string) => {
     setExpandedAlgorithm(algorithmId)
     setActiveView("learn")
     syncUrl("learn", algorithmId)
   }, [syncUrl])
 
+  // Open an algorithm from Learn in single-algorithm Demo mode.
+  // Clear its parameter overrides and validation errors,
+  // then update the active view and browser URL.
   const openLearnDemo = useCallback((algorithmId: string) => {
     setLeftAlgorithm(algorithmId)
     setLeftParams({})
@@ -234,10 +267,14 @@ function NomadDashboard() {
     syncUrl("demo", null, "single")
   }, [syncUrl])
 
+  // Smoothly scroll the requested algorithm's documentation section into view,
+  // if its element is present on the page.
   const openLearnDocumentation = useCallback((algorithmId: string) => {
     document.getElementById(`learn-documentation-${algorithmId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
   }, [])
 
+  // Store the playback timestamp reported by a Demo animation panel
+  // so the panels can use the shared time.
   const handleDemoTimeChange = useCallback((timestamp: number) => {
     setDemoTime(timestamp)
   }, [])
@@ -247,6 +284,9 @@ function NomadDashboard() {
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
+
+  // Prepare Demo for the guided tour by showing ground truth and detected stops.
+  // If scene data is available, move the shared time to the final ping.
   const prepareTour = useCallback(() => {
     setShowGroundTruth(true)
     setShowStops(true)
@@ -262,6 +302,9 @@ function NomadDashboard() {
   )
 
   useEffect(() => {
+
+    // Synchronize the active view, expanded Learn algorithm, and
+    // demo mode with URL changes, including browser navigation
     const nextRoute = dashboardRouteState(searchParamString)
     if (nextRoute.activeView === "metrics" && !metricsEntryFromDemoRef.current) setMetricsSelectedUserId(null)
     metricsEntryFromDemoRef.current = false
@@ -271,6 +314,10 @@ function NomadDashboard() {
   }, [searchParamString])
 
   useEffect(() => {
+
+    // While demo is active, replace unsupported algorithms with defaults
+    // and reload visualization data when the selected algorithms, parameters
+    // agent, trajectory, mode, or seed change
     if (activeView === "demo") {
       if (!DEMO_ALGORITHM_IDS.has(leftAlgorithm)) {
         setLeftAlgorithm("dbstop")
@@ -319,7 +366,6 @@ function NomadDashboard() {
           rightParamErrors={rightParamErrors}
           demoTrajectory={demoTrajectory}
           compareApiData={compareApiData}
-          compareLoading={compareLoading}
           compareError={compareError}
           demoTime={demoTime}
           setDemoTime={handleDemoTimeChange}
@@ -365,6 +411,8 @@ function NomadDashboard() {
   )
 }
 
+// Render the dashboard inside a Suspense boundary, providing a blank
+// full-height fallback while the dashboard's initial render is suspended.
 export default function Page() {
   return (
     <Suspense fallback={<div className="h-screen bg-background" />}>

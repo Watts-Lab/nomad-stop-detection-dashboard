@@ -1,5 +1,5 @@
 import { lachesisLabels, sequentialLabels } from "@/lib/stop-detection"
-import { DASHBOARD_VIEWS, PARAMETER_CONSTRAINTS, algorithms } from "./dashboard-data"
+import { DASHBOARD_VIEWS, DEMO_EDITABLE_PARAMS, algorithms } from "./dashboard-data"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { CompareScene, DashboardView } from "./types"
 
@@ -33,7 +33,7 @@ export function validateAlgorithmParams(
 ) {
   const normalized: Record<string, number> = {}
   const errors: Record<string, string> = {}
-  const constraints = PARAMETER_CONSTRAINTS[algoId] ?? {}
+  const constraints = DEMO_EDITABLE_PARAMS[algoId] ?? {}
 
   for (const p of algoDef.parameters) {
     const constraint = constraints[p.name]

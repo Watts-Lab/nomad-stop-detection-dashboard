@@ -46,7 +46,7 @@ export function LearnView({
                     onClick={() => openLearnAlgorithm(algo.id)}
                   >
                     <CardHeader className="px-5 pt-5 pb-1 shrink-0">
-                      <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#94a1b7] transition-colors group-hover:border-[#8acac8] group-hover:text-[#f2f4eb]">
+                    <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#3b1370] transition-colors group-hover:border-[#7629db] group-hover:text-[#7629db]">
                         {algo.name}
                       </CardTitle>
                     </CardHeader>
@@ -92,7 +92,7 @@ export function LearnView({
               <div className="shrink-0 px-5 pt-5 pb-4 md:px-8 md:pt-7">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 space-y-2">
-                    <DialogTitle className="inline-block border-b-2 border-[#8acac8] pb-2 text-2xl font-bold leading-tight text-[#f2f4eb]">
+                  <DialogTitle className="inline-block border-b-2 border-[#7629db] pb-2 text-2xl font-bold leading-tight text-[#3b1370]">
                       {expandedLearnAlgorithm.name}
                     </DialogTitle>
                     <DialogDescription className="text-sm text-muted-foreground">

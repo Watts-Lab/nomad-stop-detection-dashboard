@@ -18,12 +18,16 @@ import type {
   EChartsParams,
 } from "../_lib/types"
 
-const DEMO_CLUSTER_COLORS = [
-  "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f", "#00a8cc", "#72b01d", "#8c6d31",
-  "#e377c2", "#9467bd", "#2ca02c", "#d62728", "#17becf", "#bcbd22", "#8c564b", "#ff6f91", "#6b8e23", "#00b894",
-  "#0984e3", "#6c5ce7", "#e17055", "#d63031", "#008080", "#c44569", "#4a69bd", "#f19066", "#b33771", "#218c74",
-]
 const CURRENT_PING_COLOR = "#d83832"
+// Hue of CURRENT_PING_COLOR, and the half-width of the arc around it kept free of cluster colors
+const CURRENT_PING_HUE = 2
+const CURRENT_PING_HUE_GUARD = 30
+// Cluster hues occupy the rest of the wheel, phased so the first stop lands on the yellow
+// the hand-picked palette used to start with
+const CLUSTER_HUE_START = CURRENT_PING_HUE + CURRENT_PING_HUE_GUARD
+const CLUSTER_HUE_SPAN = 360 - 2 * CURRENT_PING_HUE_GUARD
+const CLUSTER_HUE_PHASE = (49 - CLUSTER_HUE_START) / CLUSTER_HUE_SPAN
+const CLUSTER_HUE_PEAK = 55
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
@@ -494,7 +498,16 @@ function DemoSceneRenderer({
       onPlaybackStateChangeRef.current?.(nextState)
     }
 
-    const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
+    // Walk the hue arc by the golden angle so consecutive stops land far apart and any
+    // number of them stays distinguishable; the walk wraps inside the arc, never across it.
+    // Saturation and lightness track the distance from yellow, which needs both high to read
+    // as yellow where blues and purples need them low, as in the palette this replaced
+    const clusterColor = (cluster: number) => {
+      if (cluster < 0) return "#1f2326"
+      const hue = CLUSTER_HUE_START + ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
+      const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
+      return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+    }
     const isDensityAlgorithm = DENSITY_ALGORITHMS.includes(panel.algo)
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]

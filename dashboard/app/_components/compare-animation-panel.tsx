@@ -2217,7 +2217,11 @@ function DemoSceneRenderer({
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+    <div
+      className={`relative flex w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${
+        variant === "preview" ? "h-full" : "flex-1"
+      }`}
+    >
       {(selectedPings || selectedPing) && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
           {selectedPings ? <>
@@ -2265,8 +2269,14 @@ function DemoSceneRenderer({
           </TooltipProvider>
         </div>
       )}
-      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
-      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
+      <div
+        ref={mapRef}
+        className={`flex-1 border-b border-[#d7dbd2] ${
+          variant === "preview" ? "min-h-0" : "min-h-[320px]"
+        }`}
+        data-tour={mode === "single" ? "tour-map" : undefined}
+      />
+      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : "h-32"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
           <span>Timeline</span>
@@ -2315,7 +2325,7 @@ export function CompareAnimationPanel({
   const learnAlgorithmId = panel?.algo
 
   return (
-    <Card className="h-full min-h-0 overflow-hidden py-0">
+    <Card className="flex min-w-0 flex-1 flex-col overflow-hidden py-0">
       <CardHeader className="py-3 px-4 shrink-0">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
@@ -2334,9 +2344,9 @@ export function CompareAnimationPanel({
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-5">
+      <CardContent className="flex flex-1 flex-col p-5">
         {panel ? (
-          <div className="min-h-0 w-full flex-1">
+          <div className="flex min-w-0 w-full flex-1 flex-col">
             <DemoSceneRenderer
               key={`${panel.algo}:${panel.scene.source}:${panel.scene.user_id}`}
               panel={panel}

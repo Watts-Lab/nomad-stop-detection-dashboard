@@ -120,7 +120,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground text-[16px] leading-relaxed h-screen overflow-hidden;
+    @apply bg-background text-foreground text-[16px] leading-relaxed min-h-screen overflow-y-auto;
   }
 }
 

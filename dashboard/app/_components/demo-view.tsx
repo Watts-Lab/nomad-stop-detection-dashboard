@@ -87,7 +87,7 @@ export function DemoView({
 
   // Apply reveal classes to the header and active panel layout.
   return (
-    <div className="nomad-page-frame flex h-full flex-1 flex-col gap-3 overflow-hidden py-4">
+    <div className="nomad-page-frame flex flex-1 flex-col gap-3 py-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
@@ -116,8 +116,8 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-          <div className="flex min-h-0 flex-col gap-3">
+        <div className={`${revealClass("panel", 2)} grid flex-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch`}>
+          <div className="flex min-w-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
@@ -165,9 +165,9 @@ export function DemoView({
           </Card>
         </div>
       ) : (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-          <div className="flex min-h-0 flex-col gap-3">
-            <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
+        <div className={`${revealClass("panel", 2)} grid flex-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch`}>
+          <div className="flex min-w-0 flex-col gap-3">
+          <div className="grid min-w-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
               <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
               <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>

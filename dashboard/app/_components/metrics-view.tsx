@@ -152,7 +152,7 @@ function MetricsFrame({
   }, [showTourTargets])
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
+    <div className="relative min-h-[480px] min-w-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
       {label && (
         <div className="absolute left-[12px] top-[12px] z-20 max-w-[40%] truncate rounded-sm bg-muted/80 px-2 py-0.5 text-xs font-semibold text-foreground">
           {label}
@@ -176,7 +176,7 @@ function MetricsFrame({
             iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode: tourFocusRef.current }, window.location.origin)
           }
         }}
-        className="h-full w-full border-0"
+        className="absolute inset-0 block h-full w-full border-0"
       />
     </div>
   )
@@ -258,7 +258,7 @@ export function MetricsView({
   useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
 
   return (
-    <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
+    <div className="nomad-page-frame flex flex-1 flex-col gap-3 py-3">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -273,8 +273,8 @@ export function MetricsView({
         </div>
       </div>
 
-      <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-        <Card className="h-full min-h-0 overflow-hidden py-0 flex flex-col">
+      <div className={`${revealClass("panel", 2)} grid flex-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch`}>
+      <Card className="min-w-0 overflow-hidden py-0 flex flex-col">
           {!metricsCompareMode && (
             <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
               <CardTitle className="text-sm font-semibold">
@@ -282,8 +282,12 @@ export function MetricsView({
               </CardTitle>
             </CardHeader>
           )}
-          <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
-            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
+          <CardContent className="flex flex-1 flex-col p-2">
+            <div className={`grid flex-1 gap-2 ${
+              metricsCompareMode
+                ? "grid-rows-[minmax(480px,1fr)_minmax(480px,1fr)]"
+                : "grid-rows-[minmax(480px,1fr)]"
+            }`}>
               <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} label={metricsCompareMode ? metricsLeftAlgorithm : undefined} showTourTargets />
 
               {metricsCompareMode && (

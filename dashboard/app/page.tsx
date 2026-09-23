@@ -388,7 +388,7 @@ function NomadDashboard() {
   }, [rightSweepParameters, metricsRightParameter])
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
+    <div className="min-h-screen bg-background flex flex-col nomad-shell">
       <NomadNav currentView={activeView} />
 
       {activeView === "home" && (

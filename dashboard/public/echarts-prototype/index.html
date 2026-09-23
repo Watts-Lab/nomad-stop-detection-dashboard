@@ -409,12 +409,11 @@
                 color: "#2ca02c",
               },
               emphasis: {
-                scale: 1.8,
+                scale: 1.6,
                 itemStyle: {
+                  color: "#2ca02c",
                   borderColor: "#ffffff",
-                  borderWidth: 2,
-                  shadowBlur: 8,
-                  shadowColor: "rgba(0, 0, 0, 0.55)",
+                  borderWidth: 1.5,
                 },
               },
               z: 10,
@@ -454,6 +453,25 @@
               },
               emphasis: {
                 disabled: true,
+              },
+              z: 12,
+            },
+            {
+              // Enlarges whichever point on the pinned curve the cursor is over, the way
+              // "Hovered per-user max" does for the maximum points
+              name: "Hovered pinned point",
+              id: "hovered-pinned-point",
+              type: "scatter",
+              data: emptyHighlight,
+              animation: false,
+              symbol: "circle",
+              symbolSize: 12,
+              silent: true,
+              showInLegend: false,
+              itemStyle: {
+                color: "#2ca02c",
+                borderColor: "#ffffff",
+                borderWidth: 2,
               },
               z: 12,
             },
@@ -500,6 +518,7 @@
         // A hovered point only previews a user's spread; a clicked point pins it so the
         // green line survives mouse movement until it is unpinned or replaced.
         let hoveredPoint = null;
+        let hoveredPinnedPoint = null;
         let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
 
         // Identify maximum-point events, including events on their larger invisible hit areas
@@ -524,6 +543,7 @@
                 { id: "hovered-per-user-max", data: emptyHighlight },
                 { id: "pinned-user-line", data: emptyHighlight },
                 { id: "pinned-user-hit-area", data: emptyHighlight },
+                { id: "hovered-pinned-point", data: emptyHighlight },
                 { id: "pinned-per-user-max", data: emptyHighlight },
               ],
             });
@@ -538,6 +558,7 @@
               { id: "hovered-per-user-max", data: hovered ? [hovered] : emptyHighlight },
               { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
               { id: "pinned-user-hit-area", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
+              { id: "hovered-pinned-point", data: hoveredPinnedPoint ? [hoveredPinnedPoint] : emptyHighlight },
               { id: "pinned-per-user-max", data: pinnedPoint ? [pinnedPoint] : emptyHighlight },
             ],
           });
@@ -563,17 +584,28 @@
         }
 
         chart.on("mouseover", (event) => {
+          if (event.seriesName === "Pinned user hit area") {
+            hoveredPinnedPoint = event.value;
+            renderHighlight();
+            return;
+          }
           if (!isPerUserMaxSeries(event.seriesName)) return;
           hoveredPoint = event.value;
           renderHighlight();
         });
         chart.on("mouseout", (event) => {
+          if (event.seriesName === "Pinned user hit area") {
+            hoveredPinnedPoint = null;
+            renderHighlight();
+            return;
+          }
           if (!isPerUserMaxSeries(event.seriesName)) return;
           hoveredPoint = null;
           renderHighlight();
         });
         chart.on("globalout", () => {
           hoveredPoint = null;
+          hoveredPinnedPoint = null;
           renderHighlight();
         });
         chart.on("click", (event) => {

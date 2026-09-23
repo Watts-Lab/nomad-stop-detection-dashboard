@@ -60,7 +60,7 @@
 
     // Format the parameter name as plain text for tooltips
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
-    const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread"]);
+    const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread", "Pinned user hit area"]);
 
     // Build agent, accuracy, and parameter details for maximum points and highlighted curves
     const pointTooltip = (event) => {
@@ -438,6 +438,26 @@
               z: 11,
             },
             {
+              // Sits above the maximum points' hit area so the pinned agent's own curve wins
+              // any click the two targets share, rather than pinning whoever is behind it
+              name: "Pinned user hit area",
+              id: "pinned-user-hit-area",
+              type: "scatter",
+              data: emptyHighlight,
+              animation: false,
+              symbol: "circle",
+              symbolSize: 22,
+              showInLegend: false,
+              cursor: "pointer",
+              itemStyle: {
+                color: "rgba(44, 160, 44, 0)",
+              },
+              emphasis: {
+                disabled: true,
+              },
+              z: 12,
+            },
+            {
               name: "Hovered per-user max",
               id: "hovered-per-user-max",
               type: "scatter",
@@ -485,6 +505,10 @@
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
+        // Points that open a single run in Demo: any individual result, or one on the pinned
+        // agent's curve, which covers that agent's own individual points while it is pinned
+        const isRunSelectSeries = (name) => name === "Individual" || name === "Pinned user hit area";
+
         // Get the selected agent's accuracy values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
@@ -499,6 +523,7 @@
                 { id: "highlighted-user-line", data: emptyHighlight },
                 { id: "hovered-per-user-max", data: emptyHighlight },
                 { id: "pinned-user-line", data: emptyHighlight },
+                { id: "pinned-user-hit-area", data: emptyHighlight },
                 { id: "pinned-per-user-max", data: emptyHighlight },
               ],
             });
@@ -512,6 +537,7 @@
               { id: "highlighted-user-line", data: hovered ? userLineFor(hovered) : emptyHighlight },
               { id: "hovered-per-user-max", data: hovered ? [hovered] : emptyHighlight },
               { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
+              { id: "pinned-user-hit-area", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
               { id: "pinned-per-user-max", data: pinnedPoint ? [pinnedPoint] : emptyHighlight },
             ],
           });
@@ -558,7 +584,7 @@
             postPinChange();
             return;
           }
-          if (event.seriesName !== "Individual") return;
+          if (!isRunSelectSeries(event.seriesName)) return;
           const [pointX, , userId] = event.value;
           window.parent.postMessage({
             type: "nomad-metrics-point-select",
@@ -568,6 +594,14 @@
             userId,
             fixed: fixedParameters,
           }, window.location.origin);
+        });
+        // Clicking the chart background releases the pinned agent; zrender sees clicks that
+        // never reach a series, and blank space arrives with no target element
+        chart.getZr().on("click", (event) => {
+          if (event.target || !pinnedPoint) return;
+          pinnedPoint = null;
+          renderHighlight();
+          postPinChange();
         });
         window.addEventListener("resize", () => chart.resize());
     })();

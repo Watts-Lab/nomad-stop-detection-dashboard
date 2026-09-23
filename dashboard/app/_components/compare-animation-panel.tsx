@@ -23,6 +23,7 @@ const DEMO_CLUSTER_COLORS = [
   "#e377c2", "#9467bd", "#2ca02c", "#d62728", "#17becf", "#bcbd22", "#8c564b", "#ff6f91", "#6b8e23", "#00b894",
   "#0984e3", "#6c5ce7", "#e17055", "#d63031", "#008080", "#c44569", "#4a69bd", "#f19066", "#b33771", "#218c74",
 ]
+const CURRENT_PING_COLOR = "#d83832"
 const DENSITY_ALGORITHMS = ["tadbscan", "dbstop", "seqscan", "hdbscan"]
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
@@ -1841,28 +1842,22 @@ function DemoSceneRenderer({
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api, 1.08)
             const size = circle.radius * 2.8
+            // Positioned with transform props: a path built from an SVG string bakes its shape
+            // rect in at creation and ignores later shape updates, which would freeze the pin
             return {
-              type: "group",
-              z2: Number(api.value(3)) * 2,
-              y: Number(api.value(6)),
-              children: [
-                {
-                  type: "path",
-                  shape: {
-                    pathData: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
-                    x: circle.center[0] - size / 2,
-                    y: circle.center[1] - size,
-                    width: size,
-                    height: size,
-                  },
-                  style: { fill: "#67D3E3", stroke: "#202124", lineWidth: 1.2, opacity: Number(api.value(5)) },
-                },
-                {
-                  type: "circle",
-                  shape: { cx: circle.center[0], cy: circle.center[1] - size * 0.65, r: size * 0.13 },
-                  style: { fill: "#ffffff", stroke: "#202124", lineWidth: 0.9, opacity: Number(api.value(5)) },
-                },
-              ],
+              type: "path",
+              x: circle.center[0],
+              y: circle.center[1] + Number(api.value(6)),
+              scaleX: size / 24,
+              scaleY: size / 24,
+              shape: {
+                pathData: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+                x: -12,
+                y: -24,
+                width: 24,
+                height: 24,
+              },
+              style: { fill: CURRENT_PING_COLOR, stroke: "#202124", lineWidth: 1.2, strokeNoScale: true, opacity: Number(api.value(5)) },
             }
           },
         },
@@ -2055,7 +2050,7 @@ function DemoSceneRenderer({
             return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.4 } } : null
           },
         },
-        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 6, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
+        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 6, data: [], lineStyle: { color: CURRENT_PING_COLOR, width: 2 } },
       ],
     })
 
@@ -2099,7 +2094,7 @@ function DemoSceneRenderer({
       if (previewing) return
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
-      pingFloatPhase += 0.16
+      pingFloatPhase += 0.350
       pingFloatOffset = -3 + Math.sin(pingFloatPhase) * 3
       pulsePhase = ended ? 0 : pulsePhase + 0.24
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2

@@ -445,7 +445,7 @@ function DemoSceneRenderer({
     const timeMin = scene.pings[0].timestamp * 1000
     const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
     const noisePings = chartData.pingData.filter((point) => point[2] < 0)
-    const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
+    const clusterPings = chartData.pingData.filter((point) => point[2] >= 0 && !chartData.anchorPingIndexes.has(point[3]))
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -1824,7 +1824,7 @@ function DemoSceneRenderer({
               type: "circle",
               z2: Number(api.value(3)) * 2,
               shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
-              style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#ffffff", lineWidth: 2.4, opacity: Number(api.value(6)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+              style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#ffffff", lineWidth: 1.6, opacity: Number(api.value(6)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
             }
           },
         },

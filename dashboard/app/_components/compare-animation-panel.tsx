@@ -273,6 +273,7 @@ function DemoSceneRenderer({
       : []
     const useCachedCorePoints = Boolean(panel.corePoints?.length) && panel.algo !== "sequential-centroid"
     const anchorPointData = useCachedCorePoints ? cachedCorePointData : firstAnchorData
+    const anchorPingIndexes = new Set(anchorPointData.map((point) => point[3]))
     const anchorEdgeData = useCachedCorePoints ? cachedCoreEdges : firstAnchorEdges
     const visibleCentroidAnchorFrames = useCachedCorePoints ? [] : centroidAnchorFrames
     const truthStops = scene.truth.flatMap((row) => {
@@ -377,6 +378,7 @@ function DemoSceneRenderer({
       clusterMembers,
       stops,
       anchorPointData,
+      anchorPingIndexes,
       anchorEdgeData,
       coreTimelineData,
       centroidAnchorFrames: visibleCentroidAnchorFrames,
@@ -507,7 +509,7 @@ function DemoSceneRenderer({
       return { center, radius: Math.abs(edge[0] - center[0]) }
     }
     const renderGpsPing = (_params: EChartsParams, api: EChartsApi) => {
-      const circle = pingCircle(api, 0.4 * pingScale(Number(api.value(3))))
+      const circle = pingCircle(api, 0.28 * pingScale(Number(api.value(3))))
       return {
         type: "circle",
         z2: Number(api.value(3)) * 2 + 1,
@@ -1732,10 +1734,12 @@ function DemoSceneRenderer({
           z: 10,
           data: chartData.pingData,
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const circle = pingCircle(api)
+            const pingIndex = Number(api.value(3))
+            const markScale = chartData.anchorPingIndexes.has(pingIndex) ? 1.3 : Number(api.value(2)) >= 0 ? 1 : 0.28
+            const circle = pingCircle(api, markScale * pingScale(pingIndex))
             return {
               type: "circle",
-              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * pingScale(Number(api.value(3))) },
+              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
               style: { fill: "rgba(0, 0, 0, 0.001)" },
             }
           },
@@ -1763,7 +1767,7 @@ function DemoSceneRenderer({
               type: "circle",
               z2: Number(api.value(3)) * 2,
               shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale },
-              style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) },
+              style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) },
             }
           },
         },
@@ -1820,7 +1824,7 @@ function DemoSceneRenderer({
               type: "circle",
               z2: Number(api.value(3)) * 2,
               shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
-              style: { fill: clusterColor(Number(api.value(2))), stroke: "#ffffff", lineWidth: 2.4, opacity: Number(api.value(6)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+              style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#ffffff", lineWidth: 2.4, opacity: Number(api.value(6)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
             }
           },
         },

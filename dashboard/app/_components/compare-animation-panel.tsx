@@ -226,6 +226,7 @@ function DemoSceneRenderer({
   const resultData = useMemo(() => {
     if (!sceneData) return null
     const result = panel.result
+    const xray = result.xray
 
     const pings = sceneData.pings.map((ping, index) => ({
       ...ping,
@@ -264,10 +265,10 @@ function DemoSceneRenderer({
       startTime: new Date(stop.start * 1000).toISOString().slice(11, 16),
       endTime: new Date(stop.end * 1000).toISOString().slice(11, 16),
     }))
-    const sequentialGroups = panel.algo.startsWith("sequential_")
+    const sequentialGroups = xray.schema === "sequential_first" || xray.schema === "sequential_centroid"
       ? stops.map((stop) => (clusterMembers.get(stop.cluster) ?? []).map((pingIndex) => pings[pingIndex]))
       : []
-    const anchorFrames = panel.algo === "sequential_first" ? sequentialGroups.flatMap((members) => {
+    const anchorFrames = xray.schema === "sequential_first" ? sequentialGroups.flatMap((members) => {
       const anchor = members[0]
       return members.map((ping) => ({
         cluster: ping.cluster,
@@ -278,7 +279,7 @@ function DemoSceneRenderer({
           value: [ping.cluster, anchor.i, ping.i, ping.t],
         }],
       }))
-    }) : panel.algo === "sequential_centroid" ? sequentialGroups.flatMap((members) => {
+    }) : xray.schema === "sequential_centroid" ? sequentialGroups.flatMap((members) => {
       let sumX = 0
       let sumY = 0
       return members.map((ping, index) => {
@@ -295,10 +296,10 @@ function DemoSceneRenderer({
           }],
         }
       })
-    }) : panel.algo === "lachesis" && result.kind === "anchor" ? pings.flatMap((ping) => {
-      const auxTime = result.aux_time[ping.i]
-      if (ping.cluster < 0 || auxTime == null) return []
-      const anchorIndex = sceneData.pingIndexByTimestamp.get(auxTime)
+    }) : xray.schema === "lachesis" ? pings.flatMap((ping) => {
+      const anchorTime = xray.anchor_time[ping.i]
+      if (ping.cluster < 0 || anchorTime == null) return []
+      const anchorIndex = sceneData.pingIndexByTimestamp.get(anchorTime)
       if (anchorIndex === undefined) return []
       const anchor = pings[anchorIndex]
       if (anchor.cluster !== ping.cluster) return []
@@ -312,21 +313,21 @@ function DemoSceneRenderer({
         }],
       }]
     }) : []
-    const densityCorePointData = result.kind === "density" ? pings.flatMap((ping) => (
-      ping.cluster >= 0 && result.core[ping.i] >= 0
-        ? [[ping.x, ping.y, ping.cluster, ping.i, Math.max(ping.t, result.aux_time[ping.i] ?? ping.t)]]
+    const densityCorePointData = "core" in xray ? pings.flatMap((ping) => (
+      ping.cluster >= 0 && xray.core[ping.i] >= 0
+        ? [[ping.x, ping.y, ping.cluster, ping.i, Math.max(ping.t, xray.promotion_time[ping.i] ?? ping.t)]]
         : []
     )) : []
-    const densityPromotionEdges = result.kind === "density" ? pings.flatMap((ping) => {
-      const auxTime = result.aux_time[ping.i]
-      if (ping.cluster < 0 || auxTime == null) return []
-      const sourceIndex = sceneData.pingIndexByTimestamp.get(auxTime)
+    const densityPromotionEdges = "core" in xray ? pings.flatMap((ping) => {
+      const promotionTime = xray.promotion_time[ping.i]
+      if (ping.cluster < 0 || promotionTime == null) return []
+      const sourceIndex = sceneData.pingIndexByTimestamp.get(promotionTime)
       if (sourceIndex === undefined || sourceIndex === ping.i) return []
       const source = pings[sourceIndex]
-      if (source.cluster !== ping.cluster || result.core[sourceIndex] < 0) return []
+      if (source.cluster !== ping.cluster || xray.core[sourceIndex] < 0) return []
       return [{
         coords: [[source.x, source.y], [ping.x, ping.y]],
-        value: [ping.cluster, source.i, ping.i, Math.max(ping.t, auxTime)],
+        value: [ping.cluster, source.i, ping.i, Math.max(ping.t, promotionTime)],
       }]
     }) : []
     const coreTimelineData = densityCorePointData.map((point) => [point[4] * 1000, point[2], point[3]])
@@ -373,7 +374,7 @@ function DemoSceneRenderer({
       distanceThreshold: Number(panel.params.delta_roam ?? panel.params.dist_thresh ?? 0),
       timeSequence: sceneData.timeSequence,
     }
-  }, [panel.algo, panel.params, panel.result, scene.pings, sceneData])
+  }, [panel.params, panel.result, scene.pings, sceneData])
 
   const resultDataRef = useRef(resultData)
   const updateResultRef = useRef<(data: NonNullable<typeof resultData>) => void>(() => {})
@@ -384,8 +385,9 @@ function DemoSceneRenderer({
   }, [resultData])
 
   useEffect(() => {
-    let chartData = resultDataRef.current
-    if (!chartData || !mapRef.current || !timelineRef.current) return
+    const initialData = resultDataRef.current
+    if (!initialData || !mapRef.current || !timelineRef.current) return
+    let chartData = initialData
 
     const mapEl = mapRef.current
     const timelineEl = timelineRef.current
@@ -476,8 +478,7 @@ function DemoSceneRenderer({
     }
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
-    const isDensityAlgorithm = chartData.result.kind === "density"
-    const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
+    const isDensityAlgorithm = "core" in chartData.result.xray
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
     const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
@@ -541,9 +542,10 @@ function DemoSceneRenderer({
     }
     const pingClassifiedAt = (pingIndex: number, timestampSeconds: number) => {
       const pingTime = chartData.pingData[pingIndex][4]
+      const xray = chartData.result.xray
       return pingTime <= timestampSeconds && (
-        chartData.result.kind !== "density" ||
-        Math.max(pingTime, chartData.result.aux_time[pingIndex] ?? pingTime) <= timestampSeconds
+        !("promotion_time" in xray) ||
+        Math.max(pingTime, xray.promotion_time[pingIndex] ?? pingTime) <= timestampSeconds
       )
     }
     const detectedCountFor = (timestampSeconds: number) => {
@@ -1514,9 +1516,10 @@ function DemoSceneRenderer({
           }
           if (params.seriesId === "anchor-points") {
             const ping = chartData.pings[value[3]]
-            const label = panel.algo === "sequential_centroid"
+            const schema = chartData.result.xray.schema
+            const label = schema === "sequential_centroid"
               ? "Centroid anchor for"
-              : panel.algo.startsWith("sequential_")
+              : schema === "sequential_first"
                 ? "Anchor for"
                 : "Cached anchor for"
             return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
@@ -1529,7 +1532,7 @@ function DemoSceneRenderer({
               : ping.cluster < 0
                 ? "Noise"
                 : isDensityAlgorithm && layerStateRef.current.showXray
-                  ? `${chartData.result.kind === "density" && chartData.result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
+                  ? `${"core" in chartData.result.xray && chartData.result.xray.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
                   : `Cluster ${ping.cluster}`
             const distanceLine = classified && isDensityAlgorithm && layerStateRef.current.showXray ? `<br>Distance threshold: ${chartData.distanceThreshold}` : ""
             return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}${distanceLine}`

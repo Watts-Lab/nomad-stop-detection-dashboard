@@ -1,7 +1,37 @@
-export type AlignedStopResult =
-  | { kind: "labels"; cluster: number[] }
-  | { kind: "anchor"; cluster: number[]; aux_time: Array<number | null> }
-  | { kind: "density"; cluster: number[]; core: number[]; aux_time: Array<number | null> }
+export const XRAY_FIELDS = {
+  lachesis: ["anchor_time"],
+  sequential_centroid: [],
+  sequential_first: [],
+  gridbased: [],
+  st_dbscan: ["core", "promotion_time"],
+  dbstop: ["core", "promotion_time"],
+  seqscan: ["core", "promotion_time"],
+  hdbscan: ["core", "promotion_time"],
+} as const
+
+export type XraySchema = keyof typeof XRAY_FIELDS
+export type XrayDeclaration = {
+  schema: XraySchema
+  fields: readonly string[]
+}
+
+type CoreXray = {
+  [Schema in "st_dbscan" | "dbstop" | "seqscan" | "hdbscan"]: {
+    schema: Schema
+    core: number[]
+    promotion_time: Array<number | null>
+  }
+}["st_dbscan" | "dbstop" | "seqscan" | "hdbscan"]
+
+export type XrayMetadata =
+  | { schema: "lachesis"; anchor_time: Array<number | null> }
+  | { schema: "sequential_centroid" | "sequential_first" | "gridbased" }
+  | CoreXray
+
+export type AlignedStopResult = {
+  cluster: number[]
+  xray: XrayMetadata
+}
 
 export type ComparePanelResponse = {
   algo: string

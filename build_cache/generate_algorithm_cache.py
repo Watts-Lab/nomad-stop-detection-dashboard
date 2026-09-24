@@ -20,6 +20,7 @@ import nomad.visit_attribution.visit_attribution as visits
 from nomad.city_gen import City
 from nomad.map_utils import blocks_to_mercator
 from nomad.stop_detection.validation import AlgorithmRegistry, compute_stop_detection_metrics
+from xray_schema import CACHE_FORMAT, XRAY_SCHEMAS
 
 CONFIG_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -287,7 +288,8 @@ def algorithm_specs():
         "lachesis": {
             "display_name": "Lachesis",
             "labeler": SEQUENTIAL.lachesis_labels,
-            "result_kind": "anchor",
+            "xray": XRAY_SCHEMAS["lachesis"],
+            "return_kwargs": {"return_anchors": True},
             "params": {
                 "delta_roam": DELTA_ROAM_VALUES,
                 "dt_max": DT_MAX_VALUES,
@@ -297,7 +299,7 @@ def algorithm_specs():
         "sequential_centroid": {
             "display_name": "Sequential (centroid-anchored)",
             "labeler": SEQUENTIAL.detect_stops_labels,
-            "result_kind": "labels",
+            "xray": XRAY_SCHEMAS["sequential_centroid"],
             "params": {
                 "delta_roam": DELTA_ROAM_VALUES,
                 "dt_max": DT_MAX_VALUES,
@@ -308,7 +310,7 @@ def algorithm_specs():
         "sequential_first": {
             "display_name": "Sequential (first-anchored)",
             "labeler": SEQUENTIAL.detect_stops_labels,
-            "result_kind": "labels",
+            "xray": XRAY_SCHEMAS["sequential_first"],
             "params": {
                 "delta_roam": DELTA_ROAM_VALUES,
                 "dt_max": DT_MAX_VALUES,
@@ -319,7 +321,7 @@ def algorithm_specs():
         "gridbased": {
             "display_name": "Grid-Based",
             "labeler": SEQUENTIAL.grid_based_labels,
-            "result_kind": "labels",
+            "xray": XRAY_SCHEMAS["gridbased"],
             "external_params": {
                 "h3_resolution": H3_RESOLUTION_VALUES,
             },
@@ -333,7 +335,8 @@ def algorithm_specs():
         "st_dbscan": {
             "display_name": "ST-DBSCAN",
             "labeler": DENSITY.ta_dbscan_labels,
-            "result_kind": "density",
+            "xray": XRAY_SCHEMAS["st_dbscan"],
+            "return_kwargs": {"return_cores": True},
             "params": {
                 "dist_thresh": DIST_THRESH_VALUES,
                 "time_thresh": TIME_THRESH_VALUES,
@@ -344,19 +347,22 @@ def algorithm_specs():
         "dbstop": {
             "display_name": "DBSTOP",
             "labeler": DENSITY.dbstop_labels,
-            "result_kind": "density",
+            "xray": XRAY_SCHEMAS["dbstop"],
+            "return_kwargs": {"return_cores": True},
             "params": {**density_params, "back_merge": False},
         },
         "seqscan": {
             "display_name": "SeqScan",
             "labeler": DENSITY.seqscan_labels,
-            "result_kind": "density",
+            "xray": XRAY_SCHEMAS["seqscan"],
+            "return_kwargs": {"return_cores": True},
             "params": {**density_params, "back_merge": False},
         },
         "hdbscan": {
             "display_name": "HDBSCAN",
             "labeler": DENSITY.hdbscan_labels,
-            "result_kind": "density",
+            "xray": XRAY_SCHEMAS["hdbscan"],
+            "return_kwargs": {"return_cores": True},
             "params": {
                 **density_params,
                 "dist_thresh": HDBSCAN_DIST_THRESH_VALUES,
@@ -368,11 +374,11 @@ def algorithm_specs():
 
 def initialize_worker(sparse_df, diaries_df, registry):
     global JOB_CONTEXT
-    JOB_CONTEXT = sparse_df, diaries_df, registry
+    JOB_CONTEXT = sparse_df, diaries_df, registry, algorithm_specs()
 
 
 def run_user_job(user_id):
-    sparse_df, diaries_df, registry = JOB_CONTEXT
+    sparse_df, diaries_df, registry, specs = JOB_CONTEXT
     user_sparse = sparse_df.loc[sparse_df.user_id == user_id]
     truth = diaries_df.loc[diaries_df.user_id == user_id]
     h3_inputs = {}
@@ -384,11 +390,8 @@ def run_user_job(user_id):
         config_id = family_config_ids.get(family, 0) + 1
         family_config_ids[family] = config_id
         family_output = output.setdefault(family, {"results": [], "metrics": []})
-        call_kwargs = {"traj_cols": TRAJ_COLS}
-        if family == "lachesis":
-            call_kwargs["return_anchors"] = True
-        elif family in {"st_dbscan", "dbstop", "seqscan", "hdbscan"}:
-            call_kwargs["return_cores"] = True
+        spec = specs[family]
+        call_kwargs = {"traj_cols": TRAJ_COLS, **spec.get("return_kwargs", {})}
 
         detection_input = user_sparse
         if family == "gridbased":
@@ -408,21 +411,17 @@ def run_user_job(user_id):
         result = registry.time_call(algorithm, detection_input, **call_kwargs)
         if isinstance(result, pd.Series):
             result = result.to_frame()
-        result = result.rename(columns={
-            "promotion_time": "aux_time",
-            "anchor_time": "aux_time",
-        })
-
         result_row = {
             "user_id": user_id,
             "config_id": config_id,
             "cluster": result["cluster"].to_numpy(dtype=np.int16),
         }
-        if "core" in result:
-            result_row["core"] = result["core"].to_numpy(dtype=np.int16)
-        if "aux_time" in result:
-            aux_time = result["aux_time"].astype(object)
-            result_row["aux_time"] = aux_time.where(aux_time.notna(), None).tolist()
+        for field in spec["xray"]["fields"]:
+            if field == "core":
+                result_row["xray_core"] = result[field].to_numpy(dtype=np.int16)
+            else:
+                values = result[field].astype(object)
+                result_row[f"xray_{field}"] = values.where(values.notna(), None).tolist()
         family_output["results"].append(result_row)
 
         stops = STOP_UTILS.summarize_stops(
@@ -506,7 +505,7 @@ def write_algorithm(algorithm, spec, configurations, frames, output_dir):
 
     return {
         "display_name": spec["display_name"],
-        "result_kind": spec["result_kind"],
+        "xray": spec["xray"],
         "configs": f"{algorithm}/configs.json",
         "results": f"{algorithm}/results.parquet",
         "metrics": f"{algorithm}/metrics.parquet",
@@ -516,7 +515,7 @@ def write_algorithm(algorithm, spec, configurations, frames, output_dir):
 def write_manifest(output_dir, config_key, files, users):
     manifest = {
         "config_key": config_key,
-        "format": "stop-detection-dashboard-parquet-cache-v4",
+        "format": CACHE_FORMAT,
         "algorithm_keys": list(files.keys()),
         "algorithms": files,
         "users": users.astype(str).tolist(),

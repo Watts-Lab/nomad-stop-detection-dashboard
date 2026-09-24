@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:xray": "node tests/xray-cache.mjs",
     "recording:render": "node recording/capture.mjs"
   },
   "dependencies": {

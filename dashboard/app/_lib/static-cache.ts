@@ -6,11 +6,14 @@ import {
 } from "hyparquet"
 import { compressors } from "hyparquet-compressors"
 import { publicPath } from "./public-path"
+import { XRAY_FIELDS } from "./types"
 import type {
   AlignedStopResult,
   CompareApiResponse,
   ComparePanelResponse,
   CompareScene,
+  XrayDeclaration,
+  XrayMetadata,
 } from "./types"
 
 type ComparePayload = {
@@ -30,7 +33,7 @@ type ComparePayload = {
 
 type ManifestEntry = {
   display_name: string
-  result_kind: AlignedStopResult["kind"]
+  xray: XrayDeclaration
   configs: string
   results: string
 }
@@ -109,8 +112,18 @@ function loadManifest(cacheRoot: string) {
   if (cached) return cached
 
   const manifest = fetchJson<Manifest>(cacheRoot, "manifest.json").then((value) => {
-    if (value.format !== "stop-detection-dashboard-parquet-cache-v4") {
+    if (value.format !== "stop-detection-dashboard-parquet-cache-v5") {
       throw new Error("Unsupported stop-detection cache format: " + value.format)
+    }
+    for (const [algorithm, entry] of Object.entries(value.algorithms)) {
+      if (!Object.hasOwn(XRAY_FIELDS, algorithm) || entry.xray?.schema !== algorithm) {
+        throw new Error("Unsupported X-ray schema for " + algorithm)
+      }
+      const fields = XRAY_FIELDS[entry.xray.schema]
+      if (!Array.isArray(entry.xray.fields) || entry.xray.fields.length !== fields.length ||
+          fields.some((field) => !entry.xray.fields.includes(field))) {
+        throw new Error("Invalid X-ray fields for " + algorithm)
+      }
     }
     return value
   })
@@ -192,7 +205,7 @@ function loadResults(
   cacheRoot: string,
   algorithm: string,
   resultsPath: string,
-  resultKind: AlignedStopResult["kind"],
+  xray: XrayDeclaration,
   userId: string,
   userIndex: number,
   configCount: number,
@@ -202,9 +215,7 @@ function loadResults(
   if (cached?.key === cacheKey) return cached.value
 
   const rowStart = userIndex * configCount
-  const columns = ["user_id", "config_id", "cluster"]
-  if (resultKind === "density") columns.push("core", "aux_time")
-  if (resultKind === "anchor") columns.push("aux_time")
+  const columns = ["user_id", "config_id", "cluster", ...xray.fields.map((field) => "xray_" + field)]
   const results = readParquet(cacheRoot, resultsPath, {
     columns,
     rowStart,
@@ -259,7 +270,7 @@ async function resultForUser(
     cacheRoot,
     algorithm,
     entry.results,
-    entry.result_kind,
+    entry.xray,
     userId,
     userIndex,
     configs.length,
@@ -268,23 +279,34 @@ async function resultForUser(
   if (!row) throw new Error("Cached result is missing config_id " + config.config_id)
 
   const cluster = listValues(row.cluster, "cluster", trajectoryLength).map(Number)
-  let result: AlignedStopResult
-  if (entry.result_kind === "density") {
-    const core = listValues(row.core, "core", trajectoryLength).map(Number)
-    const aux_time = listValues(row.aux_time, "aux_time", trajectoryLength).map(
-      (value) => value == null ? null : Number(value),
-    )
-    result = { kind: "density", cluster, core, aux_time }
-  } else if (entry.result_kind === "anchor") {
-    const aux_time = listValues(row.aux_time, "aux_time", trajectoryLength).map(
-      (value) => value == null ? null : Number(value),
-    )
-    result = { kind: "anchor", cluster, aux_time }
-  } else if (entry.result_kind === "labels") {
-    result = { kind: "labels", cluster }
-  } else {
-    throw new Error("Unsupported result kind for " + algorithm + ": " + entry.result_kind)
+  let xray: XrayMetadata
+  const schema = entry.xray.schema
+  switch (schema) {
+    case "lachesis":
+      xray = {
+        schema,
+        anchor_time: listValues(row.xray_anchor_time, "xray_anchor_time", trajectoryLength)
+          .map((value) => value == null ? null : Number(value)),
+      }
+      break
+    case "st_dbscan":
+    case "dbstop":
+    case "seqscan":
+    case "hdbscan":
+      xray = {
+        schema,
+        core: listValues(row.xray_core, "xray_core", trajectoryLength).map(Number),
+        promotion_time: listValues(row.xray_promotion_time, "xray_promotion_time", trajectoryLength)
+          .map((value) => value == null ? null : Number(value)),
+      }
+      break
+    case "sequential_centroid":
+    case "sequential_first":
+    case "gridbased":
+      xray = { schema }
+      break
   }
+  const result: AlignedStopResult = { cluster, xray }
   return { displayName: entry.display_name, result }
 }
 

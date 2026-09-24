@@ -154,7 +154,7 @@ export default function AboutPage() {
                 {group.members.map((person, personIndex) => (
                   <Card
                     key={person.name}
-                    className={`${revealClass("up", personIndex + groupIndex + 2)} nomad-interactive-card overflow-hidden py-0`}
+                    className={`${revealClass("up", personIndex + groupIndex + 2)} nomad-interactive-card overflow-hidden border-2 bg-[#f8f9fc] py-0`}
                   >
                     <CardContent className="flex items-center gap-4 p-4 sm:gap-5">
                       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-[#34455d] bg-[#202738] sm:h-28 sm:w-28">
@@ -177,8 +177,8 @@ export default function AboutPage() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-3">
                         <div className="space-y-1">
-                          <h3 className="text-lg font-semibold sm:text-xl">{person.name}</h3>
-                          <p className="font-mono text-[0.68rem] uppercase tracking-[0.12em] text-foreground sm:text-xs">
+                          <h3 className="text-lg font-semibold text-[#3b1370]">{person.name}</h3>
+                          <p className="text-sm text-[#080d1a]">
                             {person.role}
                           </p>
                         </div>
@@ -194,7 +194,7 @@ export default function AboutPage() {
                                 rel="noreferrer"
                                 aria-label={`${person.name} ${link.label}`}
                                 title={link.label}
-                                className="flex h-8 w-8 items-center justify-center rounded-md border border-[#34455d] text-muted-foreground transition-colors hover:border-[#8acac8] hover:text-[#8acac8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
+                                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-[#080d1a] transition-colors hover:border-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 <LinkIcon className="h-4 w-4" />
                               </a>

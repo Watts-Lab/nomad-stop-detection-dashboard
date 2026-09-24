@@ -30,7 +30,7 @@ export function LearnView({
       <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-4 pb-6 transition duration-200 ${expandedLearnAlgorithm ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
         <div className={`${revealClass()} shrink-0 space-y-1`}>
           <h2 className="text-3xl font-bold">Learn Algorithms</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[#080d1a]">
             Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch.
           </p>
         </div>
@@ -42,16 +42,16 @@ export function LearnView({
                 {algorithms.filter((algo) => algo.family === family.id).map((algo, algoIndex) => (
                   <Card
                     key={algo.id}
-                    className={`${revealClass("up", familyIndex * 4 + algoIndex + 2)} nomad-interactive-card group cursor-pointer border-2 flex flex-col py-0`}
+                    className={`${revealClass("up", familyIndex * 4 + algoIndex + 2)} nomad-interactive-card group flex cursor-pointer flex-col gap-0 border-2 bg-[#f8f9fc] py-0`}
                     onClick={() => openLearnAlgorithm(algo.id)}
                   >
-                    <CardHeader className="px-5 pt-5 pb-1 shrink-0">
-                    <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#3b1370] transition-colors group-hover:border-[#7629db] group-hover:text-[#7629db]">
+                    <CardHeader className="shrink-0 px-5 pt-5 pb-0">
+                      <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#3b1370] transition-colors group-hover:border-[#7629db] group-hover:text-[#7629db]">
                         {algo.name}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
-                      <p className="text-sm text-muted-foreground">{algo.shortDesc}</p>
+                      <p className="text-sm">{algo.shortDesc}</p>
                       <div className="relative aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
                         <Image
                           src={algo.cardDiagramSrc}
@@ -61,7 +61,7 @@ export function LearnView({
                           className="object-contain p-1"
                         />
                       </div>
-                      <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium text-[#8acac8]">
+                      <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium">
                         <span>View more</span>
                         <Maximize2 className="h-4 w-4" />
                       </div>

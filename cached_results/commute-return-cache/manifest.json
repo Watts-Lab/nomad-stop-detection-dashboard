@@ -1,6 +1,6 @@
 {
   "config_key": "commute_return",
-  "format": "stop-detection-dashboard-parquet-cache-v4",
+  "format": "stop-detection-dashboard-parquet-cache-v5",
   "algorithm_keys": [
     "lachesis",
     "sequential_centroid",
@@ -13,52 +13,84 @@
   "algorithms": {
     "lachesis": {
       "display_name": "Lachesis",
-      "result_kind": "anchor",
       "configs": "lachesis/configs.json",
       "results": "lachesis/results.parquet",
-      "metrics": "lachesis/metrics.parquet"
+      "metrics": "lachesis/metrics.parquet",
+      "xray": {
+        "schema": "lachesis",
+        "fields": [
+          "anchor_time"
+        ]
+      }
     },
     "sequential_centroid": {
       "display_name": "Sequential (centroid-anchored)",
-      "result_kind": "labels",
       "configs": "sequential_centroid/configs.json",
       "results": "sequential_centroid/results.parquet",
-      "metrics": "sequential_centroid/metrics.parquet"
+      "metrics": "sequential_centroid/metrics.parquet",
+      "xray": {
+        "schema": "sequential_centroid",
+        "fields": []
+      }
     },
     "sequential_first": {
       "display_name": "Sequential (first-anchored)",
-      "result_kind": "labels",
       "configs": "sequential_first/configs.json",
       "results": "sequential_first/results.parquet",
-      "metrics": "sequential_first/metrics.parquet"
+      "metrics": "sequential_first/metrics.parquet",
+      "xray": {
+        "schema": "sequential_first",
+        "fields": []
+      }
     },
     "gridbased": {
       "display_name": "Grid-Based",
-      "result_kind": "labels",
       "configs": "gridbased/configs.json",
       "results": "gridbased/results.parquet",
-      "metrics": "gridbased/metrics.parquet"
+      "metrics": "gridbased/metrics.parquet",
+      "xray": {
+        "schema": "gridbased",
+        "fields": []
+      }
     },
     "st_dbscan": {
       "display_name": "ST-DBSCAN",
-      "result_kind": "density",
       "configs": "st_dbscan/configs.json",
       "results": "st_dbscan/results.parquet",
-      "metrics": "st_dbscan/metrics.parquet"
+      "metrics": "st_dbscan/metrics.parquet",
+      "xray": {
+        "schema": "st_dbscan",
+        "fields": [
+          "core",
+          "promotion_time"
+        ]
+      }
     },
     "dbstop": {
       "display_name": "DBSTOP",
-      "result_kind": "density",
       "configs": "dbstop/configs.json",
       "results": "dbstop/results.parquet",
-      "metrics": "dbstop/metrics.parquet"
+      "metrics": "dbstop/metrics.parquet",
+      "xray": {
+        "schema": "dbstop",
+        "fields": [
+          "core",
+          "promotion_time"
+        ]
+      }
     },
     "seqscan": {
       "display_name": "SeqScan",
-      "result_kind": "density",
       "configs": "seqscan/configs.json",
       "results": "seqscan/results.parquet",
-      "metrics": "seqscan/metrics.parquet"
+      "metrics": "seqscan/metrics.parquet",
+      "xray": {
+        "schema": "seqscan",
+        "fields": [
+          "core",
+          "promotion_time"
+        ]
+      }
     }
   },
   "users": [

@@ -37,7 +37,11 @@ def main():
         subprocess.run([sys.executable, str(CONFIG_DIR / "generate_configs.py"), config_key], check=True)
 
     if not args.skip_trajectories:
-        generate_trajectories([config_key for config_key, _, _ in SCENARIOS])
+        generate_trajectories(
+            [config_key for config_key, _, _ in SCENARIOS],
+            args.max_users,
+        )
+        print("Synthetic trajectory generation complete.")
 
     for config_key, output_dir, public_name in SCENARIOS:
         generate_cache(
@@ -49,6 +53,7 @@ def main():
             args.workers,
         )
         public_dir = PUBLIC_CACHE_DIR / public_name
+        PUBLIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         if public_dir.exists():
             shutil.rmtree(public_dir)
         shutil.copytree(output_dir, public_dir)

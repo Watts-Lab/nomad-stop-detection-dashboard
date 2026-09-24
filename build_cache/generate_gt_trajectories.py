@@ -1,6 +1,7 @@
 import argparse
 import json
 from pathlib import Path
+import time
 
 import pandas as pd
 
@@ -15,6 +16,7 @@ DEFAULT_CONFIG_KEYS = ["2_stops", "low_ha", "high_ha", "commute_return"]
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate ground-truth trajectory parquet inputs.")
     parser.add_argument("--config-keys", nargs="+", default=DEFAULT_CONFIG_KEYS)
+    parser.add_argument("--max-users", type=int, default=None)
     return parser.parse_args()
 
 
@@ -24,7 +26,7 @@ def agent_value(value, index):
     return value
 
 
-def generate_trajectories(keys):
+def generate_trajectories(keys, max_users=None):
     for key in keys:
         config_file = CONFIG_DIR / f"config_{key}.json"
 
@@ -33,6 +35,11 @@ def generate_trajectories(keys):
 
         par = config["agent_params"]
         out = config["output_files"]
+        agent_count = (
+            min(config["N"], max_users)
+            if max_users is not None
+            else config["N"]
+        )
 
         city = City.from_geopackage(config["city_file"])
 
@@ -46,13 +53,15 @@ def generate_trajectories(keys):
 
         population = Population(city)
         population.generate_agents(
-            N=config["N"],
+            N=agent_count,
             seed=config["name_seed"],
             name_count=config["name_count"],
             agent_homes=par["agent_homes"],
             agent_workplaces=par["agent_workplaces"],
         )
 
+        print(f"Generating {agent_count} agents for {key}...")
+        start_time = time.time()
         for i, agent in enumerate(population.roster.values()):
             agent.generate_trajectory(
                 destination_diary=destinations,
@@ -61,8 +70,12 @@ def generate_trajectories(keys):
                 step_seed=par["seed_trajectory"][i],
             )
 
-            agent.sample_trajectory(
+            agent.set_beta_params(
+                beta_start=agent_value(par["beta_start"], i),
+                beta_durations=agent_value(par["beta_durations"], i),
                 beta_ping=agent_value(par["beta_ping"], i),
+            )
+            agent.sample_trajectory(
                 seed=par["seed_sparsity"][i],
                 ha=agent_value(par["ha"], i),
                 pareto_prior=False,
@@ -74,14 +87,27 @@ def generate_trajectories(keys):
             sparse_path=out["sparse_path"],
             diaries_path=out["diaries_path"],
             homes_path=out["homes_path"],
-            beta_ping=par["beta_ping"],
-            ha=par["ha"],
+            beta_ping=(
+                par["beta_ping"][:agent_count]
+                if isinstance(par["beta_ping"], list)
+                else par["beta_ping"]
+            ),
+            ha=(
+                par["ha"][:agent_count]
+                if isinstance(par["ha"], list)
+                else par["ha"]
+            ),
+        )
+        generation_time = time.time() - start_time
+        print(
+            f"Generated {agent_count} agents for {key} in {generation_time:.2f}s "
+            f"({generation_time / agent_count:.2f}s per agent)"
         )
 
 
 def main():
     args = parse_args()
-    generate_trajectories(args.config_keys)
+    generate_trajectories(args.config_keys, args.max_users)
 
 
 if __name__ == "__main__":

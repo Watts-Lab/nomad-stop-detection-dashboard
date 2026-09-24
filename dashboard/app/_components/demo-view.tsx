@@ -6,41 +6,17 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CompareAnimationPanel } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
+import { TrajectoryOptions } from "./trajectory-options"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
 
-const demoTrajectoryOptions = [
-  {
-    id: "two-stop",
-    name: "Two-stop trajectory",
-    note: "Ground-truth path with two stops in the destination diary.",
-  },
-  {
-    id: "four-stop-low-ha",
-    name: "Four-stop",
-    note: "Lower horizontal-accuracy radius keeps sampled pings closer to the simulated path, so this trajectory is less noisy.",
-  },
-  {
-    id: "four-stop-high-ha",
-    name: "Four-stop (noisier)",
-    note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
-  },
-  {
-    id: "commute-return",
-    name: "Commute return",
-    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
-  },
-]
-
-// Render single or comparison Demo panels and connect their controls
-// to parent-provided handlers. Keep trajectory-info visibility and
-// comparison replay/playback coordination local to this view.
 export function DemoView({
   compareMode,
   showGroundTruth,
   showStops,
+  showXray,
   leftAlgo,
   rightAlgo,
   demoAlgorithms,
@@ -57,6 +33,7 @@ export function DemoView({
   setDemoTime,
   setShowGroundTruth,
   setShowStops,
+  setShowXray,
   setLeftParams,
   setRightParams,
   setLeftParamErrors,
@@ -72,6 +49,7 @@ export function DemoView({
   compareMode: boolean
   showGroundTruth: boolean
   showStops: boolean
+  showXray: boolean
   leftAlgo: AlgorithmDefinition | undefined
   rightAlgo: AlgorithmDefinition | undefined
   demoAlgorithms: AlgorithmDefinition[]
@@ -88,6 +66,7 @@ export function DemoView({
   setDemoTime: (timestamp: number) => void
   setShowGroundTruth: (checked: boolean) => void
   setShowStops: (checked: boolean) => void
+  setShowXray: (checked: boolean) => void
   setLeftParams: ParamStateSetter
   setRightParams: ParamStateSetter
   setLeftParamErrors: ParamStateSetter
@@ -104,52 +83,7 @@ export function DemoView({
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-
-  // Track which trajectory description is open; null closes all descriptions.
-  const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
-
-  // Build trajectory buttons with CSS hover styling and expandable descriptions.
-  const trajectoryOptions = (
-    <div className="space-y-1.5">
-      {demoTrajectoryOptions.map((trajectory) => {
-        const selected = demoTrajectory === trajectory.id
-        const showingInfo = trajectoryInfoId === trajectory.id
-        return (
-          <div key={trajectory.id} className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-
-                  // Close the description when switching trajectories, then select the trajectory.
-                  if (trajectory.id !== demoTrajectory) setTrajectoryInfoId(null)
-                  setDemoTrajectory(trajectory.id)
-                }}
-                className={`h-9 flex-1 rounded-md border px-3 text-left text-sm font-medium transition hover:bg-muted ${selected ? "bg-muted text-muted-foreground opacity-95" : "bg-background"}`}
-              >
-                {trajectory.name}
-              </button>
-              <button
-                type="button"
-
-                // Toggle this trajectory's description without changing the selected trajectory.
-                onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border transition hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-                aria-label={`Show ${trajectory.name} trajectory info`}
-              >
-                <HelpCircle className="h-4 w-4" />
-              </button>
-            </div>
-            {showingInfo && (
-              <div className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed text-muted-foreground">
-                {trajectory.note}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+  const trajectoryOptions = <TrajectoryOptions value={demoTrajectory} onChange={setDemoTrajectory} />
 
   // Apply reveal classes to the header and active panel layout.
   return (
@@ -167,7 +101,6 @@ export function DemoView({
         </div>
         <div className="flex flex-wrap items-center gap-4" data-tour="tour-layers">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-
             <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
             Ground Truth
           </label>
@@ -175,13 +108,17 @@ export function DemoView({
             <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
             Detected Stops
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <Checkbox checked={showXray} onCheckedChange={(checked) => setShowXray(checked === true)} />
+            X-ray
+          </label>
         </div>
       </div>
 
       {!compareMode ? (
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
-            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} />
+            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
@@ -231,8 +168,8 @@ export function DemoView({
         <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
+              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
+              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
             </div>
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>

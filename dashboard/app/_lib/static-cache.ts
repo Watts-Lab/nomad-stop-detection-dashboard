@@ -1,7 +1,17 @@
-import { parquetReadObjects } from "hyparquet"
+import {
+  asyncBufferFromUrl,
+  cachedAsyncBuffer,
+  parquetReadObjects,
+  type ParquetQueryFilter,
+} from "hyparquet"
 import { compressors } from "hyparquet-compressors"
 import { publicPath } from "./public-path"
-import type { CompareApiResponse, ComparePanelResponse, CompareScene } from "./types"
+import type {
+  AlignedStopResult,
+  CompareApiResponse,
+  ComparePanelResponse,
+  CompareScene,
+} from "./types"
 
 type ComparePayload = {
   seed?: number
@@ -20,90 +30,58 @@ type ComparePayload = {
 
 type ManifestEntry = {
   display_name: string
-  parameter_columns: string[]
-  labels: string
-  core_points?: string
+  result_kind: AlignedStopResult["kind"]
+  configs: string
+  results: string
 }
 
 type Manifest = {
-  algorithm_keys: string[]
+  format: string
   algorithms: Record<string, ManifestEntry>
   users: string[]
-  shared_files: { configs: string }
+  shared_files: {
+    scene: string
+    routes: string
+    trajectory: string
+    diary: string
+  }
 }
 
 type ConfigsFile = {
-  configs: Array<Record<string, unknown> & {
-    algorithm: string
-    config_id: number
-    key: string
-    label_column: string
-  }>
+  configs: ConfigRow[]
 }
 
 type ConfigRow = {
-  params: Record<string, number>
+  params: Record<string, number | string | boolean | null>
   config_id: number
-  label_column: string
-  key: string
 }
 
-type SceneCache = {
-  crs: string
-  source: string
-  bounds: [number, number, number, number]
-  users: string[]
-  buildings: CompareScene["buildings"]
-  pings: Array<{
-    user_id: string
-    x: number
-    y: number
-    timestamp: number
-  }>
-  truth: Array<{
-    user_id: string
-    location: string | null
-    timestamp: number
-    duration: number
-    x: number | null
-    y: number | null
-  }>
-}
+type SceneCache = Pick<CompareScene, "crs" | "source" | "bounds" | "buildings">
 
 type SeedScene = {
   response: CompareScene
-  userId: string
-  orderedTimestamps: number[]
+  userIndex: number
+}
+
+type ParquetSelection = {
+  columns?: string[]
+  rowStart?: number
+  rowEnd?: number
+  filter?: ParquetQueryFilter
 }
 
 const stopCacheRoot = publicPath("/cached-results/stop-detection-cache")
 const defaultTrajectory = "two-stop"
 const trajectoryDirectories = new Set([defaultTrajectory, "four-stop-high-ha", "four-stop-low-ha", "commute-return"])
 
-const algorithmDirectories: Record<string, string> = {
-  lachesis: "lachesis",
-  "sequential-centroid": "sequential_centroid",
-  "sequential-first": "sequential_first",
-  gridbased: "gridbased",
-  tadbscan: "st_dbscan",
-  dbstop: "dbstop",
-  seqscan: "seqscan",
-  hdbscan: "hdbscan",
-}
-
-const parameterAliases: Record<string, string> = {
-  eps_spatial: "dist_thresh",
-  T_max: "time_thresh",
-  minPts: "min_pts",
-}
-
 const manifestCache = new Map<string, Promise<Manifest>>()
-const configsFileCache = new Map<string, Promise<ConfigsFile["configs"]>>()
+const configsFileCache = new Map<string, Promise<ConfigRow[]>>()
 const sceneCache = new Map<string, Promise<SceneCache>>()
 const routeCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>()
-const configCache = new Map<string, Promise<ConfigRow[]>>()
-const labelCache = new Map<string, Promise<Map<string, Record<string, unknown>>>>()
-const corePointCache = new Map<string, Promise<Map<string, Record<string, unknown>[]>>>()
+let diaryCache: { key: string; value: Promise<CompareScene["truth"]> } | undefined
+let trajectoryCache: { key: string; value: Promise<CompareScene["pings"]> } | undefined
+const resultCache = new Map<string, { key: string; value: Promise<Record<string, unknown>[]> }>()
+const parquetFileCache = new Map<string, ReturnType<typeof asyncBufferFromUrl>>()
 
 function cacheRootForTrajectory(trajectory: string | undefined) {
   const trajectoryDirectory = trajectory && trajectoryDirectories.has(trajectory) ? trajectory : defaultTrajectory
@@ -116,234 +94,224 @@ async function fetchJson<T>(cacheRoot: string, relativePath: string) {
   return response.json() as Promise<T>
 }
 
-async function readParquet(cacheRoot: string, relativePath: string) {
-  const response = await fetch(cacheRoot + "/" + relativePath)
-  if (!response.ok) throw new Error("Failed to load " + relativePath)
-  const buffer = await response.arrayBuffer()
-  return parquetReadObjects({ file: buffer, compressors }) as Promise<Record<string, unknown>[]>
+async function readParquet(cacheRoot: string, relativePath: string, selection: ParquetSelection = {}) {
+  const url = cacheRoot + "/" + relativePath
+  let file = parquetFileCache.get(url)
+  if (!file) {
+    file = asyncBufferFromUrl({ url }).then((buffer) => cachedAsyncBuffer(buffer))
+    parquetFileCache.set(url, file)
+  }
+  return parquetReadObjects({ file: await file, compressors, ...selection })
 }
 
 function loadManifest(cacheRoot: string) {
   const cached = manifestCache.get(cacheRoot)
   if (cached) return cached
 
-  const manifest = fetchJson<Manifest>(cacheRoot, "manifest.json")
+  const manifest = fetchJson<Manifest>(cacheRoot, "manifest.json").then((value) => {
+    if (value.format !== "stop-detection-dashboard-parquet-cache-v4") {
+      throw new Error("Unsupported stop-detection cache format: " + value.format)
+    }
+    return value
+  })
   manifestCache.set(cacheRoot, manifest)
   return manifest
 }
 
-function loadConfigsFile(cacheRoot: string, manifest: Manifest) {
-  const cached = configsFileCache.get(cacheRoot)
+function loadConfigs(cacheRoot: string, relativePath: string) {
+  const cacheKey = cacheRoot + "|" + relativePath
+  const cached = configsFileCache.get(cacheKey)
   if (cached) return cached
 
-  const configs = fetchJson<ConfigsFile>(cacheRoot, manifest.shared_files.configs).then((file) => file.configs)
-  configsFileCache.set(cacheRoot, configs)
+  const configs = fetchJson<ConfigsFile>(cacheRoot, relativePath).then((file) => file.configs)
+  configsFileCache.set(cacheKey, configs)
   return configs
 }
 
-function loadScene(cacheRoot: string) {
+function loadScene(cacheRoot: string, manifest: Manifest) {
   const cached = sceneCache.get(cacheRoot)
   if (cached) return cached
 
-  const scene = fetchJson<SceneCache>(cacheRoot, "scene.json")
+  const scene = fetchJson<SceneCache>(cacheRoot, manifest.shared_files.scene)
   sceneCache.set(cacheRoot, scene)
   return scene
 }
 
-function loadRoutes(cacheRoot: string) {
+function loadRoutes(cacheRoot: string, manifest: Manifest) {
   const cached = routeCache.get(cacheRoot)
   if (cached) return cached
 
-  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, "routes.json")
+  const routes = fetchJson<NonNullable<CompareScene["routes"]>>(cacheRoot, manifest.shared_files.routes)
   routeCache.set(cacheRoot, routes)
   return routes
 }
 
-function loadConfigs(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry, manifest: Manifest) {
-  const cacheKey = cacheRoot + "|" + algorithmDirectory
-  const cached = configCache.get(cacheKey)
-  if (cached) return cached
+function loadDiary(cacheRoot: string, manifest: Manifest, userId: string) {
+  const cacheKey = cacheRoot + "|" + userId
+  if (diaryCache?.key === cacheKey) return diaryCache.value
 
-  const configs = loadConfigsFile(cacheRoot, manifest).then((rows) => rows
-    .filter((row) => row.algorithm === algorithmDirectory)
-    .map((row) => ({
-      params: Object.fromEntries(
-        entry.parameter_columns
-          .map((column) => [column, Number(row[column])] as const)
-          .filter(([, value]) => Number.isFinite(value)),
-      ),
-      config_id: Number(row.config_id),
-      label_column: String(row.label_column),
-      key: String(row.key),
-    })))
-  configCache.set(cacheKey, configs)
-  return configs
-}
-
-function loadLabels(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry) {
-  const cacheKey = cacheRoot + "|" + algorithmDirectory
-  const cached = labelCache.get(cacheKey)
-  if (cached) return cached
-
-  const labels = readParquet(cacheRoot, entry.labels).then((rows) => new Map(
-    rows.map((row) => [String(row.user_id) + "|" + Number(row.timestamp), row]),
-  ))
-  labelCache.set(cacheKey, labels)
-  return labels
-}
-
-function loadCorePoints(cacheRoot: string, algorithmDirectory: string, entry: ManifestEntry) {
-  if (!entry.core_points) return null
-  const cacheKey = cacheRoot + "|" + algorithmDirectory
-  const cached = corePointCache.get(cacheKey)
-  if (cached) return cached
-
-  const corePoints = readParquet(cacheRoot, entry.core_points).then((rows) => {
-    const map = new Map<string, Record<string, unknown>[]>()
-    for (const row of rows) {
-      const key = Number(row.config_id) + "|" + String(row.user_id)
-      const existing = map.get(key)
-      if (existing) existing.push(row)
-      else map.set(key, [row])
+  const diary = readParquet(cacheRoot, manifest.shared_files.diary, {
+    columns: ["user_id", "location", "timestamp", "duration", "x", "y"],
+    filter: { user_id: { $eq: userId } },
+  }).then((rows) => rows.map((row) => {
+    if (String(row.user_id) !== userId) throw new Error("Cached diary row does not match selected user " + userId)
+    return {
+      location: row.location == null ? null : String(row.location),
+      timestamp: Number(row.timestamp),
+      duration: Number(row.duration),
+      x: row.x == null ? null : Number(row.x),
+      y: row.y == null ? null : Number(row.y),
     }
-    return map
+  }))
+  diaryCache = { key: cacheKey, value: diary }
+  return diary
+}
+
+function loadTrajectory(cacheRoot: string, manifest: Manifest, userId: string, userIndex: number) {
+  const cacheKey = cacheRoot + "|" + userIndex
+  if (trajectoryCache?.key === cacheKey) return trajectoryCache.value
+
+  const pings = readParquet(cacheRoot, manifest.shared_files.trajectory, {
+    columns: ["user_id", "timestamp", "x", "y"],
+    rowStart: userIndex,
+    rowEnd: userIndex + 1,
+  }).then((rows) => {
+    if (rows.length !== 1 || String(rows[0].user_id) !== userId) {
+      throw new Error("Cached trajectory row does not match selected user " + userId)
+    }
+    const timestamps = listValues(rows[0].timestamp, "timestamp").map(Number)
+    const x = listValues(rows[0].x, "x", timestamps.length).map(Number)
+    const y = listValues(rows[0].y, "y", timestamps.length).map(Number)
+    return timestamps.map((timestamp, index) => ({ timestamp, x: x[index], y: y[index] }))
   })
-  corePointCache.set(cacheKey, corePoints)
-  return corePoints
+  trajectoryCache = { key: cacheKey, value: pings }
+  return pings
 }
 
-function resolveConfig(entry: ManifestEntry, configs: ConfigRow[], params: Record<string, number>) {
-  const requested = Object.fromEntries(
-    Object.entries(params)
-      .map(([name, value]) => [parameterAliases[name] ?? name, value] as const)
-      .filter(([name, value]) => entry.parameter_columns.includes(name) && Number.isFinite(value)),
-  )
-  let best = configs[0]
-  let bestDistance = Infinity
+function loadResults(
+  cacheRoot: string,
+  algorithm: string,
+  resultsPath: string,
+  resultKind: AlignedStopResult["kind"],
+  userId: string,
+  userIndex: number,
+  configCount: number,
+) {
+  const cacheKey = cacheRoot + "|" + algorithm + "|" + userIndex
+  const cached = resultCache.get(algorithm)
+  if (cached?.key === cacheKey) return cached.value
 
-  for (const config of configs) {
-    const distance = entry.parameter_columns.reduce((total, column) => (
-      column in requested ? total + Math.abs(requested[column] - config.params[column]) : total
-    ), 0)
-    if (distance < bestDistance) {
-      bestDistance = distance
-      best = config
+  const rowStart = userIndex * configCount
+  const columns = ["user_id", "config_id", "cluster"]
+  if (resultKind === "density") columns.push("core", "aux_time")
+  if (resultKind === "anchor") columns.push("aux_time")
+  const results = readParquet(cacheRoot, resultsPath, {
+    columns,
+    rowStart,
+    rowEnd: rowStart + configCount,
+  }).then((rows) => {
+    if (rows.length !== configCount || rows.some((row) => String(row.user_id) !== userId)) {
+      throw new Error("Cached results do not match selected user " + userId)
     }
-  }
-  return best
+    return rows
+  })
+  resultCache.set(algorithm, { key: cacheKey, value: results })
+  return results
 }
 
-async function labelsForUser(
+function resolveConfig(configs: ConfigRow[], params: Record<string, number>) {
+  const requested = Object.entries(params)
+  if (requested.some(([, value]) => !Number.isFinite(value))) {
+    throw new Error("Stop-detection parameters must be finite numbers")
+  }
+  const matches = configs.filter((config) => requested.every(
+    ([name, value]) => Object.is(config.params[name], value),
+  ))
+  if (matches.length === 0) throw new Error("No cached configuration matches the requested parameters")
+  if (matches.length > 1) throw new Error("Requested parameters match multiple cached configurations")
+  return matches[0]
+}
+
+function listValues(value: unknown, field: string, expectedLength?: number) {
+  if (value == null) throw new Error("Cached row is missing required list field: " + field)
+  const values = Array.from(value as ArrayLike<unknown>)
+  if (expectedLength !== undefined && values.length !== expectedLength) {
+    throw new Error("Cached " + field + " is not aligned with the selected trajectory")
+  }
+  return values
+}
+
+async function resultForUser(
   cacheRoot: string,
   algorithm: string,
   userId: string,
-  seedPings: CompareScene["pings"],
-  orderedTimestamps: number[],
+  userIndex: number,
+  trajectoryLength: number,
   params: Record<string, number>,
 ) {
   const manifest = await loadManifest(cacheRoot)
-  const algorithmDirectory = algorithmDirectories[algorithm] ?? algorithm
-  const entry = manifest.algorithms[algorithmDirectory]
-  const [configs, labels, corePointIndex] = await Promise.all([
-    loadConfigs(cacheRoot, algorithmDirectory, entry, manifest),
-    loadLabels(cacheRoot, algorithmDirectory, entry),
-    loadCorePoints(cacheRoot, algorithmDirectory, entry),
-  ])
-  const config = resolveConfig(entry, configs, params)
-  const coreRows = corePointIndex?.get(config.config_id + "|" + userId) ?? []
-  const pingByTimestamp = new Map(seedPings.map((ping) => [ping.timestamp, ping]))
-  const coreTimestampByPoint = new Map<string, number>()
-  for (const row of coreRows) {
-    if (Number(row.role) !== 1) continue
-    const timestamp = Number(row.timestamp)
-    const coreTimestamp = Number(row.core_timestamp)
-    coreTimestampByPoint.set(
-      Number(row.cluster) + "|" + timestamp,
-      Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
+  const entry = manifest.algorithms[algorithm]
+  if (!entry) throw new Error("Unknown stop-detection algorithm: " + algorithm)
+
+  const configs = await loadConfigs(cacheRoot, entry.configs)
+  const config = resolveConfig(configs, params)
+  const rows = await loadResults(
+    cacheRoot,
+    algorithm,
+    entry.results,
+    entry.result_kind,
+    userId,
+    userIndex,
+    configs.length,
+  )
+  const row = rows.find((candidate) => Number(candidate.config_id) === config.config_id)
+  if (!row) throw new Error("Cached result is missing config_id " + config.config_id)
+
+  const cluster = listValues(row.cluster, "cluster", trajectoryLength).map(Number)
+  let result: AlignedStopResult
+  if (entry.result_kind === "density") {
+    const core = listValues(row.core, "core", trajectoryLength).map(Number)
+    const aux_time = listValues(row.aux_time, "aux_time", trajectoryLength).map(
+      (value) => value == null ? null : Number(value),
     )
+    result = { kind: "density", cluster, core, aux_time }
+  } else if (entry.result_kind === "anchor") {
+    const aux_time = listValues(row.aux_time, "aux_time", trajectoryLength).map(
+      (value) => value == null ? null : Number(value),
+    )
+    result = { kind: "anchor", cluster, aux_time }
+  } else if (entry.result_kind === "labels") {
+    result = { kind: "labels", cluster }
+  } else {
+    throw new Error("Unsupported result kind for " + algorithm + ": " + entry.result_kind)
   }
-
-  return {
-    labels: orderedTimestamps.map((timestamp) => Number(labels.get(userId + "|" + timestamp)?.[config.label_column] ?? -1)),
-    corePoints: coreRows.flatMap((row) => {
-      const timestamp = Number(row.timestamp)
-      const sourceTimestamp = Number(row.source_timestamp)
-      const coreTimestamp = Number(row.core_timestamp)
-      const point = pingByTimestamp.get(timestamp)
-      const sourcePoint = pingByTimestamp.get(sourceTimestamp)
-      if (!point || !sourcePoint) return []
-      return [{
-        timestamp,
-        role: Number(row.role),
-        sourceTimestamp,
-        coreTimestamp: Number.isFinite(coreTimestamp) ? coreTimestamp : timestamp,
-        sourceCoreTimestamp: coreTimestampByPoint.get(Number(row.cluster) + "|" + sourceTimestamp) ?? sourceTimestamp,
-        cluster: Number(row.cluster),
-        x: point.x,
-        y: point.y,
-        sourceX: sourcePoint.x,
-        sourceY: sourcePoint.y,
-      }]
-    }),
-    configKey: config.key,
-  }
-}
-
-function normalizeAlgorithm(input: string | undefined) {
-  const normalized = (input ?? "").trim().toLowerCase()
-  if (!normalized) return "dbstop"
-  if (normalized === "dbscan" || normalized === "st-dbscan") return "tadbscan"
-  return normalized
-}
-
-function prettyAlgorithmName(algorithm: string) {
-  const names: Record<string, string> = {
-    dbstop: "DBSTOP",
-    lachesis: "Lachesis",
-    "sequential-centroid": "Sequential (centroid-anchored)",
-    "sequential-first": "Sequential (first-anchored)",
-    seqscan: "SeqScan",
-    tadbscan: "ST-DBSCAN",
-    gridbased: "Grid-based",
-    hdbscan: "HDBSCAN",
-  }
-  return names[algorithm] ?? algorithm.toUpperCase()
+  return { displayName: entry.display_name, result }
 }
 
 async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: string) {
-  const [scene, routes] = await Promise.all([loadScene(cacheRoot), loadRoutes(cacheRoot)])
-  // A metrics-chart click asks for one specific agent; fall back to the seed rotation
-  // when that agent isn't part of the selected trajectory's scene.
-  const user = requestedUserId && scene.users.includes(requestedUserId)
+  const manifest = await loadManifest(cacheRoot)
+  const userId = requestedUserId && manifest.users.includes(requestedUserId)
     ? requestedUserId
-    : scene.users[Math.abs(seed) % scene.users.length]
-  const userPings = scene.pings
-    .filter((ping) => ping.user_id === user)
-    .sort((a, b) => a.timestamp - b.timestamp)
-  const truth = scene.truth
-    .filter((row) => row.user_id === user)
-    .map((row) => ({
-      location: row.location,
-      timestamp: row.timestamp,
-      duration: row.duration,
-      x: row.x,
-      y: row.y,
-    }))
-    .sort((a, b) => a.timestamp - b.timestamp)
-
+    : manifest.users[Math.abs(seed) % manifest.users.length]
+  const userIndex = manifest.users.indexOf(userId)
+  const [scene, routes, pings, diary] = await Promise.all([
+    loadScene(cacheRoot, manifest),
+    loadRoutes(cacheRoot, manifest),
+    loadTrajectory(cacheRoot, manifest, userId, userIndex),
+    loadDiary(cacheRoot, manifest, userId),
+  ])
   return {
     response: {
       crs: scene.crs,
       source: scene.source,
-      user_id: user,
+      user_id: userId,
       bounds: scene.bounds,
       buildings: scene.buildings,
-      pings: userPings.map((ping) => ({ x: ping.x, y: ping.y, timestamp: ping.timestamp })),
-      truth,
+      pings,
+      truth: diary,
       routes,
     },
-    userId: user,
-    orderedTimestamps: userPings.map((ping) => ping.timestamp),
+    userIndex,
   } satisfies SeedScene
 }
 
@@ -353,25 +321,22 @@ async function buildPanel(
   params: Record<string, number> | undefined,
   scene: SeedScene,
 ) {
-  const normalized = normalizeAlgorithm(algorithm)
-  const cachedLabels = await labelsForUser(
+  const algorithmId = algorithm ?? "dbstop"
+  const cachedResult = await resultForUser(
     cacheRoot,
-    normalized,
-    scene.userId,
-    scene.response.pings,
-    scene.orderedTimestamps,
+    algorithmId,
+    scene.response.user_id,
+    scene.userIndex,
+    scene.response.pings.length,
     params ?? {},
   )
 
   return {
-    algo: normalized,
-    title: prettyAlgorithmName(normalized),
-    available: true,
+    algo: algorithmId,
+    title: cachedResult.displayName,
     scene: scene.response,
     params: params ?? {},
-    labels: cachedLabels.labels,
-    corePoints: cachedLabels.corePoints,
-    configKey: cachedLabels.configKey,
+    result: cachedResult.result,
   } satisfies ComparePanelResponse
 }
 
@@ -380,15 +345,15 @@ export async function loadCompareData(payload: ComparePayload): Promise<CompareA
   const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1
   const cacheRoot = cacheRootForTrajectory(payload.trajectory)
   const scene = await sceneForSeed(cacheRoot, seed, payload.userId)
-  const result: CompareApiResponse = {
+  const [left, right] = await Promise.all([
+    buildPanel(cacheRoot, payload.left?.algo, payload.left?.params, scene),
+    mode === "compare" ? buildPanel(cacheRoot, payload.right?.algo, payload.right?.params, scene) : undefined,
+  ])
+  return {
     seed,
     trajectory: payload.trajectory && trajectoryDirectories.has(payload.trajectory) ? payload.trajectory : defaultTrajectory,
     mode,
-    left: await buildPanel(cacheRoot, payload.left?.algo, payload.left?.params, scene),
+    left,
+    right,
   }
-
-  if (mode === "compare") {
-    result.right = await buildPanel(cacheRoot, payload.right?.algo, payload.right?.params, scene)
-  }
-  return result
 }

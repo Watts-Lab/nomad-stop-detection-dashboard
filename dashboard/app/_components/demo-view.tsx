@@ -1,3 +1,7 @@
+/*
+LAYOUT + COORDINATOR FOR ENTIRE DEMO PAGE (controls & viz components)
+*/
+
 import { useState } from "react"
 import { BarChart3, Columns2, HelpCircle, RefreshCw, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"

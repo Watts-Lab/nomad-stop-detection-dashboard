@@ -1,3 +1,7 @@
+/*
+RENDERS TRAJECTORY/DATASET PICKER, ALLOW USERS TO SELECT TRAJ & VIEW INFO ABOUT OPTIONS
+*/
+
 import { useState } from "react"
 import { HelpCircle } from "lucide-react"
 import { TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"

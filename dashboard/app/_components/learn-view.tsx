@@ -1,3 +1,7 @@
+/*
+RENDER LEARN PAGE EXPLAINING STOP DETECTION ALGOS & CONCEPTS
+*/
+
 import Image from "next/image"
 import { Maximize2, Minimize2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"

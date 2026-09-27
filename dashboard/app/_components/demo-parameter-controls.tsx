@@ -1,3 +1,7 @@
+/* 
+UI FOR CHANGING PARAMS OF THE ALGORITHM SELECTED IN DEMO MODE
+*/ 
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { DEMO_EDITABLE_PARAMS } from "../_lib/dashboard-data"

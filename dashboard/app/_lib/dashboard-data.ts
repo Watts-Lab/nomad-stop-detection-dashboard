@@ -1,3 +1,5 @@
+/* STORE STATIC DEFINITIONS/CONFIG OF ALGOS, PARAMS, TRAJECTORY OPTIONS */
+
 import { publicPath } from "./public-path"
 import type { DashboardView, MetricsParameterNote } from "./types"
 

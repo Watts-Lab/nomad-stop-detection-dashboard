@@ -47,13 +47,13 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
             </p>
             <div className="mt-7 grid gap-5 text-left">
               <div className="home-copy-reveal home-copy-reveal-3">
-              <h2 className="text-lg font-semibold text-[#7629db]">What Stop Detection Is</h2>
+              <h2 className="text-lg font-semibold text-[#3b1370]">What Stop Detection Is</h2>
               <p className="mt-2 text-base leading-relaxed text-foreground">
                   A critical step in making sense of human mobility trajectories is stop detection. Stop detection enriches raw trajectory data with semantic information about visits to places of interest (POIs), trips between locations, and recurring mobility routines. This process applies a stop-detection algorithm to identify stationary segments in the trajectory of a moving object through spatio-temporal clustering of location records. Typically, detected stops are represented as tuples of the form (user_id, x, y, t_start, t_end), identifying the individual, median stop coordinates, and the first and last timestamps of the pings that make up the stop.
                 </p>
               </div>
               <div className="home-copy-reveal home-copy-reveal-4">
-              <h2 className="text-lg font-semibold text-[#7629db]">What This Dashboard Does</h2>
+              <h2 className="text-lg font-semibold text-[#3b1370]">What This Dashboard Does</h2>
               <p className="mt-2 text-base leading-relaxed text-foreground">
                   Learn algorithm assumptions, tune parameters, compare behavior side by side, and inspect trajectory outputs and aggregate metrics without rerunning notebook experiments.
                 </p>
@@ -70,12 +70,14 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
             </div>
           </div>
 
-          <Card className="nomad-card overflow-hidden rounded-lg py-0">
-            <CardContent className="p-0">
-            <div className="border-b border-border bg-secondary px-5 py-4">
-              <h3 className="text-lg font-semibold text-[#3b1370]">Trajectory Preview</h3>
+          <Card className="nomad-card overflow-hidden rounded-lg bg-white py-0">
+            <CardContent className="bg-white p-0">
+              <div className="border-b border-border bg-[#f8f9fc] px-5 py-4">
+                <h3 className="text-lg font-semibold text-[#3b1370]">
+                  Trajectory Preview
+                </h3>
               </div>
-              <div className="p-5">
+              <div className="bg-white p-5">
                 <HomeStopRunPreview navigateTo={navigateTo} />
               </div>
             </CardContent>

@@ -22,22 +22,22 @@ export const TRAJECTORY_OPTIONS = [
   {
     id: "two-stop",
     name: "Two-stop trajectory",
-    note: "Ground-truth path with two stops in the destination diary.",
+    note: "(Default trajectory) Two stops of equal duration at nearby destinations of equal size.",
   },
   {
     id: "four-stop-low-ha",
     name: "Four-stop",
-    note: "Lower horizontal-accuracy radius keeps sampled pings closer to the simulated path, so this trajectory is less noisy.",
+    note: "Heterogeneous trajectory consisting of four stops to destinations of varying sizes, but equal durations.",
   },
   {
     id: "four-stop-high-ha",
     name: "Four-stop (noisier)",
-    note: "Higher horizontal-accuracy radius adds more spatial error to sampled pings, so this trajectory is noisier.",
+    note: "Same as 'Four-stop' but with increased noise in its horizontal accuracy.",
   },
   {
     id: "commute-return",
     name: "Commute return",
-    note: "Ground-truth path that starts at home, spends a work-length period at a workplace, then returns to the starting building.",
+    note: "Trajectory representing recurring visits to a same destination, starting with a short visit in one destination, followed by a lengthier visit at a second destination, and a final visit to the starting destination.",
   },
 ]
 
@@ -208,7 +208,7 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
       { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
       { name: "delta_roam", defaultValue: "28", description: "Maximum roaming distance for a candidate stop, in meters." },
     ],
@@ -224,8 +224,8 @@ export const algorithms = [
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
       { name: "delta_roam", defaultValue: "28", description: "Maximum distance from the candidate centroid, in meters." },
-      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
       { name: "method", defaultValue: "centroid", description: "Anchoring rule for the candidate stop center." },
     ],
   },
@@ -240,8 +240,8 @@ export const algorithms = [
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
       { name: "delta_roam", defaultValue: "28", description: "Maximum distance from the first ping in the candidate stop, in meters." },
-      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
       { name: "method", defaultValue: "sliding", description: "Anchoring rule for the candidate stop center." },
     ],
   },
@@ -256,8 +256,8 @@ export const algorithms = [
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
       { name: "h3_resolution", defaultValue: "10", description: "H3 resolution used to tessellate the trajectory." },
-      { name: "time_thresh", defaultValue: "60", description: "Maximum gap between pings in the same cell, in minutes." },
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration for a stop, in minutes." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
   },
   {
@@ -270,9 +270,9 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "dist_thresh", defaultValue: "50", description: "Spatial neighborhood radius, in meters." },
-      { name: "time_thresh", defaultValue: "60", description: "Maximum temporal gap for neighborhood linkage, in minutes." },
-      { name: "min_pts", defaultValue: "3", description: "Minimum neighbors required for a core point." },
+      { name: "dist_thresh", defaultValue: "50", description: "Maximum distance between a core point and its neighbors, determining density." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
     ],
   },
   {
@@ -285,10 +285,10 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "time_thresh", defaultValue: "60", description: "Temporal threshold (minutes)" },
-      { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
-      { name: "min_pts", defaultValue: "3", description: "Minimum points for cluster core" },
-      { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density." },
+      { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
   },
   {
@@ -301,10 +301,10 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "time_thresh", defaultValue: "60", description: "Time threshold for stop detection (minutes)" },
-      { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
-      { name: "min_pts", defaultValue: "3", description: "Minimum points for cluster core" },
-      { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density" },
+      { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
   },
   {
@@ -317,10 +317,10 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "dist_thresh", defaultValue: "10", description: "Distance threshold (meters)" },
-      { name: "time_thresh", defaultValue: "60", description: "Temporal threshold (minutes)" },
-      { name: "min_pts", defaultValue: "3", description: "Minimum points for cluster core" },
-      { name: "dur_min", defaultValue: "5", description: "Minimum stop duration (minutes)" },
+      { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
+      { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
   },
 ]

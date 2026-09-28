@@ -103,3 +103,26 @@ export function isPlaybackComplete(
   ) {
     return sequenceIndex >= timeSequenceLength - 1
   }
+
+// Convert a timeline value in milliseconds into a valid playback timestamp.
+export function timelineValueToTimestamp(
+    timeMs: number,
+    timeSequence: number[]
+  ) {
+    return clampPlaybackTimestamp(
+      timeMs / 1000,
+      timeSequence
+    )
+  }
+
+// Move the playback timestamp by a timeline scrub delta.
+export function scrubPlaybackTimestamp(
+    currentTimestamp: number,
+    deltaSeconds: number,
+    timeSequence: number[]
+  ) {
+    return clampPlaybackTimestamp(
+      currentTimestamp + deltaSeconds,
+      timeSequence
+    )
+  }

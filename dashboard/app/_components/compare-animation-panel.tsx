@@ -11,28 +11,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { parameterDisplayName } from "../_lib/dashboard-utils"
-import type {
-  ComparePanelResponse,
-  EChartsApi,
-  EChartsParams,
-} from "../_lib/types"
+import type { ComparePanelResponse, EChartsApi, EChartsParams } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
-import {
-  groundTruthAt,
-  pastTruthStopData,
-  currentTruthStopData,
-  nextTruthStopData,
-  groundTruthBuildingsSeriesData,
-  groundTruthBuildingGlowData,
-  groundTruthRouteLength,
-  groundTruthRouteMarkerAt,
-  groundTruthRouteGlowPoints
-} from "./demo-ground-truth"
-import {
-  xrayAnchorFramesAt,
-  xrayDistanceCircleData,
-} from "./demo-xray"
+import { groundTruthAt, pastTruthStopData, currentTruthStopData, nextTruthStopData,
+  groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength, 
+  groundTruthRouteMarkerAt, groundTruthRouteGlowPoints } from "./demo-ground-truth"
+import { xrayAnchorFramesAt, xrayDistanceCircleData } from "./demo-xray"
+import { detectedCountFor, pingClassifiedAt, hoveredAssignedBuildingData, visibleNoisePingsAt, 
+  visibleClusterPingsAt } from "./demo-detected-stops"
+import { selectedPingLineData, relatedPingIndexesAt, connectedPingIndexes , associatedWithHover, 
+  associationOpacity, anchorOpacity, edgeOpacity, pingScale } from "./demo-interactions"
+import { sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor , 
+  clampPlaybackTimestamp, nextSequenceIndex, isPlaybackComplete } from "./demo-playback"
 
 const DEMO_CLUSTER_COLORS = [
   "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f", "#00a8cc", "#72b01d", "#8c6d31",
@@ -210,9 +201,8 @@ function DemoSceneRenderer({
 
     // Derive playing, paused, or complete state and report it to React and the parent callback
     const syncPlaybackState = () => {
-      const atEnd = sequenceIndex >= chartData.timeSequence.length - 1
-      const nextState = atEnd && paused ? "complete" : paused ? "paused" : "playing"
-      setPlaybackState(nextState)
+      const nextState = playbackStateFor(paused, sequenceIndex, chartData.timeSequence.length )
+      setPlaybackState(nextState) 
       onPlaybackStateChangeRef.current?.(nextState)
     }
 
@@ -220,12 +210,6 @@ function DemoSceneRenderer({
     const isDensityAlgorithm = chartData.result.kind === "density"
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
-    const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
-    const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
-    const anchorOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 1 : 0.2
-    const edgeOpacity = (sourceIndex: number, targetIndex: number) =>
-      hoverPingIndexes === null || (hoverPingIndexes.has(sourceIndex) && hoverPingIndexes.has(targetIndex)) ? 0.7 : 0.1
-    const pingScale = (pingIndex: number) => hoverPingIndexes?.has(pingIndex) ? 1.1 : 1
     const pingCircle = (api: EChartsApi) => {
       const center = api.coord([api.value(0), api.value(1)])
       const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
@@ -272,67 +256,22 @@ function DemoSceneRenderer({
       }
       return { completedCached, completedFallback, activeCached, activeFallback, next }
     }
-    const latestPingIndexAt = (timestampSeconds: number) => {
-      let index = 0
-      for (let candidate = 0; candidate < scene.pings.length; candidate += 1) {
-        if (scene.pings[candidate].timestamp <= timestampSeconds) index = candidate
-        else break
-      }
-      return index
-    }
-    const pingClassifiedAt = (pingIndex: number, timestampSeconds: number) => {
-      const pingTime = chartData.pingData[pingIndex][4]
-      return pingTime <= timestampSeconds && (
-        chartData.result.kind !== "density" ||
-        Math.max(pingTime, chartData.result.aux_time[pingIndex] ?? pingTime) <= timestampSeconds
-      )
-    }
-    const detectedCountFor = (timestampSeconds: number) => {
-      let count = 0
-      while (count < chartData.stopEndTimes.length && chartData.stopEndTimes[count] <= timestampSeconds) count += 1
-      return count
-    }
     
     const styledScatterPoint = (point: number[]) => ({
       value: point,
-      symbolSize: 5 * pingScale(point[3]),
+      symbolSize: 5 * pingScale(point[3], hoverPingIndexes),
       itemStyle: {
-        opacity: associationOpacity(point[3]),
+        opacity: associationOpacity(point[3], hoverPingIndexes),
       },
     })
     const styledXrayPoint = (point: number[]) => ({
       value: point,
-      symbolSize: 15 * pingScale(point[3]),
+      symbolSize: 15 * pingScale(point[3], hoverPingIndexes),
       itemStyle: {
         color: clusterColor(point[2]),
-        opacity: anchorOpacity(point[3]),
+        opacity: anchorOpacity(point[3], hoverPingIndexes),
       },
     })
-
-    // While hovering a ping that belongs to a detected stop, outline the building the algorithm
-    // assigned that stop to, in the stop's cluster color - alongside the (untouched) ground-truth glow.
-    const hoveredAssignedBuildingData = (timestampSeconds: number) => {
-      if (!layerStateRef.current.showStops || hoverPingIndex === null) return []
-      if (!pingClassifiedAt(hoverPingIndex, timestampSeconds)) return []
-      const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
-      if (cluster < 0) return []
-      const stop = chartData.stops.find((candidate) => candidate.cluster === cluster)
-      const buildingId = stop?.destination.id
-      if (!buildingId) return []
-      const buildingIndex = chartData.buildings.findIndex((building) => building.id === buildingId)
-      return buildingIndex >= 0 ? [[buildingIndex, cluster]] : []
-    }
-    
-    // For density-based algorithms, show the dist_thresh neighborhood radius around the hovered point.
-    const selectedPingLineData = () => {
-      if (selectedPingIndexesRef.current.length !== 2) return []
-      return [{
-        coords: selectedPingIndexesRef.current.map((pingIndex) => {
-          const ping = chartData.pings[pingIndex]
-          return [ping.x, ping.y]
-        })
-      }]
-    }
 
     // Cancel the route-glow animation and clear its chart series
     const stopRouteGlow = () => {
@@ -431,11 +370,9 @@ function DemoSceneRenderer({
     // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
       previewing = false
-      const latestPingIndex = latestPingIndexAt(timestampSeconds)
-      const noisePings = chartData.pingData.filter((point) => point[2] < 0)
-      const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
+      const latestPingIndex = latestPingIndexAt(timestampSeconds, scene.pings)
       const route = routeProgressAt(timestampSeconds)
-      const detectedStopCount = detectedCountFor(timestampSeconds)
+      const detectedStopCount = detectedCountFor(timestampSeconds, chartData)
       const anchorFrames = xrayAnchorFramesAt(timestampSeconds,chartData)
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
@@ -443,43 +380,28 @@ function DemoSceneRenderer({
       if (selectedPingIndexesRef.current.length === 2) {
         hoverPingIndexes = new Set(selectedPingIndexesRef.current)
         if (hoverPingIndex !== null) hoverPingIndexes.add(hoverPingIndex)
-      } else if (hoverEdgeEndpoints) {
-        // Edge hover: reveal only the connected component reachable from this edge.
-        const connectedPings = new Set<number>(hoverEdgeEndpoints)
-        hoverPingIndexes = connectedPings
-        const pending: number[] = [...hoverEdgeEndpoints]
-        while (pending.length) {
-          const current = pending.pop()!
-          anchorEdges.forEach((edge) => {
-            const neighbor = edge.value[1] === current
-              ? edge.value[2]
-              : edge.value[2] === current
-                ? edge.value[1]
-                : null
-            if (neighbor !== null && !connectedPings.has(neighbor)) {
-              connectedPings.add(neighbor)
-              pending.push(neighbor)
-            }
-          })
-        }
+        } else if (hoverEdgeEndpoints) {
+          // Edge hover: reveal only the connected component reachable from this edge.
+          hoverPingIndexes = connectedPingIndexes(
+            hoverEdgeEndpoints,
+            anchorEdges
+          )
       } else if (hoverPingIndex !== null) {
-        // Ping hover: reveal every ping in the same detected stop (or just itself for noise).
-        const cluster = pingClassifiedAt(hoverPingIndex, timestampSeconds)
-          ? chartData.pingData[hoverPingIndex]?.[2] ?? -1
-          : -1
-        const members = cluster >= 0
-          ? chartData.clusterMembers.get(cluster)?.filter((pingIndex) => pingClassifiedAt(pingIndex, timestampSeconds))
-          : undefined
-        hoverPingIndexes = new Set(members ?? [hoverPingIndex])
+        hoverPingIndexes = new Set(
+          relatedPingIndexesAt(
+            hoverPingIndex,
+            timestampSeconds,
+            chartData
+          )
+        )
       } else if (selectedPingIndexesRef.current.length) {
-        hoverPingIndexes = new Set(selectedPingIndexesRef.current.flatMap((pingIndex) => {
-          const cluster = pingClassifiedAt(pingIndex, timestampSeconds)
-            ? chartData.pingData[pingIndex]?.[2] ?? -1
-            : -1
-          return cluster >= 0
-            ? chartData.clusterMembers.get(cluster)?.filter((memberIndex) => pingClassifiedAt(memberIndex, timestampSeconds)) ?? [pingIndex]
-            : [pingIndex]
-        }))
+        hoverPingIndexes = new Set(
+          selectedPingIndexesRef.current.flatMap((pingIndex) =>
+            relatedPingIndexesAt(
+              pingIndex, timestampSeconds, chartData
+            )
+          )
+        )
       } else {
         hoverPingIndexes = null
       }
@@ -502,22 +424,27 @@ function DemoSceneRenderer({
             pulseStrength,
             hoverBuildingId,
           ) },
-          { id: "assigned-building-outline", data: hoveredAssignedBuildingData(timestampSeconds) },
+          { id: "assigned-building-outline", data: hoveredAssignedBuildingData(
+            timestampSeconds,
+            chartData,
+            layerStateRef.current.showStops,
+            hoverPingIndex
+          ) },
           { id: "completed-paths", data: layerStateRef.current.showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
           { id: "completed-fallback-paths", data: layerStateRef.current.showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
           { id: "active-path", data: layerStateRef.current.showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: layerStateRef.current.showGroundTruth ? route.activeFallback : [] },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
-          { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3]), itemStyle: { opacity: associatedWithHover(point[3]) ? 1 : 0.18 } })) },
-          { id: "noise-pings", data: layerStateRef.current.showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
-          { id: "cluster-pings", data: layerStateRef.current.showStops ? clusterPings.filter((point) => pingClassifiedAt(point[3], timestampSeconds)).map((point) => [...point, associationOpacity(point[3])]) : [] },
-          { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
+          { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3], hoverPingIndexes), itemStyle: { opacity: associatedWithHover(point[3], hoverPingIndexes) ? 1 : 0.18 } })) },
+          { id: "noise-pings", data: layerStateRef.current.showStops ? visibleNoisePingsAt(timestampSeconds, chartData).map(styledScatterPoint): [] },
+          { id: "cluster-pings", data: layerStateRef.current.showStops ? visibleClusterPingsAt(timestampSeconds, chartData).map((point) => [...point, associationOpacity(point[3], hoverPingIndexes)]): []},
+          { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2], hoverPingIndexes) } })) : [] },
           { id: "promotion-edges-hit-area", data: layerStateRef.current.showXray ? promotionEdges : [] },
           { id: "core-points", data: layerStateRef.current.showXray ? chartData.densityCorePointData.filter((point) => point[4] <= timestampSeconds).map(styledXrayPoint) : [] },
-          { id: "anchor-edges", data: layerStateRef.current.showXray ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
+          { id: "anchor-edges", data: layerStateRef.current.showXray ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2], hoverPingIndexes) } })) : [] },
           { id: "anchor-edges-hit-area", data: layerStateRef.current.showXray ? anchorEdges : [] },
           { id: "anchor-points", data: layerStateRef.current.showXray ? anchorFrames.map((frame) => frame.point).map(styledXrayPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
+          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds, chartData) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, hoverPingIndexes) } }] },
           { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
           {
             id: "distance-circles",
@@ -528,11 +455,11 @@ function DemoSceneRenderer({
               isDensityAlgorithm,
               hoverPingIndex,
               hoverPingIndex !== null &&
-                pingClassifiedAt(hoverPingIndex, timestampSeconds)
+              pingClassifiedAt(hoverPingIndex, timestampSeconds,chartData)
             ),
           },
           { id: "ping-hit-area", data: chartData.pingData },
-          { id: "selected-ping-line", data: selectedPingLineData() },
+          { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData)},
         ],
       }, { lazyUpdate: true })
       syncRouteGlow()
@@ -576,7 +503,7 @@ function DemoSceneRenderer({
           { id: "current-ping", data: [] },
           { id: "current-ping-hole", data: [] },
           { id: "distance-circles", data: [] },
-          { id: "selected-ping-line", data: selectedPingLineData() },
+          { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData)},
         ],
       }, { lazyUpdate: true })
       timelineChart.setOption({
@@ -610,13 +537,13 @@ function DemoSceneRenderer({
       renderTrajectoryPreview(0)
       timer = window.setTimeout(step, 20)
     }
-    const activeTimestamp = () => selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
+    const activeTimestamp = () => activePlaybackTimestamp(selectedTimestampRef.current, sequenceIndex, chartData.timeSequence )
 
     // Update the hovered ping and its ground-truth building, 
     // Redraw highlights and reposition tooltips
     const setHoveredPing = (pingIndex: number | null) => {
       const ping = pingIndex === null ? null : chartData.pings[pingIndex]
-      const buildingId = ping ? groundTruthAt(ping.t).current?.location ?? "" : ""
+      const buildingId = ping ? groundTruthAt(ping.t, chartData).current?.location ?? "" : ""
       if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId && hoverEdgeEndpoints === null) return
       hoverPingIndex = pingIndex
       hoverEdgeEndpoints = null
@@ -955,21 +882,14 @@ function DemoSceneRenderer({
 
     // Align the playback sequence index with the supplied timestamp
     const syncSequenceIndex = (timestampSeconds: number) => {
-      let index = 0
-      for (let candidate = 0; candidate < chartData.timeSequence.length; candidate += 1) {
-        if (chartData.timeSequence[candidate] <= timestampSeconds) index = candidate
-        else break
-      }
-      sequenceIndex = index
+      sequenceIndex = sequenceIndexAt( timestampSeconds, chartData.timeSequence )
     }
 
     // Convert a timeline pointer position into a timestamp clamped to the scene's time range
     const timestampFromOffset = (offsetX: number, offsetY: number) => {
       const point = timelineChart.convertFromPixel({ gridIndex: 0 }, [offsetX, offsetY])
       const timeMs = Array.isArray(point) ? point[0] : point
-      const minT = chartData.timeSequence[0]
-      const maxT = chartData.timeSequence[chartData.timeSequence.length - 1]
-      return Math.max(minT, Math.min(maxT, timeMs / 1000))
+      return clampPlaybackTimestamp(timeMs / 1000, chartData.timeSequence)
     }
 
     // Update the local timestamp and sequence index, then report the new time to the parent
@@ -1046,10 +966,11 @@ function DemoSceneRenderer({
     // Notify preview completion when applicable
     const advance = () => {
       if (paused || !syncMaster) return
-      sequenceIndex = Math.min(sequenceIndex + 1, chartData.timeSequence.length - 1)
+      sequenceIndex = nextSequenceIndex(sequenceIndex, chartData.timeSequence.length)
       const timestampSeconds = chartData.timeSequence[sequenceIndex]
       onTimeChange(timestampSeconds)
-      if (sequenceIndex >= chartData.timeSequence.length - 1) {
+      if (isPlaybackComplete(sequenceIndex, chartData.timeSequence.length)
+      ) {
         paused = true
         syncPlaybackState()
         renderScene(timestampSeconds)
@@ -1205,7 +1126,7 @@ function DemoSceneRenderer({
           }
           if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
             const ping = chartData.pings[value[3]]
-            const classified = pingClassifiedAt(ping.i, activeTimestamp())
+            const classified = pingClassifiedAt(ping.i, activeTimestamp(), chartData)
             const cluster = !classified
               ? "Unclassified"
               : ping.cluster < 0
@@ -1421,7 +1342,7 @@ function DemoSceneRenderer({
             const circle = pingCircle(api)
             return {
               type: "circle",
-              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * pingScale(Number(api.value(3))) },
+              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * pingScale(Number(api.value(3)), hoverPingIndexes) },
               style: { fill: "rgba(0, 0, 0, 0.001)" },
             }
           },
@@ -1436,7 +1357,7 @@ function DemoSceneRenderer({
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api)
-            const scale = pingScale(Number(api.value(3)))
+            const scale = pingScale(Number(api.value(3)), hoverPingIndexes)
             return {
               type: "group",
               children: [

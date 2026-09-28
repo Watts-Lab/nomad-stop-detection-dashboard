@@ -143,6 +143,7 @@ export function DemoView({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
                 <DemoParameterControls
+                  key={leftAlgorithm}
                   algo={leftAlgo}
                   algoId={leftAlgorithm}
                   values={leftParams}
@@ -192,6 +193,7 @@ export function DemoView({
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <DemoParameterControls
+                  key={`left-${leftAlgorithm}`}
                   algo={leftAlgo}
                   algoId={leftAlgorithm}
                   values={leftParams}
@@ -207,6 +209,7 @@ export function DemoView({
                   <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <DemoParameterControls
+                  key={`right-${rightAlgorithm}`}
                   algo={rightAlgo}
                   algoId={rightAlgorithm}
                   values={rightParams}

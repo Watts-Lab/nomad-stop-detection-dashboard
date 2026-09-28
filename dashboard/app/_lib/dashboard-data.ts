@@ -208,9 +208,9 @@ export const algorithms = [
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
-      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
       { name: "delta_roam", defaultValue: "28", description: "Maximum roaming distance for a candidate stop, in meters." },
+      { name: "dt_max", defaultValue: "60", description: "Maximum allowed time gap between consecutive pings, in minutes." },
+      { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
   },
   {
@@ -285,8 +285,8 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
-      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
       { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density." },
+      { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
       { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],
@@ -301,8 +301,8 @@ export const algorithms = [
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
+        { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density" },
       { name: "time_thresh", defaultValue: "60", description: "Maximum time gap allowed between consecutive pings in a detected stop." },
-      { name: "dist_thresh", defaultValue: "10", description: "Maximum distance between a core point and its neighbors, determining density" },
       { name: "min_pts", defaultValue: "3", description: "Minimum number of points in a ping's neighborhood to be considered a core point." },
       { name: "dur_min", defaultValue: "5", description: "Minimum duration allowed for detected stops." },
     ],

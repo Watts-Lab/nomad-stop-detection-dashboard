@@ -1,6 +1,4 @@
-/* 
-UI FOR CHANGING PARAMS OF THE ALGORITHM SELECTED IN DEMO MODE
-*/ 
+/* UI FOR CHANGING PARAMS OF THE ALGORITHM SELECTED IN DEMO MODE */ 
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"

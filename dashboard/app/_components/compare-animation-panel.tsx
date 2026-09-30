@@ -11,29 +11,27 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { parameterDisplayName } from "../_lib/dashboard-utils"
-import type { ComparePanelResponse, EChartsApi, EChartsParams } from "../_lib/types"
+import type { ComparePanelResponse, EChartsApi } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
-import {
+import { 
   groundTruthAt, pastTruthStopData, currentTruthStopData, nextTruthStopData,
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
-  groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
-} from "./demo-ground-truth"
-import { xrayAnchorFramesAt, xrayDistanceCircleData } from "./demo-xray"
-import {
-  detectedCountFor, pingClassifiedAt, hoveredAssignedBuildingData, visibleNoisePingsAt,
-  visibleClusterPingsAt
-} from "./demo-detected-stops"
-import {
-  selectedPingLineData, relatedPingIndexesAt, connectedPingIndexes, associatedWithHover,
-  associationOpacity, anchorOpacity, edgeOpacity, pingScale
-} from "./demo-interactions"
-import {
+  groundTruthRouteMarkerAt, groundTruthRouteGlowPoints 
+} from "./demo-viz/overlays/demo-ground-truth"
+import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
+import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
+import { selectedPingLineData } from "./demo-viz/demo-interactions"
+import { 
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
-  nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
-  scrubPlaybackTimestamp
-} from "./demo-playback"
-import { createDemoMapChartOptions } from "./demo-map-chart"
+  nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp, 
+  scrubPlaybackTimestamp 
+} from "./demo-viz/demo-playback"
+import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
+import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
+import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./demo-viz/demo-tooltip-layout"
+import { partialPath, routeProgressAt } from "./demo-viz/demo-route-animation"
+import { buildDemoMapSeries, resolveHoverPingIndexes } from "./demo-viz/demo-scene-render"
 
 const DEMO_CLUSTER_COLORS = [
   "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f", "#00a8cc", "#72b01d", "#8c6d31",
@@ -225,63 +223,6 @@ function DemoSceneRenderer({
       const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
       return { center, radius: Math.abs(edge[0] - center[0]) }
     }
-    const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
-      const target = segment.length * Math.max(0, progress)
-      const drawn = [segment.points[0]]
-      for (let index = 1; index < segment.points.length; index += 1) {
-        const previous = segment.points[index - 1]
-        const next = segment.points[index]
-        const segmentLength = segment.cumulative[index] - segment.cumulative[index - 1]
-        if (segment.cumulative[index] >= target) {
-          const local = segmentLength === 0 ? 1 : (target - segment.cumulative[index - 1]) / segmentLength
-          drawn.push([
-            previous[0] + (next[0] - previous[0]) * local,
-            previous[1] + (next[1] - previous[1]) * local,
-          ])
-          return drawn
-        }
-        drawn.push(next)
-      }
-      return drawn
-    }
-    const routeProgressAt = (timestampSeconds: number) => {
-      const completedCached: number[][][] = []
-      const completedFallback: number[][][] = []
-      let activeCached: number[][] = []
-      let activeFallback: number[][] = []
-      let next: typeof preparedSegments[number] | null = null
-      for (const segment of preparedSegments) {
-        if (timestampSeconds >= segment.end) {
-          if (segment.isFallback) completedFallback.push(segment.points)
-          else completedCached.push(segment.points)
-          continue
-        }
-        if (timestampSeconds >= segment.start) {
-          const active = partialPath(segment, (timestampSeconds - segment.start) / Math.max(1, segment.end - segment.start))
-          if (segment.isFallback) activeFallback = active
-          else activeCached = active
-          continue
-        }
-        if (!next) next = segment
-      }
-      return { completedCached, completedFallback, activeCached, activeFallback, next }
-    }
-
-    const styledScatterPoint = (point: number[]) => ({
-      value: point,
-      symbolSize: 5 * pingScale(point[3], hoverPingIndexes),
-      itemStyle: {
-        opacity: associationOpacity(point[3], hoverPingIndexes),
-      },
-    })
-    const styledXrayPoint = (point: number[]) => ({
-      value: point,
-      symbolSize: 15 * pingScale(point[3], hoverPingIndexes),
-      itemStyle: {
-        color: clusterColor(point[2]),
-        opacity: anchorOpacity(point[3], hoverPingIndexes),
-      },
-    })
 
     // Cancel the route-glow animation and clear its chart series
     const stopRouteGlow = () => {
@@ -309,7 +250,7 @@ function DemoSceneRenderer({
           return
         }
         const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
-        const points = groundTruthRouteGlowPoints(routeProgressAt(timestampSeconds))
+        const points = groundTruthRouteGlowPoints(routeProgressAt(timestampSeconds, preparedSegments))
         const length = groundTruthRouteLength(points)
         const endHoldStarts = routeGlowStartDelay + routeGlowTravelSeconds
         const fadeOutStarts = endHoldStarts + routeGlowEndHoldSeconds
@@ -350,7 +291,7 @@ function DemoSceneRenderer({
       nextPathStartedAt = performance.now()
       const step = (now: number) => {
         const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex] ?? chartData.timeSequence[0]
-        const next = routeProgressAt(timestampSeconds).next
+        const next = routeProgressAt(timestampSeconds, preparedSegments).next
         if (!layerStateRef.current.showGroundTruth || !next) {
           stopNextPathFlow()
           return
@@ -381,105 +322,45 @@ function DemoSceneRenderer({
     const renderScene = (timestampSeconds: number) => {
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds, scene.pings)
-      const route = routeProgressAt(timestampSeconds)
+      const route = routeProgressAt(timestampSeconds, preparedSegments)
       const detectedStopCount = detectedCountFor(timestampSeconds, chartData)
       const anchorFrames = xrayAnchorFramesAt(timestampSeconds, chartData)
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
-      if (selectedPingIndexesRef.current.length === 2) {
-        hoverPingIndexes = new Set(selectedPingIndexesRef.current)
-        if (hoverPingIndex !== null) hoverPingIndexes.add(hoverPingIndex)
-      } else if (hoverEdgeEndpoints) {
-        // Edge hover: reveal only the connected component reachable from this edge.
-        hoverPingIndexes = connectedPingIndexes(
-          hoverEdgeEndpoints,
-          anchorEdges
-        )
-      } else if (hoverPingIndex !== null) {
-        hoverPingIndexes = new Set(
-          relatedPingIndexesAt(
-            hoverPingIndex,
-            timestampSeconds,
-            chartData
-          )
-        )
-      } else if (selectedPingIndexesRef.current.length) {
-        hoverPingIndexes = new Set(
-          selectedPingIndexesRef.current.flatMap((pingIndex) =>
-            relatedPingIndexesAt(
-              pingIndex, timestampSeconds, chartData
-            )
-          )
-        )
-      } else {
-        hoverPingIndexes = null
-      }
-
+      hoverPingIndexes = resolveHoverPingIndexes({
+        timestampSeconds,
+        chartData,
+        selectedPingIndexes: selectedPingIndexesRef.current,
+        hoverPingIndex,
+        hoverEdgeEndpoints,
+        anchorEdges
+      })
       mapChart.setOption({
-        series: [
-          { id: "streets", data: chartData.streets.map((_, index) => index) },
-          { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
-          {
-            id: "buildings", data: groundTruthBuildingsSeriesData(
-              timestampSeconds,
-              chartData,
-              layerStateRef.current.showGroundTruth,
-              pulseStrength,
-              hoverBuildingId,
-            )
-          },
-          {
-            id: "building-glow", data: groundTruthBuildingGlowData(
-              timestampSeconds,
-              chartData,
-              layerStateRef.current.showGroundTruth,
-              pulseStrength,
-              hoverBuildingId,
-            )
-          },
-          {
-            id: "assigned-building-outline", data: hoveredAssignedBuildingData(
-              timestampSeconds,
-              chartData,
-              layerStateRef.current.showStops,
-              hoverPingIndex
-            )
-          },
-          { id: "completed-paths", data: layerStateRef.current.showGroundTruth ? route.completedCached.map((points) => ({ coords: points })) : [] },
-          { id: "completed-fallback-paths", data: layerStateRef.current.showGroundTruth ? route.completedFallback.map((points) => ({ coords: points })) : [] },
-          { id: "active-path", data: layerStateRef.current.showGroundTruth ? route.activeCached : [] },
-          { id: "active-fallback-path", data: layerStateRef.current.showGroundTruth ? route.activeFallback : [] },
-          ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
-          { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3], hoverPingIndexes), itemStyle: { opacity: associatedWithHover(point[3], hoverPingIndexes) ? 1 : 0.18 } })) },
-          { id: "noise-pings", data: layerStateRef.current.showStops ? visibleNoisePingsAt(timestampSeconds, chartData).map(styledScatterPoint) : [] },
-          { id: "cluster-pings", data: layerStateRef.current.showStops ? visibleClusterPingsAt(timestampSeconds, chartData).map((point) => [...point, associationOpacity(point[3], hoverPingIndexes)]) : [] },
-          { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2], hoverPingIndexes) } })) : [] },
-          { id: "promotion-edges-hit-area", data: layerStateRef.current.showXray ? promotionEdges : [] },
-          { id: "core-points", data: layerStateRef.current.showXray ? chartData.densityCorePointData.filter((point) => point[4] <= timestampSeconds).map(styledXrayPoint) : [] },
-          { id: "anchor-edges", data: layerStateRef.current.showXray ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2], hoverPingIndexes) } })) : [] },
-          { id: "anchor-edges-hit-area", data: layerStateRef.current.showXray ? anchorEdges : [] },
-          { id: "anchor-points", data: layerStateRef.current.showXray ? anchorFrames.map((frame) => frame.point).map(styledXrayPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds, chartData) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex, hoverPingIndexes) } }] },
-          { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
-          {
-            id: "distance-circles",
-            data: xrayDistanceCircleData(
-              chartData,
-              anchorFrames,
-              layerStateRef.current.showXray,
-              isDensityAlgorithm,
-              hoverPingIndex,
-              hoverPingIndex !== null &&
-              pingClassifiedAt(hoverPingIndex, timestampSeconds, chartData)
-            ),
-          },
-          { id: "ping-hit-area", data: chartData.pingData },
-          { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
-        ],
+        series: buildDemoMapSeries({
+          timestampSeconds,
+          chartData,
+          route,
+          latestPingIndex,
+          anchorFrames,
+          anchorEdges,
+          promotionEdges,
+          hoverPingIndexes,
+          hoverPingIndex,
+          hoverBuildingId,
+          selectedPingIndexes: selectedPingIndexesRef.current,
+          showGroundTruth: layerStateRef.current.showGroundTruth,
+          showStops: layerStateRef.current.showStops,
+          showXray: layerStateRef.current.showXray,
+          nextPathVisible,
+          pulseStrength,
+          isDensityAlgorithm,
+          clusterColor
+        })
       }, { lazyUpdate: true })
       syncRouteGlow()
       syncNextPathFlow()
+
       timelineChart.setOption({
         series: [
           { id: "ping-ticks", data: chartData.pingData.map((_, index) => [index]) },
@@ -488,8 +369,8 @@ function DemoSceneRenderer({
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
           { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] },
           { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
-          { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] },
-        ],
+          { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] }
+        ]
       }, { lazyUpdate: true })
     }
 
@@ -598,35 +479,7 @@ function DemoSceneRenderer({
       const ping = chartData.pings[pingIndex]
       return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
     })
-    const boxIntersectsSelection: (position: number[], width: number, height: number, points: number[][]) => boolean = (position, width, height, points) => {
-      if (!points.length) return false
-      const clearance = 10
-      const left = position[0] - clearance
-      const top = position[1] - clearance
-      const right = position[0] + width + clearance
-      const bottom = position[1] + height + clearance
-      const start = points[0]
-      const end = points[points.length - 1]
-      const deltaX = end[0] - start[0]
-      const deltaY = end[1] - start[1]
-      let entry = 0
-      let exit = 1
-      const boundaries = [
-        [-deltaX, start[0] - left],
-        [deltaX, right - start[0]],
-        [-deltaY, start[1] - top],
-        [deltaY, bottom - start[1]],
-      ]
-      for (const [direction, distance] of boundaries) {
-        if (direction === 0 && distance < 0) return false
-        if (direction < 0) entry = Math.max(entry, distance / direction)
-        if (direction > 0) exit = Math.min(exit, distance / direction)
-        if (entry > exit) return false
-      }
-      return true
-    }
-    const boxIntersectsPoint: (position: number[], width: number, height: number, point: number[]) => boolean = ([left, top], width, height, [x, y]) =>
-      x >= left - 10 && x <= left + width + 10 && y >= top - 10 && y <= top + height + 10
+    
     const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
       if (!element || element.style.visibility === "hidden") return false
       return !(
@@ -636,37 +489,7 @@ function DemoSceneRenderer({
         top >= element.offsetTop + element.offsetHeight + gap
       )
     }
-    const tooltipPositions: (width: number, height: number, padding: number, gap: number, points: number[][]) => number[][] = (width, height, padding, gap, points) => {
-      const minX = Math.min(...points.map(([x]) => x))
-      const maxX = Math.max(...points.map(([x]) => x))
-      const minY = Math.min(...points.map(([, y]) => y))
-      const maxY = Math.max(...points.map(([, y]) => y))
-      const maxLeft = Math.max(padding, mapEl.clientWidth - width - padding)
-      const maxTop = Math.max(padding, mapEl.clientHeight - height - padding)
-      const clamp: (position: number[]) => number[] = ([left, top]) => [
-        Math.max(padding, Math.min(left, maxLeft)),
-        Math.max(padding, Math.min(top, maxTop)),
-      ]
-      const horizontalCenter = (minX + maxX - width) / 2
-      const verticalCenter = (minY + maxY - height) / 2
-      const localOffsets = [gap, gap + 24, gap + 48]
-      const edgeSteps = Array.from({ length: 9 }, (_, index) => index / 8)
-      return [
-        ...localOffsets.flatMap((offset) => [
-          [maxX + offset, verticalCenter],
-          [minX - offset - width, verticalCenter],
-          [horizontalCenter, minY - offset - height],
-          [horizontalCenter, maxY + offset],
-        ]),
-        ...edgeSteps.flatMap((step) => [
-          [padding + (maxLeft - padding) * step, padding],
-          [padding + (maxLeft - padding) * step, maxTop],
-          [padding, padding + (maxTop - padding) * step],
-          [maxLeft, padding + (maxTop - padding) * step],
-        ]),
-      ].map(clamp)
-    }
-
+ 
     // Position the selection tooltip without covering selected pings, their connecting line, 
     // the pointer, or the hover tooltip; hide it if no position fits
     const positionComparisonTooltip = () => {
@@ -682,7 +505,7 @@ function DemoSceneRenderer({
       const gap = 16
       const tooltipWidth = tooltip.offsetWidth
       const tooltipHeight = tooltip.offsetHeight
-      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points)
+      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points, mapEl.clientWidth, mapEl.clientHeight )
         .find((candidate) =>
           !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
           (!hoveredPoint || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, hoveredPoint)) &&
@@ -1109,158 +932,15 @@ function DemoSceneRenderer({
     const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
       .findIndex((series) => series.id === "ping-hit-area")
 
-    timelineChart.setOption({
-      animation: true,
-      animationDurationUpdate: 180,
-      animationEasingUpdate: "cubicOut",
-      grid: { left: 34, right: 22, top: 0, bottom: 28 },
-      dataZoom: [{
-        id: "timeline-zoom",
-        type: "inside",
-        xAxisIndex: 0,
-        filterMode: "none",
-        minSpan: 1,
-        zoomOnMouseWheel: "ctrl",
-        moveOnMouseMove: "shift",
-        moveOnMouseWheel: "shift",
-      }],
-      xAxis: {
-        type: "time",
-        min: timeMin,
-        max: timeMax,
-        axisLine: { lineStyle: { color: "#a9aea5" } },
-        axisTick: { show: false },
-        axisLabel: { color: "#626760", formatter: (value: number) => new Date(value).toISOString().slice(11, 16) },
-        splitLine: { show: true, lineStyle: { color: "#edf0ea" } },
-      },
-      yAxis: { min: 0, max: 1, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
-      tooltip: { show: false },
-      series: [
-        {
-          id: "ping-ticks",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: false,
-          z: 7,
-          data: [],
-          renderItem(_params: EChartsParams, api: EChartsApi) {
-            const pingIndex = Number(api.value(0))
-            const ping = chartData.pings[pingIndex]
-            const hovered = hoverPingIndex === pingIndex
-            const selected = selectedPingIndexesRef.current.includes(pingIndex)
-            const emphasized = hovered || selected
-            const halfHeight = 0.22 * (emphasized ? 1.2 : 1)
-            const top = api.coord([ping.t * 1000, 0.5 + halfHeight])
-            const bottom = api.coord([ping.t * 1000, 0.5 - halfHeight])
-            const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
-            return {
-              type: "group",
-              children: [
-                { type: "line", z2: emphasized ? 9 : 0, shape, style: { stroke: "rgba(0, 0, 0, 0)", lineWidth: 10 } },
-                { type: "line", z2: emphasized ? 10 : 0, shape, style: { stroke: "#000000", lineWidth: emphasized ? 5 : 2.5, opacity: hoverPingIndex === null || emphasized ? 0.85 : 0.2 } },
-              ],
-            }
-          },
-        },
-        {
-          id: "core-point-ticks",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: false,
-          z: 7,
-          data: [],
-          renderItem(_params: EChartsParams, api: EChartsApi) {
-            const pingIndex = Number(api.value(2))
-            const hovered = hoverPingIndex === pingIndex
-            const selected = selectedPingIndexesRef.current.includes(pingIndex)
-            const emphasized = hovered || selected
-            const halfHeight = 0.22 * (emphasized ? 1.2 : 1)
-            const top = api.coord([api.value(0), 0.5 + halfHeight])
-            const bottom = api.coord([api.value(0), 0.5 - halfHeight])
-            const shape = { x1: top[0], y1: top[1], x2: bottom[0], y2: bottom[1] }
-            const color = clusterColor(Number(api.value(1)))
-            return emphasized
-              ? {
-                type: "group", children: [
-                  { type: "line", z2: 10, shape, style: { stroke: "#000000", lineWidth: 6 } },
-                  { type: "line", z2: 11, shape, style: { stroke: color, lineWidth: 3.5, opacity: 0.95 } },
-                ]
-              }
-              : { type: "line", z2: 1, shape, style: { stroke: color, lineWidth: 3.5, opacity: hoverPingIndex === null ? 0.95 : 0.2 } }
-          },
-        },
-        {
-          id: "past-truth-stops",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: false,
-          z: 3,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.18])
-            const end = api.coord([api.value(1), 0.82])
-            const shape = echarts.graphic.clipRectByRect(
-              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
-              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
-            )
-            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2, opacity: 0.62 } } : null
-          },
-        },
-        {
-          id: "current-truth-stop",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: false,
-          z: 4,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.18])
-            const end = api.coord([api.value(1), 0.82])
-            const pulse = Number(api.value(2))
-            const shape = echarts.graphic.clipRectByRect(
-              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
-              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
-            )
-            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2 + pulse, shadowBlur: 4 + pulse * 8, shadowColor: "rgba(15, 118, 110, 0.48)" } } : null
-          },
-        },
-        {
-          id: "next-truth-stop",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: false,
-          z: 2,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.18])
-            const end = api.coord([api.value(1), 0.82])
-            const shape = echarts.graphic.clipRectByRect(
-              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
-              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
-            )
-            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: FUTURE_GROUND_TRUTH_COLOR, lineWidth: 2, opacity: 0.78 } } : null
-          },
-        },
-        {
-          id: "stop-bars",
-          type: "custom",
-          coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 4,
-          data: [],
-          renderItem(params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.24])
-            const end = api.coord([api.value(1), 0.76])
-            const shape = echarts.graphic.clipRectByRect(
-              { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
-              { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
-            )
-            return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.4 } } : null
-          },
-        },
-        { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 6, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
-      ],
-    })
+    timelineChart.setOption(
+      createDemoTimelineChartOptions({
+        chartData,
+        timeMin,
+        timeMax,
+        getHoverPingIndex: () => hoverPingIndex,
+        getSelectedPingIndexes: () => selectedPingIndexesRef.current
+      })
+    )
 
     toggleRef.current = toggle
     replayRef.current = replay

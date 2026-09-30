@@ -1,6 +1,4 @@
-/*
-RENDER AGG METRICS PAGE (visualizations, algo/trajectory controls, compare mode)
-*/
+/* RENDER AGG METRICS PAGE (visualizations, algo/trajectory controls, compare mode) */
 
 "use client"
 

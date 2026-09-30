@@ -1,10 +1,10 @@
 /* OWN ECHARTS MAP CONFIGURATION */
 
 import * as echarts from "echarts"
-import type { EChartsApi, EChartsParams } from "../_lib/types"
-import type { DemoResultData } from "../_lib/demo-result-data"
-import { pingScale } from "./demo-interactions"
-import { pingClassifiedAt } from "./demo-detected-stops"
+import type { EChartsApi, EChartsParams } from "../../../_lib/types"
+import type { DemoResultData } from "../../../_lib/demo-result-data"
+import { pingScale } from "../demo-interactions"
+import { pingClassifiedAt } from "../overlays/demo-detected-stops"
 
 const DEMO_CLUSTER_COLORS = [
   "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e",

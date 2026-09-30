@@ -1,7 +1,7 @@
 /* HOVER AND SELECTION INTERACTION LOGIC FOR DEMO MODE */
 
-import type { DemoResultData } from "../_lib/demo-result-data"
-import { classifiedClusterMembersAt, pingClassifiedAt } from "./demo-detected-stops"
+import type { DemoResultData } from "../../_lib/demo-result-data"
+import { classifiedClusterMembersAt, pingClassifiedAt } from "./overlays/demo-detected-stops"
 
 // Build the line connecting two selected pings.
 export function selectedPingLineData(

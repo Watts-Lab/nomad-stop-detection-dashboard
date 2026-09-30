@@ -1,6 +1,6 @@
 /* X-RAY VISUALIZATION LOGIC FOR DEMO MODE */
 
-import type { DemoResultData } from "../_lib/demo-result-data"
+import type { DemoResultData } from "../../../_lib/demo-result-data"
 
 // Return the most recent X-ray anchor frame for each stop/cluster
 // that has been reached by the current playback time.

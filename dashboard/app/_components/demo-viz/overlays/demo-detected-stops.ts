@@ -1,6 +1,6 @@
 /* DETECTED STOPS VISUALIZATION LOGIC FOR DEMO MODE */
 
-import type { DemoResultData } from "../_lib/demo-result-data"
+import type { DemoResultData } from "../../../_lib/demo-result-data"
 
 // Count how many detected stops have been reached by the current playback time.
 export function detectedCountFor(

@@ -1,6 +1,6 @@
 /* GROUND TRUTH VISUALIZATION LOGIC FOR DEMO MODE */
 
-import type { DemoResultData } from "../_lib/demo-result-data"
+import type { DemoResultData } from "../../../_lib/demo-result-data"
 
 // Find the active and upcoming ground-truth stops at a given playback time.
 export function groundTruthAt(

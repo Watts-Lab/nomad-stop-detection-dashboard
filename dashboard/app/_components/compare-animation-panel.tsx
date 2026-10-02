@@ -37,7 +37,7 @@ const elapsedTimeLabel = (seconds: number) => {
 
 // Render and control the interactive map and timeline, 
 // including hover, selection, playback, and panel synchronization
-function DemoSceneRenderer({
+export function DemoSceneRenderer({
   panel,
   mode,
   currentTime,
@@ -61,7 +61,7 @@ function DemoSceneRenderer({
   showGroundTruth: boolean
   showStops: boolean
   showXray: boolean
-  variant?: "full" | "preview"
+  variant?: "full" | "preview" | "destination-preview"
   onPreviewComplete?: () => void
   previewRunId?: number
   onReplayStart?: () => void
@@ -69,6 +69,7 @@ function DemoSceneRenderer({
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const scene = panel.scene
+  const destinationPreview = variant === "destination-preview"
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
@@ -119,6 +120,29 @@ function DemoSceneRenderer({
       }),
     )
     const buildingById = new Map(buildings.map((building) => [building.id, building]))
+    const destinationColorByLocation = new Map<string, number>()
+    scene.destinationDiary.forEach(({ location }) => {
+      if (!destinationColorByLocation.has(location)) {
+        destinationColorByLocation.set(location, destinationColorByLocation.size)
+      }
+    })
+    let destinationElapsed = 0
+    const destinationStops = scene.destinationDiary.map(({ location, duration }) => {
+      const start = destinationElapsed
+      destinationElapsed += duration * 60 * 1000
+      return [start, destinationElapsed, destinationColorByLocation.get(location)!]
+    })
+    const destinationBuildings = buildings.flatMap((building, index) => {
+      const color = destinationColorByLocation.get(building.id)
+      return color === undefined ? [] : [[index, color]]
+    })
+    const destinationBuildingShapes = buildings.filter((building) => destinationColorByLocation.has(building.id))
+    const destinationBounds = {
+      minX: Math.min(...destinationBuildingShapes.map((building) => building.minX)),
+      minY: Math.min(...destinationBuildingShapes.map((building) => building.minY)),
+      maxX: Math.max(...destinationBuildingShapes.map((building) => building.maxX)),
+      maxY: Math.max(...destinationBuildingShapes.map((building) => building.maxY)),
+    }
     const blockSide = Math.min(...buildings.flatMap((building) => [
       building.maxX - building.minX,
       building.maxY - building.minY,
@@ -218,9 +242,13 @@ function DemoSceneRenderer({
       segments,
       streets,
       streetLanes,
+      destinationStops,
+      destinationBuildings,
+      destinationDuration: destinationElapsed,
+      destinationBounds,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
-  }, [scene.buildings, scene.pings, scene.routes, scene.truth])
+  }, [scene.buildings, scene.destinationDiary, scene.pings, scene.routes, scene.truth])
   // Combine the scene with the selected algorithm result to build chart-ready stops,
   // cluster assignments, anchors, density metadata, and focus bounds.
   const resultData = useMemo(() => {
@@ -362,6 +390,10 @@ function DemoSceneRenderer({
       coreTimelineData,
       truthStops: sceneData.truthStops,
       segments: sceneData.segments,
+      destinationStops: sceneData.destinationStops,
+      destinationBuildings: sceneData.destinationBuildings,
+      destinationDuration: sceneData.destinationDuration,
+      destinationBounds: sceneData.destinationBounds,
       focusBounds: {
         minX: Math.min(...focusXs),
         minY: Math.min(...focusYs),
@@ -395,10 +427,11 @@ function DemoSceneRenderer({
     timelineEl.style.touchAction = "none"
     const mapChart = echarts.getInstanceByDom(mapEl) ?? echarts.init(mapEl, null, { renderer: "canvas" })
     const timelineChart = echarts.getInstanceByDom(timelineEl) ?? echarts.init(timelineEl, null, { renderer: "canvas" })
-    const minX = chartData.focusBounds.minX
-    const minY = chartData.focusBounds.minY
-    const maxX = chartData.focusBounds.maxX
-    const maxY = chartData.focusBounds.maxY
+    const focusBounds = destinationPreview ? chartData.destinationBounds : chartData.focusBounds
+    const minX = focusBounds.minX
+    const minY = focusBounds.minY
+    const maxX = focusBounds.maxX
+    const maxY = focusBounds.maxY
     const xSpan = maxX - minX
     const ySpan = maxY - minY
     const xPad = Math.max(28, xSpan * 0.14)
@@ -426,8 +459,8 @@ function DemoSceneRenderer({
         yAxis: { min: bounds.yMin, max: bounds.yMax },
       })
     }
-    const timeMin = scene.pings[0].timestamp * 1000
-    const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
+    const timeMin = destinationPreview ? 0 : scene.pings[0].timestamp * 1000
+    const timeMax = destinationPreview ? chartData.destinationDuration : scene.pings[scene.pings.length - 1].timestamp * 1000
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -771,6 +804,23 @@ function DemoSceneRenderer({
     // Redraw map and timeline layers for the active time, visibility settings, hover, and selection
     // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
+      if (destinationPreview) {
+        mapChart.setOption({
+          series: [
+            {
+              id: "buildings",
+              data: [
+                ...chartData.buildings.map((_, index) => [index, 0, 0, -1]),
+                ...chartData.destinationBuildings.map(([index, color]) => [index, 0, 0, color]),
+              ],
+            },
+          ],
+        })
+        timelineChart.setOption({
+          series: [{ id: "stop-bars", data: chartData.destinationStops }],
+        })
+        return
+      }
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const noisePings = chartData.pingData.filter((point) => point[2] < 0)
@@ -1585,11 +1635,12 @@ function DemoSceneRenderer({
             const state = Number(api.value(1))
             const next = state === 2
             const faded = Number(api.value(2)) === 1
+            const destinationColor = Number(api.value(3))
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
-                fill: "#8b8b8b",
+                fill: destinationColor >= 0 ? clusterColor(destinationColor) : "#8b8b8b",
                 stroke: next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",
                 lineWidth: next ? 2.6 : 2,
                 opacity: faded ? MAP_FOCUS_FADE_OPACITY : 1,
@@ -1734,7 +1785,7 @@ function DemoSceneRenderer({
           type: "custom",
           coordinateSystem: "cartesian2d",
           z: 10,
-          data: chartData.pingData,
+          data: destinationPreview ? [] : chartData.pingData,
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api)
             return {
@@ -1910,11 +1961,13 @@ function DemoSceneRenderer({
       .findIndex((series) => series.id === "ping-hit-area")
 
     timelineChart.setOption({
-      backgroundColor: "#f8f9fc",
-      animation: true,
+      backgroundColor: destinationPreview ? "transparent" : "#f8f9fc",
+      animation: !destinationPreview,
       animationDurationUpdate: 180,
       animationEasingUpdate: "cubicOut",
-      grid: { left: 34, right: 22, top: 0, bottom: 28 },
+      grid: destinationPreview
+        ? { left: 0, right: 0, top: 0, bottom: 0 }
+        : { left: 34, right: 22, top: 0, bottom: 28 },
       dataZoom: [{
         id: "timeline-zoom",
         type: "inside",
@@ -1929,10 +1982,10 @@ function DemoSceneRenderer({
         type: "time",
         min: timeMin,
         max: timeMax,
-        axisLine: { lineStyle: { color: "#a9aea5" } },
+        axisLine: destinationPreview ? { show: false } : { lineStyle: { color: "#a9aea5" } },
         axisTick: { show: false },
-        axisLabel: { color: "#626760", formatter: (value: number) => new Date(value).toISOString().slice(11, 16) },
-        splitLine: { show: true, lineStyle: { color: "#edf0ea" } },
+        axisLabel: destinationPreview ? { show: false } : { color: "#626760", formatter: (value: number) => new Date(value).toISOString().slice(11, 16) },
+        splitLine: destinationPreview ? { show: false } : { show: true, lineStyle: { color: "#edf0ea" } },
       },
       yAxis: { min: 0, max: 1, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
       tooltip: { show: false },
@@ -2048,13 +2101,19 @@ function DemoSceneRenderer({
           z: 4,
           data: [],
           renderItem(params: EChartsParams, api: EChartsApi) {
-            const start = api.coord([api.value(0), 0.24])
-            const end = api.coord([api.value(1), 0.76])
+            const start = api.coord([api.value(0), destinationPreview ? 0 : 0.24])
+            const end = api.coord([api.value(1), destinationPreview ? 1 : 0.76])
             const shape = echarts.graphic.clipRectByRect(
               { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
               { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
             )
-            return shape ? { type: "rect", shape, style: { fill: clusterColor(Number(api.value(2))), opacity: 0.4 } } : null
+            return shape ? {
+              type: "rect",
+              shape,
+              style: destinationPreview
+                ? { fill: clusterColor(Number(api.value(2))), stroke: "rgba(255, 255, 255, 0.7)", lineWidth: 1 }
+                : { fill: clusterColor(Number(api.value(2))), opacity: 0.4 },
+            } : null
           },
         },
         { id: "cursor", type: "line", coordinateSystem: "cartesian2d", showSymbol: false, z: 6, data: [], lineStyle: { color: "#67D3E3", width: 2 } },
@@ -2075,15 +2134,26 @@ function DemoSceneRenderer({
         selectedTimestampRef.current ?? data.timeSequence[data.timeSequence.length - 1],
       )
     }
-    const initialTimestamp = variant === "preview"
-      ? chartData.timeSequence[0]
-      : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    const initialTimestamp = destinationPreview
+      ? 0
+      : variant === "preview"
+        ? chartData.timeSequence[0]
+        : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
     sequenceIndex = chartData.timeSequence.findIndex((timestamp) => timestamp >= initialTimestamp)
     if (sequenceIndex < 0) sequenceIndex = chartData.timeSequence.length - 1
     paused = true
     syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
     window.addEventListener("resize", resize)
+    if (destinationPreview) {
+      return () => {
+        window.removeEventListener("resize", resize)
+        updateResultRef.current = () => {}
+        renderSceneRef.current = null
+        mapEl.style.touchAction = previousTouchAction
+        timelineEl.style.touchAction = previousTimelineTouchAction
+      }
+    }
     window.addEventListener("nomad-tour-action", onTourAction)
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("pointerup", onMapSelectionPointerUp)
@@ -2158,7 +2228,7 @@ function DemoSceneRenderer({
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
     }
-  }, [mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
 
   useEffect(() => {
     layerStateRef.current = { showGroundTruth, showStops, showXray }
@@ -2196,9 +2266,10 @@ function DemoSceneRenderer({
   }, [previewRunId, syncMaster])
 
   useEffect(() => {
+    if (destinationPreview) return
     if (!resultData || currentTime !== null) return
     onTimeChange(variant === "preview" ? resultData.timeSequence[0] : resultData.timeSequence[resultData.timeSequence.length - 1])
-  }, [currentTime, onTimeChange, resultData, variant])
+  }, [currentTime, destinationPreview, onTimeChange, resultData, variant])
 
   useEffect(() => {
     const data = resultDataRef.current
@@ -2218,7 +2289,7 @@ function DemoSceneRenderer({
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+    <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
       {(selectedPings || selectedPing) && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
           {selectedPings ? <>
@@ -2266,10 +2337,10 @@ function DemoSceneRenderer({
           </TooltipProvider>
         </div>
       )}
-      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
-      <div className={`flex shrink-0 flex-col bg-[#f8f9fc] ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
-        <div ref={timelineRef} className="min-h-0 flex-1" />
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
+      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" && !destinationPreview ? "tour-map" : undefined} />
+      <div className={`flex shrink-0 flex-col ${destinationPreview ? "h-6 justify-center bg-[#171d2e] px-1.5" : variant === "preview" ? "h-20 bg-[#f8f9fc]" : mode === "single" ? "h-28 bg-[#f8f9fc]" : "h-24 bg-[#f8f9fc]"}`} data-tour={mode === "single" && !destinationPreview ? "tour-timeline" : undefined}>
+        <div ref={timelineRef} className={destinationPreview ? "h-3 shrink-0 overflow-hidden rounded-full border border-white" : "min-h-0 flex-1"} />
+        {!destinationPreview && <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
           <span>Timeline</span>
           <span className="font-mono tracking-normal text-[#202124]">
             {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) : "--:--:--"}
@@ -2277,7 +2348,7 @@ function DemoSceneRenderer({
           {selectedPingIndexes.length > 0 && (
             <button type="button" onClick={() => clearSelectionRef.current()} className="rounded border border-[#bfc6bb] bg-[#f8f9fc] px-2 py-0.5 text-[10px] text-[#3b1370] hover:bg-white hover:border-[#7629db]">Clear selection</button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )

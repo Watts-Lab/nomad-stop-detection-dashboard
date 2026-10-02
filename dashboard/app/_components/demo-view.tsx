@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CompareAnimationPanel } from "./compare-animation-panel"
+import { CompareAnimationPanel, DemoSceneRenderer } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { TrajectoryOptions } from "./trajectory-options"
 import { revealClass } from "../_lib/dashboard-utils"
@@ -83,12 +83,31 @@ export function DemoView({
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+  const previewPanel = compareApiData?.trajectory === demoTrajectory ? compareApiData.left : undefined
   const dataPanel = (
     <Card className="min-h-0 overflow-hidden bg-[#f8f9fc]" data-tour="tour-data">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
-          <TrajectoryOptions value={demoTrajectory} onChange={setDemoTrajectory} />
+          <TrajectoryOptions
+            value={demoTrajectory}
+            onChange={setDemoTrajectory}
+            preview={previewPanel && (
+              <div className="h-60">
+                <DemoSceneRenderer
+                  panel={previewPanel}
+                  mode="single"
+                  currentTime={null}
+                  onTimeChange={setDemoTime}
+                  syncMaster={false}
+                  showGroundTruth={false}
+                  showStops={false}
+                  showXray={false}
+                  variant="destination-preview"
+                />
+              </div>
+            )}
+          />
         </div>
         <Button onClick={handleNewTrajectory} size="lg" className="nomad-action mt-auto w-full">
           <RefreshCw className="h-4 w-4" />

@@ -1,16 +1,16 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Check, HelpCircle } from "lucide-react"
 import { TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 
-// Render single or comparison Demo panels and connect their controls
-// to parent-provided handlers. Keep comparison replay/playback coordination
-// local to this view.
+// Render the shared trajectory choices.
 export function TrajectoryOptions({
   value,
   onChange,
+  preview,
 }: {
   value: string
   onChange: (trajectoryId: string) => void
+  preview?: ReactNode
 }) {
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
 
@@ -52,6 +52,7 @@ export function TrajectoryOptions({
                 <HelpCircle className="h-4 w-4" />
               </button>
             </div>
+            {selected && preview}
             {showingInfo && (
               <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] p-3 text-sm leading-relaxed text-foreground">
                 {trajectory.note}

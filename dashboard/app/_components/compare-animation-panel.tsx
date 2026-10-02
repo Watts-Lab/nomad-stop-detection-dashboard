@@ -477,7 +477,6 @@ function DemoSceneRenderer({
 
     const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
     const isDensityAlgorithm = chartData.result.kind === "density"
-    const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
     const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
@@ -2157,7 +2156,7 @@ function DemoSceneRenderer({
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
     }
-  }, [mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+  }, [mode, onPreviewComplete, onTimeChange, panel.algo, panel.params?.dist_thresh, panel.params?.eps_spatial, scene.pings, syncMaster, variant])
 
   useEffect(() => {
     layerStateRef.current = { showGroundTruth, showStops, showXray }
@@ -2215,6 +2214,66 @@ function DemoSceneRenderer({
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
+  const dbstopExplanation = useMemo(() => {
+    if (panel.algo !== "dbstop" || !selectedPing || !resultData || resultData.result.kind !== "density") return null
+    const result = resultData.result
+    const promotionTime = result.aux_time[selectedPing.i]
+    const classifiedAt = Math.max(selectedPing.t, promotionTime ?? selectedPing.t)
+    const parameters = [
+      `Distance threshold: ${panel.params.dist_thresh} m`,
+      `Time threshold: ${panel.params.time_thresh}`,
+      `Minimum points: ${panel.params.min_pts}`,
+      `Minimum duration: ${panel.params.dur_min} min`,
+    ]
+
+    if (currentTime !== null && classifiedAt > currentTime) {
+      return {
+        title: "Not classified yet",
+        summary: `Ping ${selectedPing.i + 1} has arrived, but DBSTOP does not reveal its final assignment until ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}.`,
+        evidence: parameters,
+      }
+    }
+    if (selectedPing.cluster < 0) {
+      return {
+        title: "Not assigned to a stop",
+        summary: `DBSTOP returned Ping ${selectedPing.i + 1} as noise. It did not become a core point or connect to a qualifying core point under the current settings.`,
+        evidence: [...parameters, "The cache does not record which individual requirement failed."],
+      }
+    }
+    if (result.core[selectedPing.i] >= 0) {
+      return {
+        title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
+        summary: `DBSTOP found enough nearby pings to satisfy the current density settings: at least ${panel.params.min_pts} points within the ${panel.params.dist_thresh} m distance threshold and configured time window. This made Ping ${selectedPing.i + 1} a core point for Stop ${selectedPing.cluster}.`,
+        evidence: ["Classification: Core point", ...parameters, `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`],
+      }
+    }
+
+    const core = resultData.pings.flatMap((ping) => {
+      const coreClassifiedAt = Math.max(ping.t, result.aux_time[ping.i] ?? ping.t)
+      const distance = Math.hypot(selectedPing.x - ping.x, selectedPing.y - ping.y)
+      return ping.cluster === selectedPing.cluster && result.core[ping.i] >= 0 && coreClassifiedAt <= classifiedAt && distance <= Number(panel.params.dist_thresh)
+        ? [{ ping, distance }]
+        : []
+    }).sort((a, b) => a.distance - b.distance)[0]
+    if (!core) {
+      return {
+        title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
+        summary: `DBSTOP connected Ping ${selectedPing.i + 1} to a qualifying core point in Stop ${selectedPing.cluster}, so it was included in the same stop as a border point.`,
+        evidence: ["Classification: Border point", ...parameters, `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`],
+      }
+    }
+    return {
+      title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
+      summary: `Ping ${selectedPing.i + 1} is part of Stop ${selectedPing.cluster} because its nearest eligible core point, Ping ${core.ping.i + 1}, is ${core.distance.toFixed(1)} m away, which is within the ${panel.params.dist_thresh} m distance threshold. Since that core point belongs to Stop ${selectedPing.cluster}, this ping was included as a border point.`,
+      evidence: [
+        "Classification: Border point",
+        `Nearest eligible core: Ping ${core.ping.i + 1}`,
+        `Distance check: ${core.distance.toFixed(1)} m <= ${panel.params.dist_thresh} m`,
+        `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`,
+        `Time threshold: ${panel.params.time_thresh} | Minimum points: ${panel.params.min_pts} | Minimum duration: ${panel.params.dur_min} min`,
+      ],
+    }
+  }, [currentTime, panel.algo, panel.params, resultData, selectedPing])
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
@@ -2226,7 +2285,15 @@ function DemoSceneRenderer({
             <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
             <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
             <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
-          </> : <div>Ping {selectedPing!.i + 1} selected</div>}
+          </> : dbstopExplanation ? (
+            <div className="max-w-[340px] space-y-1.5 text-xs leading-4">
+              <div className="font-semibold text-[#8acac8]">{dbstopExplanation.title}</div>
+              <div>{dbstopExplanation.summary}</div>
+              <div className="space-y-0.5 border-t border-white/20 pt-1.5 text-[11px] text-white/80">
+                {dbstopExplanation.evidence.map((line) => <div key={line}>{line}</div>)}
+              </div>
+            </div>
+          ) : <div>Ping {selectedPing!.i + 1} selected</div>}
         </div>
       )}
       {syncMaster && variant === "full" && (

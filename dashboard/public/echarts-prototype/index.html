@@ -108,23 +108,26 @@
             failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
           });
           const xValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
-          const heatmapData = xValues.flatMap((x, xIndex) => failureTypes.map((failure, failureIndex) => {
-            const values = failureRowsByX.get(x)
-              .map((row) => row[failure.field])
-              .filter(Number.isFinite);
-            const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-            return [xIndex, failureIndex, mean];
+          const failureData = failureTypes.map((failure) => xValues.map((x) => {
+            const values = failureRowsByX.get(x).map((row) => row[failure.field]);
+            return values.reduce((sum, value) => sum + value, 0) / values.length;
           }));
 
           chart.setOption({
             animationDurationUpdate: 0,
-            grid: {
-              left: 104,
-              right: 42,
-              top: 28,
-              bottom: 70,
+            title: failureTypes.map((failure, index) => ({
+              text: failure.label,
+              left: "center",
+              top: `${index * 31}%`,
+              textStyle: { fontSize: 12, fontWeight: 600 },
+            })),
+            grid: failureTypes.map((_, index) => ({
+              left: 20,
+              right: 24,
+              top: `${6 + index * 31}%`,
+              height: "21%",
               containLabel: true,
-            },
+            })),
             tooltip: {
               trigger: "item",
               confine: true,
@@ -137,34 +140,20 @@
                 fontSize: 12,
               },
               formatter: (event) => {
-                const [xIndex, failureIndex, value] = event.value;
-                const failure = failureTypes[failureIndex];
-                return `<div style="min-width:210px"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Known stops affected</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${xValues[xIndex]}</span></div><div style="max-width:240px;color:#d1d5db">${failure.description}</div></div>`;
+                const failure = failureTypes[event.seriesIndex];
+                return `<div style="min-width:210px"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Known stops affected</span><span style="font-family:monospace">${(event.value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${event.name}</span></div><div style="max-width:240px;color:#d1d5db">${failure.description}</div></div>`;
               },
             },
-            visualMap: {
-              min: 0,
-              max: 1,
-              calculable: false,
-              orient: "horizontal",
-              left: "center",
-              bottom: 4,
-              itemWidth: 12,
-              itemHeight: 120,
-              text: ["100% affected", "0%"],
-              textGap: 8,
-              inRange: {
-                color: ["#fff7f3", "#fcae91", "#de2d26", "#7f0000"],
-              },
-            },
-            xAxis: {
+            xAxis: failureTypes.map((_, index) => ({
               type: "category",
               data: xValues,
-              name: `Parameter: ${parameterLabel(xLabel)}`,
+              gridIndex: index,
+              boundaryGap: false,
+              name: index === 2 ? `Parameter: ${parameterLabel(xLabel)}` : "",
               nameLocation: "center",
-              nameGap: 28,
-              splitArea: { show: true },
-              axisLabel: { fontSize: 12 },
+              nameGap: 24,
+              axisLabel: { fontSize: 11, show: index === 2 },
+              axisTick: { show: index === 2 },
               nameTextStyle: {
                 fontSize: 14,
                 rich: {
@@ -172,26 +161,37 @@
                   sub: { fontSize: 11, padding: [10, 0, 0, 1] },
                 },
               },
-            },
-            yAxis: {
-              type: "category",
-              data: failureTypes.map((failure) => failure.label),
-              inverse: true,
-              axisLabel: { fontSize: 12 },
-              splitArea: { show: true },
-            },
-            series: [{
-              name: "Failure types",
-              type: "heatmap",
-              data: heatmapData,
-              label: { show: false },
+            })),
+            yAxis: failureTypes.map((_, index) => ({
+              type: "value",
+              gridIndex: index,
+              min: 0,
+              max: 1,
+              interval: 0.5,
+              axisLabel: {
+                fontSize: 10,
+                formatter: (value) => `${value * 100}%`,
+              },
+              splitLine: { lineStyle: { color: "#e5e7eb" } },
+            })),
+            series: failureTypes.map((failure, index) => ({
+              name: failure.label,
+              type: "line",
+              xAxisIndex: index,
+              yAxisIndex: index,
+              data: failureData[index],
+              symbol: "circle",
+              symbolSize: 5,
+              lineStyle: { color: "#b91c1c", width: 2 },
+              itemStyle: { color: "#b91c1c" },
+              areaStyle: { color: "rgba(220, 38, 38, 0.14)" },
               emphasis: {
                 itemStyle: {
-                  borderColor: "#111827",
-                  borderWidth: 1,
+                  borderColor: "#7f1d1d",
+                  borderWidth: 2,
                 },
               },
-            }],
+            })),
           });
           new ResizeObserver(() => chart.resize()).observe(document.getElementById("chart"));
           return;

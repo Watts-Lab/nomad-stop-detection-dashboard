@@ -129,8 +129,13 @@
               containLabel: true,
             })),
             tooltip: {
-              trigger: "item",
+              trigger: "axis",
               confine: true,
+              axisPointer: {
+                type: "line",
+                snap: true,
+                lineStyle: { color: "#9ca3af", type: "dashed" },
+              },
               backgroundColor: "rgba(17, 24, 39, 0.96)",
               borderColor: "#4b5563",
               borderWidth: 1,
@@ -139,9 +144,10 @@
                 color: "#f3f4f6",
                 fontSize: 12,
               },
-              formatter: (event) => {
+              formatter: (events) => {
+                const event = events[0];
                 const failure = failureTypes[event.seriesIndex];
-                return `<div style="min-width:210px"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Known stops affected</span><span style="font-family:monospace">${(event.value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${event.name}</span></div><div style="max-width:240px;color:#d1d5db">${failure.description}</div></div>`;
+                return `<div style="box-sizing:border-box;width:220px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:6px"><span style="color:#9ca3af">Known stops affected</span><span style="font-family:monospace">${(event.value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${event.name}</span></div><div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere">${failure.description}</div></div>`;
               },
             },
             xAxis: failureTypes.map((_, index) => ({
@@ -181,7 +187,7 @@
               yAxisIndex: index,
               data: failureData[index],
               symbol: "circle",
-              symbolSize: 5,
+              symbolSize: 7,
               lineStyle: { color: "#b91c1c", width: 2 },
               itemStyle: { color: "#b91c1c" },
               areaStyle: { color: "rgba(220, 38, 38, 0.14)" },

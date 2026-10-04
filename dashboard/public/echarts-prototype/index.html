@@ -240,9 +240,8 @@
         const xValues = rows.map((d) => d.x);
         const minX = Math.min(...xValues);
         const maxX = Math.max(...xValues);
-        const xPadding = (maxX - minX) * 0.025;
-        const axisMinX = xMinParam === null ? minX - xPadding : Number(xMinParam);
-        const axisMaxX = xMaxParam === null ? maxX + xPadding : Number(xMaxParam);
+        const axisMinX = xMinParam === null ? minX : Number(xMinParam);
+        const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
         const meanPerUserMaxLabel = "Mean user max";
         const highestAverageLabel = "Best mean";
         const averageUserMaxLabel = "Avg user max";
@@ -366,7 +365,7 @@
             nameLocation: "center",
             nameGap: 42,
             min: 0,
-            max: 1.05,
+            max: 1,
             splitLine: {
               lineStyle: {
                 color: "#ddd",

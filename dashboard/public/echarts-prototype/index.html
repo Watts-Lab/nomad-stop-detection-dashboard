@@ -118,14 +118,14 @@
             title: failureTypes.map((failure, index) => ({
               text: failure.label,
               left: "center",
-              top: `${index * 31}%`,
+              top: `${3 + index * 30}%`,
               textStyle: { fontSize: 12, fontWeight: 600 },
             })),
             grid: failureTypes.map((_, index) => ({
               left: 20,
               right: 24,
-              top: `${6 + index * 31}%`,
-              height: "21%",
+              top: `${9 + index * 30}%`,
+              height: "23%",
               containLabel: true,
             })),
             tooltip: {
@@ -157,7 +157,7 @@
               boundaryGap: false,
               name: index === 2 ? `Parameter: ${parameterLabel(xLabel)}` : "",
               nameLocation: "center",
-              nameGap: 24,
+              nameGap: 16,
               axisLabel: { fontSize: 11, show: index === 2 },
               axisTick: { show: index === 2 },
               nameTextStyle: {
@@ -363,7 +363,7 @@
             type: "value",
             name: "minute recall",
             nameLocation: "center",
-            nameGap: 42,
+            nameGap: 32,
             min: 0,
             max: 1,
             splitLine: {

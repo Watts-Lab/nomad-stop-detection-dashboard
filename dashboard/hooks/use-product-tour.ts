@@ -116,7 +116,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-controls']",
     popover: {
       title: "Choose and Compare Algorithms",
-      description: "Use the control panel to select an algorithm and review the settings held fixed during the experiment. Switch to Compare to place two plots top and bottom. Each plot names the parameter being varied, while the vertical axis provides a common measure for comparison.",
+      description: "Use the control panel to switch between minute recall and failure types, select an algorithm, and review the settings held fixed during the experiment. Switch to Compare to place two algorithms top and bottom using the same chart view.",
     },
   },
 ]

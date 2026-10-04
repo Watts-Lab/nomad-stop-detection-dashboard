@@ -42,6 +42,7 @@
     const params = new URLSearchParams(window.location.search);
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
+    const chartView = params.get("view") === "failures" ? "failures" : "recall";
     const legendMode = params.get("legend");
     const showLegend = legendMode !== "false" && legendMode !== "space";
     const reserveLegendSpace = legendMode !== "false";
@@ -62,14 +63,14 @@
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
     const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread"]);
 
-    // Build agent, accuracy, and parameter details for maximum points and highlighted curves
+    // Build agent, minute-recall, and parameter details for maximum points and highlighted curves
     const pointTooltip = (event) => {
       if (!tooltipSeries.has(event.seriesName)) return "";
       const [pointX, recall, userId] = event.value;
       const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
         .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
         .join("");
-      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Accuracy</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
+      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
     };
     let pendingTourFocus = null;
 
@@ -89,9 +90,112 @@
             user_id: d.user_id,
             x: Number(d[xField]),
             recall: Number(d.recall),
+            missed_fraction: Number(d.missed_fraction),
+            merged_fraction: Number(d.merged_fraction),
+            split_fraction: Number(d.split_fraction),
           }))
           .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.recall))
           .sort((a, b) => a.user_id.localeCompare(b.user_id) || a.x - b.x);
+
+        if (chartView === "failures") {
+          const failureTypes = [
+            { field: "missed_fraction", label: "Missed stops", description: "Known stops the algorithm did not detect." },
+            { field: "merged_fraction", label: "Merged stops", description: "Separate known stops the algorithm treated as one." },
+            { field: "split_fraction", label: "Split stops", description: "Known stops the algorithm divided into multiple stops." },
+          ];
+          const failureRowsByX = new Map();
+          rows.forEach((row) => {
+            failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
+          });
+          const xValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
+          const heatmapData = xValues.flatMap((x, xIndex) => failureTypes.map((failure, failureIndex) => {
+            const values = failureRowsByX.get(x)
+              .map((row) => row[failure.field])
+              .filter(Number.isFinite);
+            const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+            return [xIndex, failureIndex, mean];
+          }));
+
+          chart.setOption({
+            animationDurationUpdate: 0,
+            grid: {
+              left: 104,
+              right: 42,
+              top: 28,
+              bottom: 70,
+              containLabel: true,
+            },
+            tooltip: {
+              trigger: "item",
+              confine: true,
+              backgroundColor: "rgba(17, 24, 39, 0.96)",
+              borderColor: "#4b5563",
+              borderWidth: 1,
+              padding: 10,
+              textStyle: {
+                color: "#f3f4f6",
+                fontSize: 12,
+              },
+              formatter: (event) => {
+                const [xIndex, failureIndex, value] = event.value;
+                const failure = failureTypes[failureIndex];
+                return `<div style="min-width:210px"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Known stops affected</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${xValues[xIndex]}</span></div><div style="max-width:240px;color:#d1d5db">${failure.description}</div></div>`;
+              },
+            },
+            visualMap: {
+              min: 0,
+              max: 1,
+              calculable: false,
+              orient: "horizontal",
+              left: "center",
+              bottom: 4,
+              itemWidth: 12,
+              itemHeight: 120,
+              text: ["100% affected", "0%"],
+              textGap: 8,
+              inRange: {
+                color: ["#fff7f3", "#fcae91", "#de2d26", "#7f0000"],
+              },
+            },
+            xAxis: {
+              type: "category",
+              data: xValues,
+              name: `Parameter: ${parameterLabel(xLabel)}`,
+              nameLocation: "center",
+              nameGap: 28,
+              splitArea: { show: true },
+              axisLabel: { fontSize: 12 },
+              nameTextStyle: {
+                fontSize: 14,
+                rich: {
+                  delta: { fontSize: 18, fontWeight: 500 },
+                  sub: { fontSize: 11, padding: [10, 0, 0, 1] },
+                },
+              },
+            },
+            yAxis: {
+              type: "category",
+              data: failureTypes.map((failure) => failure.label),
+              inverse: true,
+              axisLabel: { fontSize: 12 },
+              splitArea: { show: true },
+            },
+            series: [{
+              name: "Failure types",
+              type: "heatmap",
+              data: heatmapData,
+              label: { show: false },
+              emphasis: {
+                itemStyle: {
+                  borderColor: "#111827",
+                  borderWidth: 1,
+                },
+              },
+            }],
+          });
+          new ResizeObserver(() => chart.resize()).observe(document.getElementById("chart"));
+          return;
+        }
 
         const scatterData = rows.map((d) => [d.x, d.recall, d.user_id]);
 
@@ -252,7 +356,7 @@
           },
           yAxis: {
             type: "value",
-            name: "min-by-min accuracy",
+            name: "minute recall",
             nameLocation: "center",
             nameGap: 42,
             min: 0,
@@ -485,7 +589,7 @@
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
-        // Get the selected agent's accuracy values across the parameter sweep
+        // Get the selected agent's minute-recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
         // Draw hovered and pinned agent curves and emphasize their maximum points

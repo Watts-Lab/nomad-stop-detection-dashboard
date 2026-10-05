@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { HelpCircle } from "lucide-react"
+import { Check, HelpCircle } from "lucide-react"
 import { TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 
 // Render single or comparison Demo panels and connect their controls
@@ -28,21 +28,32 @@ export function TrajectoryOptions({
                   if (trajectory.id !== value) setTrajectoryInfoId(null)
                   onChange(trajectory.id)
                 }}
-                className={`h-9 flex-1 rounded-md border px-3 text-left text-sm font-medium transition hover:bg-muted ${selected ? "bg-muted text-muted-foreground opacity-95" : "bg-background"}`}
-              >
-                {trajectory.name}
+                aria-pressed={selected}
+                className={`flex h-9 flex-1 items-center justify-between rounded-md px-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]/40 ${
+                  selected
+                    ? "border-2 border-[#7629db] bg-[#e8d8fc] font-bold text-[#3b1370]"
+                    : "border border-[#d1d5db] bg-[#f8f9fc] font-medium text-foreground hover:bg-white"
+                }`}
+                >
+                  <span>{trajectory.name}</span>
+                  {selected && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
               </button>
               <button
                 type="button"
                 onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border transition hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                aria-expanded={showingInfo}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                  showingInfo
+                    ? "border-[#7629db] bg-[#e8d8fc] text-[#3b1370]"
+                    : "border-[#d1d5db] bg-[#f8f9fc] text-[#3b1370] hover:bg-white"
+                }`}
                 aria-label={`Show ${trajectory.name} trajectory info`}
               >
                 <HelpCircle className="h-4 w-4" />
               </button>
             </div>
             {showingInfo && (
-              <div className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed text-muted-foreground">
+              <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] p-3 text-sm leading-relaxed text-foreground">
                 {trajectory.note}
               </div>
             )}

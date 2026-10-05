@@ -485,10 +485,19 @@ function DemoSceneRenderer({
     const edgeOpacity = (sourceIndex: number, targetIndex: number) =>
       hoverPingIndexes === null || (hoverPingIndexes.has(sourceIndex) && hoverPingIndexes.has(targetIndex)) ? 0.7 : 0.1
     const pingScale = (pingIndex: number) => hoverPingIndexes?.has(pingIndex) ? 1.1 : 1
-    const pingCircle = (api: EChartsApi) => {
+    const pingCircle = (api: EChartsApi, scale = 1) => {
       const center = api.coord([api.value(0), api.value(1)])
-      const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
+      const edge = api.coord([api.value(0) + chartData.blockSide / 8 * scale, api.value(1)])
       return { center, radius: Math.abs(edge[0] - center[0]) }
+    }
+    const renderGpsPing = (_params: EChartsParams, api: EChartsApi) => {
+      const circle = pingCircle(api, 0.28 * pingScale(Number(api.value(3))))
+      return {
+        type: "circle",
+        z2: Number(api.value(3)) * 2 + 1,
+        shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
+        style: { fill: "#000000", opacity: Number(api.value(5)) },
+      }
     }
     const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
       const target = segment.length * Math.max(0, progress)
@@ -558,21 +567,18 @@ function DemoSceneRenderer({
       })
       return Array.from(framesByStop.values())
     }
-    const styledScatterPoint = (point: number[]) => ({
-      value: point,
-      symbolSize: 5 * pingScale(point[3]),
-      itemStyle: {
-        opacity: associationOpacity(point[3]),
-      },
-    })
-    const styledXrayPoint = (point: number[]) => ({
-      value: point,
-      symbolSize: 15 * pingScale(point[3]),
-      itemStyle: {
-        color: clusterColor(point[2]),
-        opacity: anchorOpacity(point[3]),
-      },
-    })
+    // All point series use [x, y, cluster, ping index, time, opacity].
+    const styledScatterPoint = (point: number[]) => [...point, associationOpacity(point[3])]
+    const styledXrayPoint = (point: number[]) => [...point, anchorOpacity(point[3])]
+    const renderXrayPoint = (_params: EChartsParams, api: EChartsApi) => {
+      const circle = pingCircle(api, 1.3 * pingScale(Number(api.value(3))))
+      return {
+        type: "circle",
+        z2: Number(api.value(3)) * 2,
+        shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
+        style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#ffffff", lineWidth: 1.6, opacity: Number(api.value(5)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+      }
+    }
     const groundTruthAt = (timestampSeconds: number) => {
       const current = chartData.truthStops.find((truth) =>
         timestampSeconds >= truth.timestamp && timestampSeconds <= truth.timestamp + truth.duration * 60
@@ -837,7 +843,7 @@ function DemoSceneRenderer({
           { id: "active-path", data: layerStateRef.current.showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: layerStateRef.current.showGroundTruth ? route.activeFallback : [] },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
-          { id: "ghost-pings", data: chartData.pingData.map((point) => ({ value: point, symbolSize: 5 * pingScale(point[3]), itemStyle: { opacity: associatedWithHover(point[3]) ? 1 : 0.18 } })) },
+          { id: "ghost-pings", data: chartData.pingData.map((point) => [...point, associatedWithHover(point[3]) ? 1 : 0.18]) },
           { id: "noise-pings", data: layerStateRef.current.showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
           { id: "cluster-pings", data: layerStateRef.current.showStops ? clusterPings.filter((point) => pingClassifiedAt(point[3], timestampSeconds)).map((point) => [...point, associationOpacity(point[3])]) : [] },
           { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
@@ -846,8 +852,7 @@ function DemoSceneRenderer({
           { id: "anchor-edges", data: layerStateRef.current.showXray ? anchorEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
           { id: "anchor-edges-hit-area", data: layerStateRef.current.showXray ? anchorEdges : [] },
           { id: "anchor-points", data: layerStateRef.current.showXray ? anchorFrames.map((frame) => frame.point).map(styledXrayPoint) : [] },
-          { id: "current-ping", data: [{ value: [chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4]], itemStyle: { opacity: associationOpacity(latestPingIndex) } }] },
-          { id: "current-ping-hole", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1]]] },
+          { id: "current-ping", data: [[chartData.pingData[latestPingIndex][0], chartData.pingData[latestPingIndex][1], layerStateRef.current.showStops && pingClassifiedAt(latestPingIndex, timestampSeconds) ? chartData.pingData[latestPingIndex][2] : -1, latestPingIndex, chartData.pingData[latestPingIndex][4], associationOpacity(latestPingIndex)]] },
           { id: "distance-circles", data: distanceCircleData(timestampSeconds, anchorFrames) },
           { id: "ping-hit-area", data: chartData.pingData },
           { id: "selected-ping-line", data: selectedPingLineData() },
@@ -871,7 +876,7 @@ function DemoSceneRenderer({
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount)
+      const previewPings = chartData.pingData.slice(0, pingCount).map((point) => [...point, 1])
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -892,7 +897,6 @@ function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
-          { id: "current-ping-hole", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData() },
         ],
@@ -1707,7 +1711,7 @@ function DemoSceneRenderer({
           type: "custom",
           coordinateSystem: "cartesian2d",
           silent: true,
-          z: 6,
+          z: 5,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const center = api.coord([api.value(0), api.value(1)])
@@ -1727,7 +1731,15 @@ function DemoSceneRenderer({
             }
           },
         },
-        { id: "ghost-pings", name: "All pings", type: "scatter", coordinateSystem: "cartesian2d", silent: false, z: 3, data: [], symbolSize: 5, itemStyle: { color: "#000000" } },
+        {
+          id: "ghost-pings",
+          name: "All pings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          z: 5,
+          data: [],
+          renderItem: renderGpsPing,
+        },
         {
           id: "ping-hit-area",
           name: "Ping hit area",
@@ -1736,30 +1748,46 @@ function DemoSceneRenderer({
           z: 10,
           data: chartData.pingData,
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const circle = pingCircle(api)
+            const pingIndex = Number(api.value(3))
+            const timestamp = activeTimestamp()
+            const isVisibleAnchor = layerStateRef.current.showXray && (
+              anchorFramesAt(timestamp).some((frame) => frame.point[3] === pingIndex) ||
+              chartData.densityCorePointData.some((point) => point[3] === pingIndex && point[4] <= timestamp)
+            )
+            const markScale = isVisibleAnchor ? 1.3 : layerStateRef.current.showStops && Number(api.value(2)) >= 0 && pingClassifiedAt(pingIndex, timestamp) ? 1 : 0.28
+            const circle = pingCircle(api, markScale * pingScale(pingIndex))
             return {
               type: "circle",
-              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * pingScale(Number(api.value(3))) },
+              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
               style: { fill: "rgba(0, 0, 0, 0.001)" },
             }
           },
         },
-        { id: "noise-pings", name: "Noise pings", type: "scatter", coordinateSystem: "cartesian2d", z: 5, data: [], symbolSize: 5, itemStyle: { color: "rgba(0, 0, 0, 0.75)" } },
+        {
+          id: "noise-pings",
+          name: "Noise pings",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          z: 6,
+          data: [],
+          renderItem: renderGpsPing,
+        },
         {
           id: "cluster-pings",
           name: "Cluster pings",
           type: "custom",
           coordinateSystem: "cartesian2d",
-          z: 6,
+          z: 5,
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api)
             const scale = pingScale(Number(api.value(3)))
             return {
               type: "group",
+              z2: Number(api.value(3)) * 2,
               children: [
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale }, style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) } },
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: 3.6 * scale }, style: { fill: "#000000", opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale }, style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale * 0.28 }, style: { fill: "#000000", opacity: Number(api.value(5)) } },
               ],
             }
           },
@@ -1770,7 +1798,7 @@ function DemoSceneRenderer({
           type: "lines",
           coordinateSystem: "cartesian2d",
           silent: true,
-          z: 7,
+          z: 4,
           data: [],
           symbol: "none",
           lineStyle: { width: 1.8, opacity: 0.55 },
@@ -1790,12 +1818,11 @@ function DemoSceneRenderer({
         {
           id: "core-points",
           name: "Core points",
-          type: "scatter",
+          type: "custom",
           coordinateSystem: "cartesian2d",
-          z: 8,
+          z: 5,
           data: [],
-          symbolSize: 15,
-          itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+          renderItem: renderXrayPoint,
         },
         {
           id: "anchor-edges",
@@ -1803,7 +1830,7 @@ function DemoSceneRenderer({
           type: "lines",
           coordinateSystem: "cartesian2d",
           silent: true,
-          z: 7,
+          z: 4,
           data: [],
           symbol: "none",
           lineStyle: {
@@ -1829,41 +1856,27 @@ function DemoSceneRenderer({
         {
           id: "anchor-points",
           name: "Anchor points",
-          type: "scatter",
+          type: "custom",
           coordinateSystem: "cartesian2d",
-          z: 8,
+          z: 5,
           data: [],
-          symbolSize: 15,
-          itemStyle: { borderColor: "#ffffff", borderWidth: 2.4, shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+          renderItem: renderXrayPoint,
         },
         {
           id: "current-ping",
           name: "Current ping",
-          type: "effectScatter",
-          coordinateSystem: "cartesian2d",
-          z: 9,
-          data: [],
-          symbol: "pin",
-          symbolSize: 30,
-          animationDurationUpdate: 0,
-          rippleEffect: { scale: 1.8, brushType: "stroke" },
-          itemStyle: { color: "#67D3E3", borderColor: "#202124", borderWidth: 1.2, opacity: 0.96 },
-        },
-        {
-          id: "current-ping-hole",
-          name: "Current ping hole",
           type: "custom",
           coordinateSystem: "cartesian2d",
-          silent: true,
-          z: 10,
+          z: 5,
           data: [],
           animationDurationUpdate: 0,
           renderItem(_params: EChartsParams, api: EChartsApi) {
-            const center = api.coord([api.value(0), api.value(1)])
+            const circle = pingCircle(api, 1.2)
             return {
               type: "circle",
-              shape: { cx: center[0], cy: center[1] - 16, r: 4.3 },
-              style: { fill: "#ffffff", stroke: "#202124", lineWidth: 0.9 },
+              z2: Number(api.value(3)) * 2,
+              shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
+              style: { fill: "#67D3E3", stroke: "#202124", lineWidth: 1.2, opacity: Number(api.value(5)) },
             }
           },
         },

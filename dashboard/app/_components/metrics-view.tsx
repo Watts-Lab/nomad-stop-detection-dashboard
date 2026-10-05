@@ -34,20 +34,20 @@ function PinnedAgentCard({
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-muted-foreground">Selected agent</h4>
+      <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
       {pinned ? (
-        <div className="space-y-2 rounded-md border border-[#2ca02c]/60 bg-[#2ca02c]/5 px-3 py-2">
+        <div className="space-y-2 rounded-md border-2 border-[#7629db] bg-[#e8d8fc] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Agent</span>
-            <span className="truncate text-xs font-mono text-foreground">{pinned.userId}</span>
+            <span className="text-xs font-bold text-[#3b1370]">Agent</span>
+            <span className="truncate text-xs font-mono font-bold text-[#3b1370]">{pinned.userId}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Best {parameterDisplayName(pinned.param)}</span>
-            <span className="text-xs font-mono text-foreground">{pinned.value}</span>
+            <span className="text-xs font-bold text-[#3b1370]">Best {parameterDisplayName(pinned.param)}</span>
+            <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Accuracy</span>
-            <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
+            <span className="text-xs font-bold text-[#3b1370]">Accuracy</span>
+            <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
             Open in Demo
@@ -79,9 +79,9 @@ function MetricsParameterRows({
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
+      <h4 className="text-sm font-medium text-[#3b1370]">Parameters</h4>
       {rows.map(([name, value]) => (
-        <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+        <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-mono text-muted-foreground">{name}</span>
             <span className="text-xs font-mono text-foreground">{value}</span>
@@ -154,17 +154,17 @@ function MetricsFrame({
   }, [showTourTargets])
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/30" data-tour={showTourTargets ? "metrics-chart" : undefined}>
+    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-[#f8f9fc]" data-tour={showTourTargets ? "metrics-chart" : undefined}>
       {label && (
-        <div className="absolute left-[12px] top-[12px] z-20 max-w-[40%] truncate rounded-sm bg-muted/80 px-2 py-0.5 text-xs font-semibold text-foreground">
+        <div className="absolute left-[12px] top-[12px] z-20 max-w-[40%] truncate rounded-sm bg-[#f8f9fc] px-2 py-0.5 text-xs font-semibold text-[#3b1370]">
           {label}
         </div>
       )}
       {loading && (
-        <div className="absolute inset-0 z-10 grid gap-3 bg-[#111625] p-4">
-          <Skeleton className="h-7 w-1/3 bg-[#202738]" />
-          <Skeleton className="h-full bg-[#202738]" />
-          <Skeleton className="h-5 w-2/3 bg-[#202738]" />
+        <div className="absolute inset-0 z-10 grid gap-3 bg-[#f8f9fc] p-4">
+          <Skeleton className="h-7 w-1/3 bg-[#e6e3eb]" />
+          <Skeleton className="h-full bg-[#e6e3eb]" />
+          <Skeleton className="h-5 w-2/3 bg-[#e6e3eb]" />
         </div>
       )}
       <iframe
@@ -269,17 +269,17 @@ export function MetricsView({
               <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-foreground">
             Sweep one scale parameter for the selected algorithm{metricsCompareMode ? "s" : ""}; fixed notebook parameters are shown in the control panel.
           </p>
         </div>
       </div>
 
       <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-        <Card className="h-full min-h-0 overflow-hidden py-0 flex flex-col">
+      <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
           {!metricsCompareMode && (
-            <CardHeader className="shrink-0 py-2 px-3 bg-muted/30">
-              <CardTitle className="text-sm font-semibold">
+            <CardHeader className="shrink-0 py-2 px-3 bg-[#f8f9fc]">
+              <CardTitle className="text-lg font-semibold text-[#3b1370]">
                 {metricsLeftAlgorithm}
               </CardTitle>
             </CardHeader>
@@ -295,27 +295,27 @@ export function MetricsView({
           </CardContent>
         </Card>
 
-        <Card className="min-h-0 overflow-hidden py-0" data-tour="metrics-controls">
+        <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-0" data-tour="metrics-controls">
           <CardHeader className="shrink-0 px-5 py-3">
-            <CardTitle className="text-lg font-semibold">
+            <CardTitle className="text-lg font-semibold text-[#3b1370]">
               {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
             </CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
             <Button
-              variant={metricsCompareMode ? "default" : "outline"}
+              variant="outline"
               size="sm"
               onClick={() => setMetricsCompareMode(!metricsCompareMode)}
-              className="gap-2"
+              className="gap-2 border-[#d1d5db] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:text-[#3b1370]"
             >
               {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
             </Button>
             <div className="space-y-1.5">
-              <h4 className="text-sm font-medium text-muted-foreground">Ground truth diary</h4>
+              <h4 className="text-sm font-medium text-[#3b1370]">Ground truth diary</h4>
               <TrajectoryOptions value={metricsTrajectory} onChange={setMetricsTrajectory} />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">
+              <label className="text-sm font-medium text-[#3b1370]">
                 {metricsCompareMode ? "Top" : "Algorithm"}
               </label>
               <Select
@@ -337,7 +337,7 @@ export function MetricsView({
             {metricsCompareMode && (
               <>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Bottom</label>
+                  <label className="text-sm font-medium text-[#3b1370]">Bottom</label>
                   <Select
                     value={metricsRightAlgorithm}
                     onValueChange={(algorithm) => {

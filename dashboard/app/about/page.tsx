@@ -97,11 +97,11 @@ export default function AboutPage() {
       <main className="nomad-page-frame grid gap-12 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(32rem,1.15fr)] lg:gap-16 lg:py-14">
         <div className="space-y-12 lg:sticky lg:top-[131px] lg:self-start">
           <section className={`${revealClass()} space-y-5`}>
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#8acac8]">About NOMAD</p>
-            <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#3b1370]">About NOMAD</p>
+          <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-[#3b1370] sm:text-5xl">
               We create tools for analysis of human mobility
             </h1>
-            <div className="max-w-xl space-y-5 text-sm leading-relaxed text-[#b6c9dc] sm:text-base">
+            <div className="max-w-xl space-y-5 text-sm leading-relaxed text-foreground sm:text-base">
               <p>
                 NOMAD, the Network for Open Mobility Analysis and Data, is an NSF-funded initiative of the Computational Social Science Lab at the University of Pennsylvania. Its mission is to expand access to high-precision human mobility data, to offer technical and scientific guidance on how to work with it, and to provide the tools to analyze it at scale and translate insights into research, applications, and decision-support tools. In doing so, NOMAD brings together researchers, industry partners, and decision-makers around the privacy-centered and socially beneficial use of human mobility data.
               </p>
@@ -114,7 +114,7 @@ export default function AboutPage() {
           <section className={`${revealClass("up", 2)} max-w-xl space-y-4 border-t border-[#263449] pt-6`}>
             <div className="space-y-2">
               <h2 className="text-xl font-semibold">Code availability</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-foreground">
                 The source code for this dashboard is publicly available on GitHub. For questions about reuse,
                 licensing, data access, or collaboration, contact the NOMAD team at{" "}
                 <strong>nomad@seas.upenn.edu</strong>.
@@ -131,7 +131,7 @@ export default function AboutPage() {
                   View source
                 </a>
               </Button>
-              <Button asChild variant="outline" className="border-[#3a465d] bg-[#171d2e]/70 hover:bg-[#242b3d]">
+              <Button asChild variant="outline" className="border-border bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground">
                 <a href="mailto:nomad@seas.upenn.edu">
                   <Mail className="h-4 w-4" />
                   Contact us
@@ -154,7 +154,7 @@ export default function AboutPage() {
                 {group.members.map((person, personIndex) => (
                   <Card
                     key={person.name}
-                    className={`${revealClass("up", personIndex + groupIndex + 2)} nomad-interactive-card overflow-hidden py-0`}
+                    className={`${revealClass("up", personIndex + groupIndex + 2)} nomad-interactive-card overflow-hidden border-2 bg-[#f8f9fc] py-0`}
                   >
                     <CardContent className="flex items-center gap-4 p-4 sm:gap-5">
                       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-[#34455d] bg-[#202738] sm:h-28 sm:w-28">
@@ -177,8 +177,8 @@ export default function AboutPage() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-3">
                         <div className="space-y-1">
-                          <h3 className="text-lg font-semibold sm:text-xl">{person.name}</h3>
-                          <p className="font-mono text-[0.68rem] uppercase tracking-[0.12em] text-muted-foreground sm:text-xs">
+                          <h3 className="text-lg font-semibold text-[#3b1370]">{person.name}</h3>
+                          <p className="text-sm text-[#080d1a]">
                             {person.role}
                           </p>
                         </div>
@@ -194,7 +194,7 @@ export default function AboutPage() {
                                 rel="noreferrer"
                                 aria-label={`${person.name} ${link.label}`}
                                 title={link.label}
-                                className="flex h-8 w-8 items-center justify-center rounded-md border border-[#34455d] text-muted-foreground transition-colors hover:border-[#8acac8] hover:text-[#8acac8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8acac8]"
+                                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-[#080d1a] transition-colors hover:border-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 <LinkIcon className="h-4 w-4" />
                               </a>

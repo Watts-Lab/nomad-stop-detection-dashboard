@@ -1115,7 +1115,7 @@ function DemoSceneRenderer({
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#ffffff] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
       {(selectedPings || selectedPing) && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
           {selectedPings ? <>
@@ -1130,7 +1130,7 @@ function DemoSceneRenderer({
       {syncMaster && variant === "full" && (
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
-            <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-white/92 px-1 py-1 shadow-sm">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
               {playbackState !== "complete" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1138,7 +1138,7 @@ function DemoSceneRenderer({
                       type="button"
                       onClick={() => toggleRef.current()}
                       aria-label={playbackState === "playing" ? "Pause" : "Play"}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-white text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
                     >
                       {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
                     </button>
@@ -1152,7 +1152,7 @@ function DemoSceneRenderer({
                     type="button"
                     onClick={() => replayRef.current()}
                     aria-label="Replay"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-white text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
                   >
                     <RotateCcw className="h-4 w-4" />
                   </button>
@@ -1164,15 +1164,15 @@ function DemoSceneRenderer({
         </div>
       )}
       <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
-      <div className={`flex shrink-0 flex-col bg-white ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
+      <div className={`flex shrink-0 flex-col bg-[#f8f9fc] ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
         <div ref={timelineRef} className="min-h-0 flex-1" />
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#626760]">
+        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
           <span>Timeline</span>
           <span className="font-mono tracking-normal text-[#202124]">
             {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) : "--:--:--"}
           </span>
           {selectedPingIndexes.length > 0 && (
-            <button type="button" onClick={() => clearSelectionRef.current()} className="rounded border border-[#bfc6bb] bg-white px-2 py-0.5 text-[10px] text-[#202124] hover:border-[#2f6f73] hover:text-[#2f6f73]">Clear selection</button>
+            <button type="button" onClick={() => clearSelectionRef.current()} className="rounded border border-[#bfc6bb] bg-[#f8f9fc] px-2 py-0.5 text-[10px] text-[#3b1370] hover:bg-white hover:border-[#7629db]">Clear selection</button>
           )}
         </div>
       </div>
@@ -1213,9 +1213,9 @@ export function CompareAnimationPanel({
   const learnAlgorithmId = panel?.algo
 
   return (
-    <Card className="h-full min-h-0 overflow-hidden py-0">
+    <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0">
       <CardHeader className="py-3 px-4 shrink-0">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+      <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
             <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
@@ -1252,11 +1252,11 @@ export function CompareAnimationPanel({
             />
           </div>
         ) : (
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
-            <Skeleton className="flex-1 rounded-none bg-[#202738]" />
-            <div className="h-24 border-t border-[#263449] bg-[#151b2c] p-4">
-              <Skeleton className="h-4 w-full bg-[#202738]" />
-              <Skeleton className="mt-4 h-4 w-2/3 bg-[#202738]" />
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc]">
+            <Skeleton className="flex-1 rounded-none bg-[#e6e3eb]" />
+            <div className="h-24 border-t border-[#d7dbd2] bg-[#f8f9fc] p-4">
+              <Skeleton className="h-4 w-full bg-[#e6e3eb]" />
+              <Skeleton className="mt-4 h-4 w-2/3 bg-[#e6e3eb]" />
             </div>
           </div>
         )}
@@ -1280,9 +1280,9 @@ export function StopRunPreview({
 }) {
   if (!panel) {
     return (
-      <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-[#263449] bg-[#111625]">
-        <Skeleton className="flex-1 rounded-none bg-[#202738]" />
-        <Skeleton className="m-4 h-4 bg-[#202738]" />
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc]">
+        <Skeleton className="flex-1 rounded-none bg-[#e6e3eb]" />
+        <Skeleton className="m-4 h-4 bg-[#e6e3eb]" />
       </div>
     )
   }

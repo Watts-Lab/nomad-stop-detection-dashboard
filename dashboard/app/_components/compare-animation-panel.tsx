@@ -815,7 +815,6 @@ const isDensityAlgorithm = chartData.result.kind === "density"
     // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
       previewing = false
-      const latestPingIndex = latestPingIndexAt(timestampSeconds)
       const noisePings = chartData.pingData.filter((point) => point[2] < 0)
       const clusterPings = chartData.pingData.filter((point) => point[2] >= 0)
       const route = routeProgressAt(timestampSeconds)

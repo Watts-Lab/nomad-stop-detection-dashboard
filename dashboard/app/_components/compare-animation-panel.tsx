@@ -1961,7 +1961,7 @@ export function DemoSceneRenderer({
       .findIndex((series) => series.id === "ping-hit-area")
 
     timelineChart.setOption({
-      backgroundColor: destinationPreview ? "transparent" : "#f8f9fc",
+      backgroundColor: "#f8f9fc",
       animation: !destinationPreview,
       animationDurationUpdate: 180,
       animationEasingUpdate: "cubicOut",
@@ -2338,8 +2338,8 @@ export function DemoSceneRenderer({
         </div>
       )}
       <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" && !destinationPreview ? "tour-map" : undefined} />
-      <div className={`flex shrink-0 flex-col ${destinationPreview ? "h-6 justify-center bg-[#171d2e] px-1.5" : variant === "preview" ? "h-20 bg-[#f8f9fc]" : mode === "single" ? "h-28 bg-[#f8f9fc]" : "h-24 bg-[#f8f9fc]"}`} data-tour={mode === "single" && !destinationPreview ? "tour-timeline" : undefined}>
-        <div ref={timelineRef} className={destinationPreview ? "h-3 shrink-0 overflow-hidden rounded-full border border-white" : "min-h-0 flex-1"} />
+      <div className={`flex shrink-0 flex-col bg-[#f8f9fc] ${destinationPreview ? "h-6 justify-center px-1.5" : variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" && !destinationPreview ? "tour-timeline" : undefined}>
+        <div ref={timelineRef} className={destinationPreview ? "h-3 shrink-0 overflow-hidden rounded-full border border-[#f8f9fc]" : "min-h-0 flex-1"} />
         {!destinationPreview && <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
           <span>Timeline</span>
           <span className="font-mono tracking-normal text-[#202124]">

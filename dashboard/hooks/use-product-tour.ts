@@ -95,7 +95,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-chart']",
     popover: {
       title: "Read the Parameter Sweep",
-      description: "Each pale blue dot shows one person's result at one parameter setting. The horizontal axis shows the setting being tested, while the vertical axis shows how much of the known stop time the algorithm recovered. Higher values indicate better detection.",
+      description: "Each pale blue dot shows one person's result at one parameter setting. The horizontal axis shows the setting being tested, while the vertical axis shows how much of the true stop time the algorithm recovered. Higher values indicate better detection.",
     },
   },
   {
@@ -116,7 +116,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-controls']",
     popover: {
       title: "Choose and Compare Algorithms",
-      description: "Use the control panel to switch between minute recall and failure types, select an algorithm, and review the settings held fixed during the experiment. Switch to Compare to place two algorithms top and bottom using the same chart view.",
+      description: "Minute recall shows the share of true stop time recovered; higher is better. Failure types shows the average share of true stops missed or split (orange), and merged (green); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
     },
   },
 ]

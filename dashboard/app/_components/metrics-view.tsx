@@ -280,11 +280,6 @@ export function MetricsView({
               <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-foreground">
-            {metricsChartView === "recall"
-              ? "See how much known stop time each algorithm recovers across a parameter sweep."
-              : "See where each algorithm misses, merges, or splits known stops across a parameter sweep."}
-          </p>
         </div>
       </div>
 
@@ -336,11 +331,6 @@ export function MetricsView({
                   Failure types
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {metricsChartView === "recall"
-                  ? "Share of known stop time recovered. Higher is better."
-                  : "Average share of known stops affected. Lower is better."}
-              </p>
             </div>
             <div className="space-y-1.5">
               <h4 className="text-sm font-medium text-[#3b1370]">Ground truth diary</h4>

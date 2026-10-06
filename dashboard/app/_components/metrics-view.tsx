@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Columns2, HelpCircle, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
@@ -152,9 +152,9 @@ function MetricsFrame({
   }, [showTourTargets])
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-[#f8f9fc]" data-tour={showTourTargets ? "metrics-chart" : undefined}>
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-[#f8f9fc]" data-tour={showTourTargets ? "metrics-chart" : undefined}>
       {label && (
-        <div className="absolute left-[12px] top-[12px] z-20 max-w-[40%] truncate rounded-sm bg-[#f8f9fc] px-2 py-0.5 text-xs font-semibold text-[#3b1370]">
+        <div className="shrink-0 px-3 py-2 text-lg font-semibold text-[#3b1370]">
           {label}
         </div>
       )}
@@ -176,7 +176,7 @@ function MetricsFrame({
             iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-tour-focus", mode: tourFocusRef.current }, window.location.origin)
           }
         }}
-        className="h-full w-full border-0"
+        className="min-h-0 w-full flex-1 border-0"
       />
     </div>
   )
@@ -274,17 +274,10 @@ export function MetricsView({
       </div>
 
       <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-      <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
-          {!metricsCompareMode && (
-            <CardHeader className="shrink-0 py-2 px-3 bg-[#f8f9fc]">
-              <CardTitle className="text-lg font-semibold text-[#3b1370]">
-                {metricsLeftAlgorithm}
-              </CardTitle>
-            </CardHeader>
-          )}
+        <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
           <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
             <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
-              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} label={metricsCompareMode ? metricsLeftAlgorithm : undefined} showTourTargets />
+              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} label={metricsLeftAlgorithm} showTourTargets />
 
               {metricsCompareMode && (
                 <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} label={metricsRightAlgorithm} />
@@ -294,12 +287,7 @@ export function MetricsView({
         </Card>
 
         <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-0" data-tour="metrics-controls">
-          <CardHeader className="shrink-0 px-5 py-3">
-            <CardTitle className="text-lg font-semibold text-[#3b1370]">
-              {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
+          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4 pt-4">
             <Button
               variant="outline"
               size="sm"

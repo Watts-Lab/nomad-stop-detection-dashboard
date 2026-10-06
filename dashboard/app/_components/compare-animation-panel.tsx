@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { stopsFromLabels } from "@/lib/stop-detection"
-import { parameterDisplayName } from "../_lib/dashboard-utils"
 import type {
   ComparePanelResponse,
   EChartsApi,
@@ -2328,9 +2327,6 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
-        {mode === "compare" && panel && (
-          <p className="text-xs text-white">{Object.entries(panel.params).map(([name, value]) => `${parameterDisplayName(name)}: ${value}`).join(" · ")}</p>
-        )}
         {sceneMetadata && (
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}

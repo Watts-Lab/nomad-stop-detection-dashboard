@@ -120,23 +120,17 @@ export function DemoSceneRenderer({
       }),
     )
     const buildingById = new Map(buildings.map((building) => [building.id, building]))
-    const destinationColorByLocation = new Map<string, number>()
-    scene.destinationDiary.forEach(({ location }) => {
-      if (!destinationColorByLocation.has(location)) {
-        destinationColorByLocation.set(location, destinationColorByLocation.size)
-      }
-    })
     let destinationElapsed = 0
-    const destinationStops = scene.destinationDiary.map(({ location, duration }) => {
+    const destinationStops = scene.destinationDiary.map(({ duration }, index) => {
       const start = destinationElapsed
       destinationElapsed += duration * 60 * 1000
-      return [start, destinationElapsed, destinationColorByLocation.get(location)!]
+      return [start, destinationElapsed, index]
     })
-    const destinationBuildings = buildings.flatMap((building, index) => {
-      const color = destinationColorByLocation.get(building.id)
-      return color === undefined ? [] : [[index, color]]
+    const destinationBuildings = scene.destinationDiary.flatMap(({ location }, visitIndex) => {
+      const previousVisits = scene.destinationDiary.slice(0, visitIndex).filter((visit) => visit.location === location).length
+      return buildings.flatMap((building, index) => building.id === location ? [[index, visitIndex, 0.6 ** previousVisits]] : [])
     })
-    const destinationBuildingShapes = buildings.filter((building) => destinationColorByLocation.has(building.id))
+    const destinationBuildingShapes = destinationBuildings.map(([index]) => buildings[index])
     const destinationBounds = {
       minX: Math.min(...destinationBuildingShapes.map((building) => building.minX)),
       minY: Math.min(...destinationBuildingShapes.map((building) => building.minY)),
@@ -810,8 +804,8 @@ export function DemoSceneRenderer({
             {
               id: "buildings",
               data: [
-                ...chartData.buildings.map((_, index) => [index, 0, 0, -1]),
-                ...chartData.destinationBuildings.map(([index, color]) => [index, 0, 0, color]),
+                ...chartData.buildings.map((_, index) => [index, 0, 0, -1, 1]),
+                ...chartData.destinationBuildings.map(([index, color, scale]) => [index, 0, 0, color, scale]),
               ],
             },
           ],
@@ -1636,9 +1630,13 @@ export function DemoSceneRenderer({
             const next = state === 2
             const faded = Number(api.value(2)) === 1
             const destinationColor = Number(api.value(3))
+            const scale = destinationPreview && destinationColor >= 0 ? Number(api.value(4)) : 1
             return {
               type: "polygon",
-              shape: { points: building.coords.map((coord) => api.coord(coord)) },
+              shape: { points: building.coords.map(([x, y]) => api.coord([
+                building.center[0] + (x - building.center[0]) * scale,
+                building.center[1] + (y - building.center[1]) * scale,
+              ])) },
               style: {
                 fill: destinationColor >= 0 ? clusterColor(destinationColor) : "#8b8b8b",
                 stroke: next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",

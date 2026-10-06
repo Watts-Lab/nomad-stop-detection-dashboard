@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BarChart3, Columns2, HelpCircle, RefreshCw, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -7,10 +7,55 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CompareAnimationPanel, DemoSceneRenderer } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { TrajectoryOptions } from "./trajectory-options"
-import { revealClass } from "../_lib/dashboard-utils"
+import { loadCompareData } from "../_lib/static-cache"
+import { algorithms } from "../_lib/dashboard-data"
+import { revealClass, validateAlgorithmParams } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
 import type { CompareApiResponse } from "../_lib/types"
+
+// Keep preview loading independent of the active demo and its playback state.
+function DestinationPreview({ trajectory }: { trajectory: string }) {
+  const [data, setData] = useState<CompareApiResponse | null>(null)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+    const algorithm = algorithms.find((entry) => entry.id === "dbstop")!
+    loadCompareData({
+      trajectory,
+      mode: "single",
+      seed: 1,
+      left: { algo: algorithm.id, params: validateAlgorithmParams(algorithm.id, algorithm, {}).normalized },
+    }).then(
+      (response) => { if (!cancelled) setData(response) },
+      () => { if (!cancelled) setError("Unable to load this preview.") },
+    )
+    return () => { cancelled = true }
+  }, [trajectory])
+
+  return (
+    <div className="aspect-square w-full">
+      {data ? (
+        <DemoSceneRenderer
+          panel={data.left}
+          mode="single"
+          currentTime={null}
+          onTimeChange={() => {}}
+          syncMaster={false}
+          showGroundTruth={false}
+          showStops={false}
+          showXray={false}
+          variant="destination-preview"
+        />
+      ) : (
+        <p role="status" className="flex h-full items-center justify-center text-sm text-foreground">
+          {error || "Loading preview…"}
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function DemoView({
   compareMode,
@@ -83,7 +128,6 @@ export function DemoView({
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-  const previewPanel = compareApiData?.trajectory === demoTrajectory ? compareApiData.left : undefined
   const dataPanel = (
     <Card className="min-h-0 overflow-hidden bg-[#f8f9fc]" data-tour="tour-data">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
@@ -92,21 +136,7 @@ export function DemoView({
           <TrajectoryOptions
             value={demoTrajectory}
             onChange={setDemoTrajectory}
-            preview={previewPanel && (
-              <div className="h-60">
-                <DemoSceneRenderer
-                  panel={previewPanel}
-                  mode="single"
-                  currentTime={null}
-                  onTimeChange={setDemoTime}
-                  syncMaster={false}
-                  showGroundTruth={false}
-                  showStops={false}
-                  showXray={false}
-                  variant="destination-preview"
-                />
-              </div>
-            )}
+            preview={(trajectory) => <DestinationPreview key={trajectory} trajectory={trajectory} />}
           />
         </div>
         <Button onClick={handleNewTrajectory} size="lg" className="nomad-action mt-auto w-full">

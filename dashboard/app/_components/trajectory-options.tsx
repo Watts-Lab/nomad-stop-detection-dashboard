@@ -10,7 +10,7 @@ export function TrajectoryOptions({
 }: {
   value: string
   onChange: (trajectoryId: string) => void
-  preview?: ReactNode
+  preview?: (trajectoryId: string) => ReactNode
 }) {
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
 
@@ -52,10 +52,12 @@ export function TrajectoryOptions({
                 <HelpCircle className="h-4 w-4" />
               </button>
             </div>
-            {selected && preview}
             {showingInfo && (
-              <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] p-3 text-sm leading-relaxed text-foreground">
-                {trajectory.note}
+              <div className="mr-10 space-y-1.5">
+                {preview?.(trajectory.id)}
+                <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] p-3 text-sm leading-relaxed text-foreground">
+                  {trajectory.note}
+                </div>
               </div>
             )}
           </div>

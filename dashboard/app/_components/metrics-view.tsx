@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Columns2, HelpCircle, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
@@ -287,12 +287,7 @@ export function MetricsView({
         </Card>
 
         <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-0" data-tour="metrics-controls">
-          <CardHeader className="shrink-0 px-5 py-3">
-            <CardTitle className="text-lg font-semibold text-[#3b1370]">
-              {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4">
+          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4 pt-4">
             <Button
               variant="outline"
               size="sm"

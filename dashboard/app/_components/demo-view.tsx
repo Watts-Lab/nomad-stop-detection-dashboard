@@ -129,7 +129,7 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[330px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
@@ -184,7 +184,7 @@ export function DemoView({
           </Card>
         </div>
       ) : (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[330px_minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
           {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
             <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-2 gap-3">

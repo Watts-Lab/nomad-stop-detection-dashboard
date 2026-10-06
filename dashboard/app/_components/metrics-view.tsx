@@ -283,10 +283,10 @@ export function MetricsView({
         </div>
       </div>
 
-      <div className={`${revealClass("panel", 2)} grid flex-none grid-rows-[360px_auto] gap-3 overflow-visible lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:grid-rows-1 lg:items-stretch lg:overflow-hidden`}>
+      <div className={`${revealClass("panel", 2)} grid flex-none ${metricsCompareMode ? "grid-rows-[680px_auto]" : "grid-rows-[360px_auto]"} gap-3 overflow-visible lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:grid-rows-1 lg:items-stretch lg:overflow-hidden`}>
         <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
-          <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
-            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
+          <CardContent className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(320px,1fr)_minmax(320px,1fr)]" : "h-full"}`}>
               <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`} label={metricsLeftAlgorithm} showTourTargets />
 
               {metricsCompareMode && (

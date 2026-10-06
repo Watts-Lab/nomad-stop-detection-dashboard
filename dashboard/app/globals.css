@@ -4,39 +4,42 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #111625;
-  --foreground: #f2f4eb;
-  --card: #171d2e;
-  --card-foreground: #f2f4eb;
-  --popover: #171d2e;
-  --popover-foreground: #f2f4eb;
-  --primary: #459ba4;
-  --primary-foreground: #08101c;
-  --secondary: #242b3d;
-  --secondary-foreground: #dbe9f3;
-  --muted: #202738;
-  --muted-foreground: #94a1b7;
-  --accent: #8acac8;
-  --accent-foreground: #08101c;
+  --background: #f5fafe;
+  --foreground: #080d1a;
+  --card: #f4ecfe;
+  --card-foreground: #080d1a;
+  --popover: #f4ecfe;
+  --popover-foreground: #080d1a;
+  --primary: #3b1370;
+  --primary-foreground: #ffffff;
+  --secondary: #e8d8fc;
+  --secondary-foreground: #3b1370;
+  --muted: #f4ecfe;
+  --muted-foreground: #7629db;
+  --accent: #dbc2fa;
+  --accent-foreground: #3b1370;
   --destructive: #c66d66;
   --destructive-foreground: #fff7f2;
-  --border: #263449;
-  --input: #242b3d;
-  --ring: #8acac8;
+  --border: #e6dffc;
+  --input: #e6dffc;
+  --ring: #7629db;
+
+  /* keeping existing chart colors for now */
   --chart-1: #83c9cc;
   --chart-2: #b6c9dc;
   --chart-3: #8199d8;
   --chart-4: #dec345;
   --chart-5: #c17870;
+
   --radius: 0.5rem;
-  --sidebar: #151b2c;
-  --sidebar-foreground: #f2f4eb;
-  --sidebar-primary: #459ba4;
-  --sidebar-primary-foreground: #08101c;
-  --sidebar-accent: #242b3d;
-  --sidebar-accent-foreground: #dbe9f3;
-  --sidebar-border: #263449;
-  --sidebar-ring: #8acac8;
+  --sidebar: #f4ecfe;
+  --sidebar-foreground: #080d1a;
+  --sidebar-primary: #3b1370;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8d8fc;
+  --sidebar-accent-foreground: #3b1370;
+  --sidebar-border: #e6dffc;
+  --sidebar-ring: #7629db;
 }
 
 .dark {
@@ -75,7 +78,7 @@
 }
 
 @theme inline {
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -127,7 +130,12 @@
 @layer components {
   .nomad-shell {
     background:
-      linear-gradient(180deg, #111625 0%, #111625 58%, #151b2c 100%);
+      linear-gradient(
+        180deg,
+        var(--background) 0%,
+        var(--background) 58%,
+        var(--card) 100%
+      );
   }
 
   .nomad-page-frame {
@@ -137,45 +145,45 @@
   }
 
   .nomad-action {
-    background: #459ba4;
-    color: #08101c;
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-weight: 600;
   }
 
   .nomad-action:hover {
-    background: #62b8bf;
+    background: #7629db;
   }
 
   .nomad-hero {
     position: relative;
     overflow: hidden;
     background:
-      linear-gradient(rgb(17 22 37 / 0.88), rgb(17 22 37 / 0.94)),
-      linear-gradient(90deg, transparent 31px, rgb(138 202 200 / 0.045) 32px, transparent 33px),
-      linear-gradient(transparent 31px, rgb(138 202 200 / 0.04) 32px, transparent 33px);
-    background-color: #111625;
+      linear-gradient(rgb(245 250 254 / 0.88), rgb(245 250 254 / 0.94)),
+      linear-gradient(90deg, transparent 31px, rgb(118 41 219 / 0.045) 32px, transparent 33px),
+      linear-gradient(transparent 31px, rgb(118 41 219 / 0.04) 32px, transparent 33px);
+    background-color: var(--background);
     background-size: auto, 128px 128px, 128px 128px;
   }
 
   .nomad-card {
-    border-color: rgb(138 202 200 / 0.16);
-    background: rgb(23 29 46 / 0.92);
-    box-shadow: 0 12px 28px rgb(0 0 0 / 0.14);
+    border-color: var(--border);
+    background: var(--card);
+    box-shadow: 0 12px 28px rgb(59 19 112 / 0.08);
   }
 
   .nomad-soft-card {
-    border-color: rgb(177 192 216 / 0.14);
-    background: rgb(242 244 235 / 0.045);
+    border-color: #d1e8fc;
+    background: #f5fafe;
   }
 
   .nomad-interactive-card {
-    border-color: rgb(38 52 73);
+    border-color: var(--border);
     transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   }
 
   .nomad-interactive-card:hover {
-    border-color: rgb(138 202 200 / 0.55);
-    box-shadow: 0 14px 30px rgb(0 0 0 / 0.18);
+    border-color: #7629db;
+    box-shadow: 0 14px 30px rgb(59 19 112 / 0.12);
     transform: translateY(-2px);
   }
 
@@ -250,41 +258,42 @@
  * to driver.js's defaults no matter how specific the selector is.
  */
 .driver-popover.nomad-tour-popover {
-  background-color: #171d2e;
-  color: #f2f4eb;
-  border: 1px solid #263449;
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   min-width: 280px;
   max-width: 340px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  box-shadow: 0 4px 6px -1px rgb(59 19 112 / 0.12),
+              0 2px 4px -2px rgb(59 19 112 / 0.12);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-title {
-  color: #f2f4eb;
+  color: #7629db;
   font-size: 1rem;
   font-weight: 600;
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-description {
-  color: #94a1b7;
+  color: var(--popover-foreground);
   line-height: 1.5;
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-progress-text {
-  color: #94a1b7;
+  color: var(--popover-foreground);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-close-btn {
-  color: #94a1b7;
+  color: #7629db;
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-close-btn:hover {
-  color: #f2f4eb;
+  color: var(--primary);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-footer-btn {
-  background-color: #459ba4;
-  color: #08101c;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
   text-shadow: none;
   font-weight: 600;
   border: none;
@@ -292,35 +301,35 @@
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-footer-btn:hover {
-  background-color: #62b8bf;
-  color: #08101c;
+  background-color: #7629db;
+  color: var(--primary-foreground);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-prev-btn {
   background-color: transparent;
-  color: #f2f4eb;
-  border: 1px solid #3a465d;
+  color: var(--primary);
+  border: 1px solid #7629db;
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-prev-btn:hover {
-  background-color: #242b3d;
-  color: #f2f4eb;
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow {
-  border-left-color: #171d2e;
+  border-left-color: var(--popover);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow {
-  border-right-color: #171d2e;
+  border-right-color: var(--popover);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow {
-  border-top-color: #171d2e;
+  border-top-color: var(--popover);
 }
 
 .driver-popover.nomad-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
-  border-bottom-color: #171d2e;
+  border-bottom-color: var(--popover);
 }
 
 @keyframes home-copy-reveal {

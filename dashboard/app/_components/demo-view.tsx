@@ -121,7 +121,7 @@ export function DemoView({
             <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
-          <Card className="min-h-0 overflow-hidden" data-tour="tour-params">
+          <Card className="min-h-0 overflow-hidden bg-[#f8f9fc]" data-tour="tour-params">
             <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto">
               <div className="flex justify-start">
                 <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2" data-tour="tour-compare-toggle">
@@ -130,18 +130,30 @@ export function DemoView({
                 </Button>
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">Trajectory</h4>
+                <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
                 {trajectoryOptions}
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">Algorithm</h4>
+                <h4 className="text-sm font-medium text-[#3b1370]">Algorithm</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                  <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="h-10 border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                  {demoAlgorithms.map((a) => (
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                    >
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">Parameters</h4>
+                <h4 className="text-sm font-medium text-[#3b1370]">Parameters</h4>
                 <DemoParameterControls
                   key={leftAlgorithm}
                   algo={leftAlgo}
@@ -174,7 +186,7 @@ export function DemoView({
             </div>
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
-          <Card className="min-h-0 overflow-hidden">
+          <Card className="min-h-0 overflow-hidden bg-[#f8f9fc]">
             <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
               <div className="flex justify-start">
               <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
@@ -183,14 +195,26 @@ export function DemoView({
               </Button>
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Trajectory</h4>
+              <h4 className="text-sm font-medium text-[#3b1370]">Trajectory</h4>
                 {trajectoryOptions}
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Left</h4>
+              <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                  <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                  {demoAlgorithms.map((a) => (
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                    >
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
                 <DemoParameterControls
                   key={`left-${leftAlgorithm}`}
@@ -203,10 +227,22 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Right</h4>
+              <h4 className="text-sm font-medium text-[#3b1370]">Right</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
-                  <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
-                  <SelectContent>{demoAlgorithms.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                  {demoAlgorithms.map((a) => (
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                    >
+                     {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
                 <DemoParameterControls
                   key={`right-${rightAlgorithm}`}

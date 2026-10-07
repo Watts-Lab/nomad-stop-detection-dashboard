@@ -450,6 +450,11 @@ export function DemoSceneRenderer({
         yMax: yCenter + yRange / 2,
       }
     }
+    let baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 24) / (mapBounds().xMax - mapBounds().xMin)
+    const mapZoomScale = (api: EChartsApi) => {
+      const ping = chartData.pings[0]
+      return Math.abs(api.coord([ping.x + 1, ping.y])[0] - api.coord([ping.x, ping.y])[0]) / baseMapPixelsPerUnit
+    }
     const applyMapBounds = () => {
       const bounds = mapBounds()
       mapChart.setOption({
@@ -488,6 +493,7 @@ export function DemoSceneRenderer({
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
+    let focusedLachesisCluster: number | null = null
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
@@ -522,8 +528,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const associatedWithHover = (pingIndex: number) => hoverPingIndexes === null || hoverPingIndexes.has(pingIndex)
-    const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 0.85 : 0.2
-    const anchorOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 1 : 0.2
+    const associationOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
+    const anchorOpacity = (pingIndex: number) => associatedWithHover(pingIndex) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
     const edgeOpacity = (sourceIndex: number, targetIndex: number) =>
       hoverPingIndexes === null || (hoverPingIndexes.has(sourceIndex) && hoverPingIndexes.has(targetIndex)) ? 0.7 : 0.1
     const pingScale = (pingIndex: number) => hoverPingIndexes?.has(pingIndex) ? 1.1 : 1
@@ -538,7 +544,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
         type: "circle",
         z2: Number(api.value(3)) * 2 + 1,
         shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
-        style: { fill: "#000000", opacity: Number(api.value(5)) },
+        style: { fill: associatedWithHover(Number(api.value(3))) ? "#000000" : "#9ba0a3" },
       }
     }
     const partialPath = (segment: typeof preparedSegments[number], progress: number) => {
@@ -631,15 +637,15 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       return Array.from(framesByStop.values())
     }
     // All point series use [x, y, cluster, ping index, time, opacity].
-    const styledScatterPoint = (point: number[]) => [...point, associationOpacity(point[3])]
     const styledXrayPoint = (point: number[]) => [...point, anchorOpacity(point[3])]
     const renderXrayPoint = (_params: EChartsParams, api: EChartsApi) => {
       const circle = pingCircle(api, 1.3 * pingScale(Number(api.value(3))))
+      const scale = mapZoomScale(api)
       return {
         type: "circle",
         z2: Number(api.value(3)) * 2,
         shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius },
-        style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#ffffff", lineWidth: 1.6, opacity: Number(api.value(5)), shadowBlur: 8, shadowColor: "rgba(32, 33, 36, 0.24)" },
+        style: { fill: clusterColor(Number(api.value(2))), stroke: "#ffffff", lineWidth: 1.6 * scale, opacity: Number(api.value(5)), shadowBlur: 8 * scale, shadowColor: "rgba(32, 33, 36, 0.24)" },
       }
     }
     const groundTruthAt = (timestampSeconds: number) => {
@@ -689,12 +695,62 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       anchorFrames: (typeof chartData.anchorFrames),
     ) => {
       if (!layerStateRef.current.showXray) return []
+      if (panel.algo === "lachesis") return chartData.pingData
+        .filter((point) => point[2] >= 0 && pingClassifiedAt(point[3], timestampSeconds))
+        .filter((point) => point[3] === hoverPingIndex || selectedPingIndexesRef.current.includes(point[3]))
+        .map((point) => [point[0], point[1], point[2], point[3]])
       if (!isDensityAlgorithm) return anchorFrames.map((frame) => frame.point)
       if (hoverPingIndex === null) return []
       if (!pingClassifiedAt(hoverPingIndex, timestampSeconds)) return []
       const point = chartData.pingData[hoverPingIndex]
       return [[point[0], point[1], point[2]]]
     }
+    const lachesisIntersectionAreas = (timestampSeconds: number) => {
+      if (!layerStateRef.current.showXray || panel.algo !== "lachesis") return []
+      const pointsByCluster = new Map<number, number[][]>()
+      chartData.pingData.forEach((point) => {
+        if (point[2] < 0 || !pingClassifiedAt(point[3], timestampSeconds)) return
+        const points = pointsByCluster.get(point[2])
+        if (points) points.push([point[0], point[1]])
+        else pointsByCluster.set(point[2], [[point[0], point[1]]])
+      })
+      const radius = chartData.distanceThreshold
+      const radiusSquared = radius ** 2
+      return Array.from(pointsByCluster, ([cluster, centers]) => {
+        // Only boundary points belong in the outline; interior centers create notches.
+        const candidates = centers.flatMap(([x, y]) => Array.from({ length: 64 }, (_, index) => {
+          const angle = index / 64 * Math.PI * 2
+          return [x + radius * Math.cos(angle), y + radius * Math.sin(angle)]
+        }))
+        centers.forEach(([firstX, firstY], firstIndex) => {
+          centers.slice(firstIndex + 1).forEach(([secondX, secondY]) => {
+            const distance = Math.hypot(secondX - firstX, secondY - firstY)
+            if (distance === 0 || distance > radius * 2) return
+            const midpointX = (firstX + secondX) / 2
+            const midpointY = (firstY + secondY) / 2
+            const offset = Math.sqrt(radiusSquared - (distance / 2) ** 2)
+            const perpendicularX = -(secondY - firstY) / distance * offset
+            const perpendicularY = (secondX - firstX) / distance * offset
+            candidates.push(
+              [midpointX + perpendicularX, midpointY + perpendicularY],
+              [midpointX - perpendicularX, midpointY - perpendicularY],
+            )
+          })
+        })
+        const points = candidates.filter(([x, y]) => centers.every(([centerX, centerY]) =>
+          (x - centerX) ** 2 + (y - centerY) ** 2 <= radiusSquared + 0.000001
+        ))
+        const centerX = points.reduce((sum, [x]) => sum + x, 0) / points.length
+        const centerY = points.reduce((sum, [, y]) => sum + y, 0) / points.length
+        return {
+          cluster,
+          points: points.sort(([firstX, firstY], [secondX, secondY]) =>
+            Math.atan2(firstY - centerY, firstX - centerX) - Math.atan2(secondY - centerY, secondX - centerX)
+          ),
+        }
+      }).filter((area) => area.points.length >= 3)
+    }
+    let activeLachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }> = []
     const selectedPingLineData = () => {
       if (selectedPingIndexesRef.current.length !== 2) return []
       return [{ coords: selectedPingIndexesRef.current.map((pingIndex) => {
@@ -866,7 +922,17 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
-      if (selectedPingIndexesRef.current.length === 2) {
+      const hoveredCluster = hoverPingIndex !== null && pingClassifiedAt(hoverPingIndex, timestampSeconds)
+        ? chartData.pingData[hoverPingIndex][2]
+        : -1
+      focusedLachesisCluster = panel.algo === "lachesis" && layerStateRef.current.showXray && hoveredCluster >= 0
+        ? hoveredCluster
+        : null
+      if (focusedLachesisCluster !== null) {
+        hoverPingIndexes = new Set(chartData.clusterMembers.get(focusedLachesisCluster)?.filter((pingIndex) =>
+          pingClassifiedAt(pingIndex, timestampSeconds)
+        ))
+      } else if (selectedPingIndexesRef.current.length === 2) {
         hoverPingIndexes = new Set(selectedPingIndexesRef.current)
         if (hoverPingIndex !== null) hoverPingIndexes.add(hoverPingIndex)
       } else if (hoverEdgeEndpoints) {
@@ -890,11 +956,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
         }
       } else if (hoverPingIndex !== null) {
         // Ping hover: reveal every ping in the same detected stop (or just itself for noise).
-        const cluster = pingClassifiedAt(hoverPingIndex, timestampSeconds)
-          ? chartData.pingData[hoverPingIndex]?.[2] ?? -1
-          : -1
-        const members = cluster >= 0
-          ? chartData.clusterMembers.get(cluster)?.filter((pingIndex) => pingClassifiedAt(pingIndex, timestampSeconds))
+        const members = hoveredCluster >= 0
+          ? chartData.clusterMembers.get(hoveredCluster)?.filter((pingIndex) => pingClassifiedAt(pingIndex, timestampSeconds))
           : undefined
         hoverPingIndexes = new Set(members ?? [hoverPingIndex])
       } else if (selectedPingIndexesRef.current.length) {
@@ -910,6 +973,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
         hoverPingIndexes = null
       }
 
+      activeLachesisIntersectionAreas = lachesisIntersectionAreas(timestampSeconds)
       mapChart.setOption({
         series: [
           { id: "streets", data: chartData.streets.map((_, index) => index) },
@@ -922,8 +986,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           { id: "active-path", data: layerStateRef.current.showGroundTruth ? route.activeCached : [] },
           { id: "active-fallback-path", data: layerStateRef.current.showGroundTruth ? route.activeFallback : [] },
           ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
-          { id: "ghost-pings", data: chartData.pingData.map((point) => [...point, associatedWithHover(point[3]) ? 1 : 0.18]) },
-          { id: "noise-pings", data: layerStateRef.current.showStops ? noisePings.filter((point) => point[4] <= timestampSeconds).map(styledScatterPoint) : [] },
+          { id: "ghost-pings", data: chartData.pingData.map((point) => [...point]) },
+          { id: "noise-pings", data: layerStateRef.current.showStops ? noisePings.filter((point) => point[4] <= timestampSeconds) : [] },
           { id: "cluster-pings", data: layerStateRef.current.showStops ? clusterPings.filter((point) => pingClassifiedAt(point[3], timestampSeconds)).map((point) => [...point, associationOpacity(point[3])]) : [] },
           { id: "promotion-edges", data: layerStateRef.current.showXray ? promotionEdges.map((edge) => ({ ...edge, lineStyle: { color: clusterColor(edge.value[0]), opacity: edgeOpacity(edge.value[1], edge.value[2]) } })) : [] },
           { id: "promotion-edges-hit-area", data: layerStateRef.current.showXray ? promotionEdges : [] },
@@ -932,6 +996,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           { id: "anchor-edges-hit-area", data: layerStateRef.current.showXray ? anchorEdges : [] },
           { id: "anchor-points", data: layerStateRef.current.showXray ? anchorFrames.map((frame) => frame.point).map(styledXrayPoint) : [] },
           { id: "current-ping", data: currentPingData(timestampSeconds) },
+          { id: "lachesis-intersections", data: activeLachesisIntersectionAreas.map((area) => [area.cluster]) },
           { id: "distance-circles", data: distanceCircleData(timestampSeconds, anchorFrames) },
           { id: "ping-hit-area", data: chartData.pingData },
           { id: "selected-ping-line", data: selectedPingLineData() },
@@ -955,7 +1020,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount).map((point) => [...point, 1])
+      const previewPings = chartData.pingData.slice(0, pingCount)
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -976,6 +1041,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "lachesis-intersections", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData() },
         ],
@@ -1498,10 +1564,31 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
 
+    const syncMapLineStyles = () => {
+      const ping = chartData.pings[0]
+      const origin = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
+      const edge = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x + 1, ping.y]) as number[]
+      const scale = Math.abs(edge[0] - origin[0]) / baseMapPixelsPerUnit
+      mapChart.setOption({ series: [
+        { id: "completed-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "completed-fallback-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "next-path", lineStyle: { width: 3 * scale } },
+        { id: "active-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "active-fallback-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "promotion-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "promotion-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "anchor-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "anchor-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "selected-ping-line", lineStyle: { width: 3 * scale } },
+      ] }, { lazyUpdate: true })
+    }
+
     // Resize both charts, recalculate map bounds, and reposition tooltips
     const resize = () => {
       mapChart.resize()
       applyMapBounds()
+      baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 24) / (mapBounds().xMax - mapBounds().xMin)
+      syncMapLineStyles()
       timelineChart.resize()
       refreshTooltipLayout()
     }
@@ -1636,7 +1723,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
               style: {
                 fill: "#b9bec1",
                 stroke: "#b9bec1",
-                lineWidth: 1,
+                lineWidth: mapZoomScale(api),
                 opacity: hoverBuildingId !== "" ? MAP_FOCUS_FADE_OPACITY : 1,
               },
             }
@@ -1653,7 +1740,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
             const [start, end] = chartData.streetLanes[params.dataIndex]
             const startPixel = api.coord(start)
             const endPixel = api.coord(end)
-            return { type: "line", shape: { x1: startPixel[0], y1: startPixel[1], x2: endPixel[0], y2: endPixel[1] }, style: { stroke: "#ffffff", lineWidth: 1.6, lineDash: [7, 42], opacity: hoverBuildingId !== "" ? MAP_FOCUS_FADE_OPACITY : 1 } }
+            const scale = mapZoomScale(api)
+            return { type: "line", shape: { x1: startPixel[0], y1: startPixel[1], x2: endPixel[0], y2: endPixel[1] }, style: { stroke: "#ffffff", lineWidth: 1.6 * scale, lineDash: [7 * scale, 42 * scale], opacity: hoverBuildingId !== "" ? MAP_FOCUS_FADE_OPACITY : 1 } }
           },
         },
         {
@@ -1679,7 +1767,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
               style: {
                 fill: destinationColor >= 0 ? clusterColor(destinationColor) : "#8b8b8b",
                 stroke: next ? FUTURE_GROUND_TRUTH_COLOR : "#ffffff",
-                lineWidth: next ? 2.6 : 2,
+                lineWidth: (next ? 2.6 : 2) * mapZoomScale(api),
                 opacity: faded ? MAP_FOCUS_FADE_OPACITY : 1,
               },
             }
@@ -1695,14 +1783,15 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           renderItem(params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
             const currentPulse = Number(api.value(1)) - 1
+            const scale = mapZoomScale(api)
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
                 fill: "transparent",
                 stroke: `rgba(15, 118, 110, ${0.62 + currentPulse * 0.35})`,
-                lineWidth: 2.4 + currentPulse * 1.2,
-                shadowBlur: 6 + currentPulse * 10,
+                lineWidth: (2.4 + currentPulse * 1.2) * scale,
+                shadowBlur: (6 + currentPulse * 10) * scale,
                 shadowColor: `rgba(15, 118, 110, ${0.2 + currentPulse * 0.32})`,
               },
             }
@@ -1719,14 +1808,15 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const building = chartData.buildings[Number(api.value(0))]
             const color = clusterColor(Number(api.value(1)))
+            const scale = mapZoomScale(api)
             return {
               type: "polygon",
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
                 fill: "transparent",
                 stroke: color,
-                lineWidth: 3,
-                shadowBlur: 8,
+                lineWidth: 3 * scale,
+                shadowBlur: 8 * scale,
                 shadowColor: color,
               },
             }
@@ -1799,7 +1889,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           data: [],
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const center = api.coord([api.value(0), api.value(1)])
-            const half = 5.5
+            const scale = mapZoomScale(api)
+            const half = 5.5 * scale
             const opacity = Number(api.value(4))
             return {
               type: "rect",
@@ -1807,8 +1898,8 @@ const isDensityAlgorithm = chartData.result.kind === "density"
               style: {
                 fill: GROUND_TRUTH_COLOR,
                 stroke: "#ffffff",
-                lineWidth: 1,
-                shadowBlur: 10,
+                lineWidth: scale,
+                shadowBlur: 10 * scale,
                 shadowColor: `rgba(15, 118, 110, ${opacity * 0.43})`,
                 opacity,
               },
@@ -1866,12 +1957,13 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api)
             const scale = pingScale(Number(api.value(3)))
+            const strokeScale = mapZoomScale(api)
             return {
               type: "group",
               z2: Number(api.value(3)) * 2,
               children: [
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale }, style: { fill: clusterColor(Number(api.value(2))), fillOpacity: 0.55, stroke: "#202124", lineWidth: 1.6, opacity: Number(api.value(5)) } },
-                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale * 0.28 }, style: { fill: "#000000", opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale }, style: { fill: clusterColor(Number(api.value(2))), stroke: "#202124", lineWidth: 1.6 * strokeScale, opacity: Number(api.value(5)) } },
+                { type: "circle", shape: { cx: circle.center[0], cy: circle.center[1], r: circle.radius * scale * 0.28 }, style: { fill: associatedWithHover(Number(api.value(3))) ? "#000000" : "#9ba0a3" } },
               ],
             }
           },
@@ -1957,6 +2049,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           renderItem(_params: EChartsParams, api: EChartsApi) {
             const circle = pingCircle(api, 1.08)
             const size = circle.radius * 2.8
+            const scale = mapZoomScale(api)
             // Positioned with transform props: a path built from an SVG string bakes its shape
             // rect in at creation and ignores later shape updates, which would freeze the pin
             return {
@@ -1972,7 +2065,32 @@ const isDensityAlgorithm = chartData.result.kind === "density"
                 width: 24,
                 height: 24,
               },
-              style: { fill: CURRENT_PING_COLOR, stroke: "#202124", lineWidth: 1.2, strokeNoScale: true, opacity: Number(api.value(5)) },
+              style: { fill: CURRENT_PING_COLOR, stroke: "#202124", lineWidth: 1.2 * scale, strokeNoScale: true, opacity: Number(api.value(5)) },
+            }
+          },
+        },
+        {
+          id: "lachesis-intersections",
+          name: "Lachesis feasible area",
+          type: "custom",
+          coordinateSystem: "cartesian2d",
+          silent: true,
+          z: 3,
+          data: [],
+          renderItem(params: EChartsParams, api: EChartsApi) {
+            const area = activeLachesisIntersectionAreas[params.dataIndex]
+            if (!area) return null
+            const scale = mapZoomScale(api)
+            return {
+              type: "polygon",
+              shape: { points: area.points.map((point) => api.coord(point)) },
+              style: {
+                fill: "transparent",
+                stroke: clusterColor(Number(api.value(0))),
+                lineWidth: 1.4 * scale,
+                lineDash: [5 * scale, 4 * scale],
+                opacity: focusedLachesisCluster === null || area.cluster === focusedLachesisCluster ? 1 : 0.1,
+              },
             }
           },
         },
@@ -1989,15 +2107,17 @@ const isDensityAlgorithm = chartData.result.kind === "density"
             const edge = api.coord([api.value(0) + chartData.distanceThreshold, api.value(1)])
             const radius = Math.abs(edge[0] - center[0])
             const color = clusterColor(Number(api.value(2)))
+            const scale = mapZoomScale(api)
+            const hoveredLachesisCircle = panel.algo === "lachesis" && hoverPingIndex === Number(api.value(3))
             return {
               type: "circle",
               shape: { cx: center[0], cy: center[1], r: radius },
               style: {
                 fill: "transparent",
                 stroke: color,
-                lineWidth: 1.6,
-                lineDash: [5, 4],
-                opacity: 0.9,
+                lineWidth: 1.6 * scale,
+                lineDash: hoveredLachesisCircle ? undefined : [5 * scale, 4 * scale],
+                opacity: focusedLachesisCluster === null || Number(api.value(2)) === focusedLachesisCluster ? 0.9 : 0.1,
               },
             }
           },
@@ -2222,7 +2342,11 @@ const isDensityAlgorithm = chartData.result.kind === "density"
     mapChart.on("mouseout", onMapMouseOut)
     mapChart.on("globalout", onMapMouseOut)
     mapChart.on("click", onMapClick)
-    mapChart.on("dataZoom", refreshTooltipLayout)
+    const onMapZoom = () => {
+      syncMapLineStyles()
+      refreshTooltipLayout()
+    }
+    mapChart.on("dataZoom", onMapZoom)
     mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
@@ -2285,7 +2409,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
       mapChart.off("click", onMapClick)
-      mapChart.off("dataZoom", refreshTooltipLayout)
+      mapChart.off("dataZoom", onMapZoom)
       mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)

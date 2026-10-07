@@ -145,10 +145,20 @@ export function DemoView({
         </div>
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
-          <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
-            <RefreshCw className="h-4 w-4" />
-            New Agent
-          </Button>
+          <div className="space-y-2 rounded-md border border-border/70 bg-background/30 px-3 py-2">
+            {compareApiData?.left && (
+              <div className="flex items-center gap-3 text-xs">
+                <span className="font-semibold text-foreground">agent</span>
+                <span className="min-w-0 flex-1 truncate text-right font-mono text-foreground">
+                  {compareApiData.left.scene.user_id}
+                </span>
+              </div>
+            )}
+            <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
+              <RefreshCw className="h-4 w-4" />
+              New Agent
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

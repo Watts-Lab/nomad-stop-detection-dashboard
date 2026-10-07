@@ -35,7 +35,7 @@ export function createDemoTimelineChartOptions({
 
     grid: destinationPreview
       ? { left: 0, right: 0, top: 0, bottom: 0 }
-      : { left: 34, right: 22, top: 0, bottom: 28 },
+      : { left: 28, right: 28, top: 0, bottom: 28 },
 
     dataZoom: [
       {

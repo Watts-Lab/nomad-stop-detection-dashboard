@@ -445,6 +445,7 @@ def run_user_job(user_id):
             truth=truth,
             user_id=user_id,
             algorithm=algorithm["algorithm"],
+            prf_only=False,
             traj_cols={"location_id": "location_id"},
             right_traj_cols={"location_id": "location", "timestamp": "timestamp"},
             timestamp="timestamp",

@@ -1,3 +1,5 @@
+/* RENDERS TRAJECTORY/DATASET PICKER, ALLOW USERS TO SELECT TRAJ & VIEW INFO ABOUT OPTIONS */
+
 import { useId, useState, type ReactNode } from "react"
 import { Check, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"

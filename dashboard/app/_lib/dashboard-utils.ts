@@ -1,3 +1,7 @@
+/*
+REUSABLE HELPER FUNCTIONS FOR PARAM HANDLING, VALIDATION, ROUTE/STATE UTILITIES
+*/
+
 import { DASHBOARD_VIEWS, DEMO_EDITABLE_PARAMS, METRICS_RESULTS_FILE, algorithms } from "./dashboard-data"
 import { publicPath } from "./public-path"
 import type { AlgorithmDefinition } from "./dashboard-data"

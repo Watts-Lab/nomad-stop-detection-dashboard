@@ -1,3 +1,5 @@
+/* UI FOR CHANGING PARAMS OF THE ALGORITHM SELECTED IN DEMO MODE */ 
+
 import { useId, useState } from "react"
 import { HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"

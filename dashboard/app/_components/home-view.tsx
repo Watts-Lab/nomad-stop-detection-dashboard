@@ -1,3 +1,5 @@
+/* RENDER DASHBOARD'S STATIC HOME PAGE CONTENT */
+
 "use client"
 
 import { Play } from "lucide-react"

@@ -21,6 +21,8 @@ type PinnedAgent = {
   fixed: Record<string, string>
 }
 
+type MetricsChartView = "recall" | "failures"
+
 // Display the pinned agent's metrics and a button to open it in Demo;
 // show selection instructions when no agent is pinned.
 function PinnedAgentCard({
@@ -44,7 +46,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-bold text-[#3b1370]">Accuracy</span>
+            <span className="text-xs font-bold text-[#3b1370]">Minute recall</span>
             <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
@@ -227,12 +229,13 @@ export function MetricsView({
 }) {
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
   const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
+  const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
 
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`
 
   useEffect(() => {
 
@@ -258,29 +261,45 @@ export function MetricsView({
   useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
 
   return (
-    <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3">
+    <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3 lg:overflow-hidden">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
-            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                setMetricsChartView("recall")
+                startTour()
+              }}
+              title="Take Tour"
+              aria-label="Take Tour"
+              className="h-8 w-8"
+            >
               <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-foreground">
-            Sweep one scale parameter for the selected algorithm{metricsCompareMode ? "s" : ""}; fixed notebook parameters are shown in the control panel.
-          </p>
         </div>
       </div>
 
-      <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 lg:grid-cols-[minmax(0,1fr)_330px] gap-3 items-stretch overflow-hidden`}>
-        <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
+      <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_330px] lg:items-stretch`}>
+        <Card className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f8f9fc] py-0">
           <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
             <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
-              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} aggregated metrics prototype`} label={metricsLeftAlgorithm} showTourTargets />
+              <MetricsFrame
+                src={leftMetricsPrototypeSrc}
+                title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`}
+                label={metricsLeftAlgorithm}
+                showTourTargets
+              />
 
               {metricsCompareMode && (
-                <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} aggregated metrics prototype`} label={metricsRightAlgorithm} />
+                <MetricsFrame
+                  src={rightMetricsPrototypeSrc}
+                  title={`${metricsRightAlgorithm} ${metricsChartView} metrics`}
+                  label={metricsRightAlgorithm}
+                />
               )}
             </div>
           </CardContent>
@@ -296,6 +315,27 @@ export function MetricsView({
             >
               {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}
             </Button>
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-medium text-[#3b1370]">Chart view</h4>
+              <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+                <Button
+                  variant={metricsChartView === "recall" ? "default" : "ghost"}
+                  size="sm"
+                  aria-pressed={metricsChartView === "recall"}
+                  onClick={() => setMetricsChartView("recall")}
+                >
+                  By-minute recall
+                </Button>
+                <Button
+                  variant={metricsChartView === "failures" ? "default" : "ghost"}
+                  size="sm"
+                  aria-pressed={metricsChartView === "failures"}
+                  onClick={() => setMetricsChartView("failures")}
+                >
+                  Failure modes
+                </Button>
+              </div>
+            </div>
             <div className="space-y-1.5">
               <h4 className="text-sm font-medium text-[#3b1370]">Ground truth diary</h4>
               <TrajectoryOptions value={metricsTrajectory} onChange={setMetricsTrajectory} />
@@ -318,7 +358,7 @@ export function MetricsView({
               </Select>
             </div>
             <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
-            <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />
+            {metricsChartView === "recall" && <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />}
 
             {metricsCompareMode && (
               <>
@@ -338,7 +378,7 @@ export function MetricsView({
                   </Select>
                 </div>
                 <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
-                <PinnedAgentCard pinned={pinnedRightAgent} openDemo={openPinnedAgent} />
+                {metricsChartView === "recall" && <PinnedAgentCard pinned={pinnedRightAgent} openDemo={openPinnedAgent} />}
               </>
             )}
 

@@ -4,12 +4,19 @@ import type { DemoResultData } from "../../../_lib/demo-result-data"
 
 // Count how many detected stops have been reached by the current playback time.
 export function detectedCountFor(
-    timestampSeconds: number,
-    chartData: DemoResultData
+  timestampSeconds: number,
+  chartData: DemoResultData
 ) {
-    return chartData.stopEndTimes.filter(
-        (endTime) => endTime <= timestampSeconds
-    ).length
+  let count = 0
+
+  while (
+    count < chartData.stopEndTimes.length &&
+    chartData.stopEndTimes[count] <= timestampSeconds
+  ) {
+    count += 1
+  }
+
+  return count
 }
 
 // Determine whether a ping has been classified by the algorithm

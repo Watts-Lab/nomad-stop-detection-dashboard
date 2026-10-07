@@ -303,6 +303,10 @@ export function prepareDemoResultData(
         coreTimelineData,
         truthStops: sceneData.truthStops,
         segments: sceneData.segments,
+        destinationStops: sceneData.destinationStops,
+        destinationBuildings: sceneData.destinationBuildings,
+        destinationDuration: sceneData.destinationDuration,
+        destinationBounds: sceneData.destinationBounds,
         focusBounds: {
             minX: Math.min(...focusXs),
             minY: Math.min(...focusYs),
@@ -324,5 +328,5 @@ export function prepareDemoResultData(
 }
 
 export type DemoResultData = NonNullable<
-  ReturnType<typeof prepareDemoResultData>
+    ReturnType<typeof prepareDemoResultData>
 >

@@ -1,6 +1,4 @@
-/* 
-PREPARE RAW TRAJECTORY/SCENE DATA INTO PINGS, MAP, GROUND-TRUTH & TIMELINE
-*/
+/* PREPARE RAW TRAJECTORY/SCENE DATA INTO PINGS, MAP, GROUND-TRUTH & TIMELINE */
 
 import type { ComparePanelResponse } from "./types"
 
@@ -40,6 +38,40 @@ export function prepareDemoSceneData(
         }),
     )
     const buildingById = new Map(buildings.map((building) => [building.id, building]))
+    // Prepare destination-diary timeline intervals and building highlights.
+    let destinationElapsed = 0
+
+    const destinationStops = scene.destinationDiary.map(({ duration }, index) => {
+        const start = destinationElapsed
+        destinationElapsed += duration * 60 * 1000
+        return [start, destinationElapsed, index]
+    })
+
+    const destinationBuildings = scene.destinationDiary.flatMap(
+        ({ location }, visitIndex) => {
+            const previousVisits = scene.destinationDiary
+                .slice(0, visitIndex)
+                .filter((visit) => visit.location === location).length
+
+            return buildings.flatMap((building, index) =>
+                building.id === location
+                    ? [[index, visitIndex, 0.6 ** previousVisits]]
+                    : [],
+            )
+        },
+    )
+
+    const destinationBuildingShapes = destinationBuildings.map(
+        ([index]) => buildings[index],
+    )
+
+    const destinationBounds = {
+        minX: Math.min(...destinationBuildingShapes.map((building) => building.minX)),
+        minY: Math.min(...destinationBuildingShapes.map((building) => building.minY)),
+        maxX: Math.max(...destinationBuildingShapes.map((building) => building.maxX)),
+        maxY: Math.max(...destinationBuildingShapes.map((building) => building.maxY)),
+    }
+
     const blockSide = Math.min(...buildings.flatMap((building) => [
         building.maxX - building.minX,
         building.maxY - building.minY,
@@ -139,6 +171,10 @@ export function prepareDemoSceneData(
         segments,
         streets,
         streetLanes,
+        destinationStops,
+        destinationBuildings,
+        destinationDuration: destinationElapsed,
+        destinationBounds,
         timeSequence: Array.from(times).sort((a, b) => a - b),
     }
 }

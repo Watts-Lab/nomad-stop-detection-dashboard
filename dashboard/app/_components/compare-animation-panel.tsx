@@ -14,24 +14,24 @@ import { parameterDisplayName } from "../_lib/dashboard-utils"
 import type { ComparePanelResponse, EChartsApi } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
-import { 
+import {
   groundTruthAt, pastTruthStopData, currentTruthStopData, nextTruthStopData,
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
-  groundTruthRouteMarkerAt, groundTruthRouteGlowPoints 
+  groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
 import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
 import { selectedPingLineData } from "./demo-viz/demo-interactions"
-import { 
+import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
-  nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp, 
-  scrubPlaybackTimestamp 
+  nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
+  scrubPlaybackTimestamp
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
 import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./demo-viz/demo-tooltip-layout"
 import { partialPath, routeProgressAt } from "./demo-viz/demo-route-animation"
-import { buildDemoMapSeries, resolveHoverPingIndexes } from "./demo-viz/demo-scene-render"
+import { buildDemoMapSeries, resolveHoverPingIndexes, currentPingData } from "./demo-viz/demo-scene-render"
 
 const CURRENT_PING_COLOR = "#d83832"
 // Hue of CURRENT_PING_COLOR, and the half-width of the arc around it kept free of cluster colors
@@ -120,7 +120,7 @@ export function DemoSceneRenderer({
       scene.truth,
     ],
   )
-  
+
   const resultData = useMemo(
     () => sceneData ? prepareDemoResultData(panel, sceneData) : null,
     [panel.algo, panel.params, panel.result, scene.pings, sceneData],
@@ -135,8 +135,10 @@ export function DemoSceneRenderer({
   }, [resultData])
 
   useEffect(() => {
-    let chartData = resultDataRef.current
-    if (!chartData || !mapRef.current || !timelineRef.current) return
+    const initialChartData = resultDataRef.current
+    if (!initialChartData || !mapRef.current || !timelineRef.current) return
+
+    let chartData: NonNullable<typeof resultData> = initialChartData
 
     const mapEl = mapRef.current
     const timelineEl = timelineRef.current
@@ -228,17 +230,17 @@ export function DemoSceneRenderer({
       onPlaybackStateChangeRef.current?.(nextState)
     }
 
-   // Spread cluster colors across a hue range that avoids the current ping's red.
-const clusterColor = (cluster: number) => {
-  if (cluster < 0) return "#1f2326"
-  const hue =
-    CLUSTER_HUE_START +
-    ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
-  const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
-  return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
-}
+    // Spread cluster colors across a hue range that avoids the current ping's red.
+    const clusterColor = (cluster: number) => {
+      if (cluster < 0) return "#1f2326"
+      const hue =
+        CLUSTER_HUE_START +
+        ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
+      const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
+      return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+    }
 
-const isDensityAlgorithm = chartData.result.kind === "density"
+    const isDensityAlgorithm = chartData.result.kind === "density"
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const pingCircle = (api: EChartsApi, scale = 1) => {
@@ -394,6 +396,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           showXray: layerStateRef.current.showXray,
           nextPathVisible,
           pulseStrength,
+          pingFloatOffset,
           isDensityAlgorithm,
           clusterColor
         })
@@ -518,7 +521,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       const ping = chartData.pings[pingIndex]
       return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
     })
-    
+
     const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
       if (!element || element.style.visibility === "hidden") return false
       return !(
@@ -528,7 +531,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
         top >= element.offsetTop + element.offsetHeight + gap
       )
     }
- 
+
     // Position the selection tooltip without covering selected pings, their connecting line, 
     // the pointer, or the hover tooltip; hide it if no position fits
     const positionComparisonTooltip = () => {
@@ -544,7 +547,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       const gap = 16
       const tooltipWidth = tooltip.offsetWidth
       const tooltipHeight = tooltip.offsetHeight
-      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points, mapEl.clientWidth, mapEl.clientHeight )
+      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points, mapEl.clientWidth, mapEl.clientHeight)
         .find((candidate) =>
           !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
           (!hoveredPoint || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, hoveredPoint)) &&
@@ -958,14 +961,17 @@ const isDensityAlgorithm = chartData.result.kind === "density"
 
     mapChart.setOption(
       createDemoMapChartOptions({
-        chartData,
+        getChartData: () => chartData,
         bounds,
-        hoverBuildingId,
-        hoverPingIndexes,
+        getHoverBuildingId: () => hoverBuildingId,
+        getHoverPingIndexes: () => hoverPingIndexes,
         pingTooltipPosition,
         algorithm: panel.algo,
-        showXray: layerStateRef.current.showXray,
-        activeTimestamp: activeTimestamp()
+        getShowXray: () => layerStateRef.current.showXray,
+        getShowStops: () => layerStateRef.current.showStops,
+        getActiveTimestamp: activeTimestamp,
+        destinationPreview,
+        clusterColor
       })
     )
     const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
@@ -973,11 +979,13 @@ const isDensityAlgorithm = chartData.result.kind === "density"
 
     timelineChart.setOption(
       createDemoTimelineChartOptions({
-        chartData,
+        getChartData: () => chartData,
         timeMin,
         timeMax,
         getHoverPingIndex: () => hoverPingIndex,
-        getSelectedPingIndexes: () => selectedPingIndexesRef.current
+        getSelectedPingIndexes: () => selectedPingIndexesRef.current,
+        destinationPreview,
+        clusterColor
       })
     )
 
@@ -1009,7 +1017,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
     if (destinationPreview) {
       return () => {
         window.removeEventListener("resize", resize)
-        updateResultRef.current = () => {}
+        updateResultRef.current = () => { }
         renderSceneRef.current = null
         mapEl.style.touchAction = previousTouchAction
         timelineEl.style.touchAction = previousTimelineTouchAction
@@ -1044,31 +1052,41 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({
         series: [
-...(ended ? [] : [
-  { id: "streets", data: chartData.streets.map((_, index) => index) },
-  { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
-  {
-    id: "buildings",
-    data: groundTruthBuildingsSeriesData(
-      timestampSeconds,
-      chartData,
-      layerStateRef.current.showGroundTruth,
-      pulseStrength,
-      hoverBuildingId,
-    ),
-  },
-  {
-    id: "building-glow",
-    data: groundTruthBuildingGlowData(
-      timestampSeconds,
-      chartData,
-      layerStateRef.current.showGroundTruth,
-      pulseStrength,
-      hoverBuildingId,
-    ),
-  },
-]),
-{ id: "current-ping", data: currentPingData(timestampSeconds) },
+          ...(ended ? [] : [
+            { id: "streets", data: chartData.streets.map((_, index) => index) },
+            { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
+            {
+              id: "buildings",
+              data: groundTruthBuildingsSeriesData(
+                timestampSeconds,
+                chartData,
+                layerStateRef.current.showGroundTruth,
+                pulseStrength,
+                hoverBuildingId,
+              ),
+            },
+            {
+              id: "building-glow",
+              data: groundTruthBuildingGlowData(
+                timestampSeconds,
+                chartData,
+                layerStateRef.current.showGroundTruth,
+                pulseStrength,
+                hoverBuildingId,
+              ),
+            },
+          ]),
+          {
+            id: "current-ping",
+            data: currentPingData(
+              timestampSeconds,
+              chartData,
+              latestPingIndexAt(timestampSeconds, scene.pings),
+              layerStateRef.current.showStops,
+              hoverPingIndexes,
+              pingFloatOffset,
+            ),
+          },
         ],
       })
       if (!ended) {
@@ -1194,7 +1212,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       {syncMaster && variant === "full" && (
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
-          <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
+            <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
               {playbackState !== "complete" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1279,7 +1297,7 @@ export function CompareAnimationPanel({
   return (
     <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0">
       <CardHeader className="py-3 px-4 shrink-0">
-      <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
             <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">

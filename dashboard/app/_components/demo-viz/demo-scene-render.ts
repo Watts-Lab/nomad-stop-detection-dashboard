@@ -3,7 +3,7 @@
 import type { DemoResultData } from "../../_lib/demo-result-data"
 import { 
     connectedPingIndexes, relatedPingIndexesAt, anchorOpacity, associatedWithHover, 
-    associationOpacity, edgeOpacity, pingScale, selectedPingLineData
+    associationOpacity, edgeOpacity, selectedPingLineData
 } from "./demo-interactions"
 import { hoveredAssignedBuildingData, pingClassifiedAt, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
 import { groundTruthBuildingGlowData, groundTruthBuildingsSeriesData } from "./overlays/demo-ground-truth"
@@ -73,6 +73,34 @@ export function resolveHoverPingIndexes({
     return null
 }
 
+// Prepare the current ping's position, classification, opacity,
+// and floating offset for the map renderer.
+export function currentPingData(
+    timestampSeconds: number,
+    chartData: DemoResultData,
+    latestPingIndex: number,
+    showStops: boolean,
+    hoverPingIndexes: Set<number> | null,
+    pingFloatOffset: number,
+  ) {
+    const ping = chartData.pingData[latestPingIndex]
+    const cluster =
+      showStops &&
+      pingClassifiedAt(latestPingIndex, timestampSeconds, chartData)
+        ? ping[2]
+        : -1
+  
+    return [[
+      ping[0],
+      ping[1],
+      cluster,
+      latestPingIndex,
+      ping[4],
+      associationOpacity(latestPingIndex, hoverPingIndexes),
+      pingFloatOffset,
+    ]]
+  }
+
 type BuildDemoMapSeriesArgs = {
     timestampSeconds: number
     chartData: DemoResultData
@@ -97,6 +125,7 @@ type BuildDemoMapSeriesArgs = {
     pulseStrength: number
     isDensityAlgorithm: boolean
     clusterColor: (cluster: number) => string
+    pingFloatOffset: number
 }
 
 export function buildDemoMapSeries({
@@ -116,25 +145,19 @@ export function buildDemoMapSeries({
     showXray,
     nextPathVisible,
     pulseStrength,
+    pingFloatOffset,
     isDensityAlgorithm,
     clusterColor
 }: BuildDemoMapSeriesArgs) {
-    const styledScatterPoint = (point: number[]) => ({
-        value: point,
-        symbolSize: 5 * pingScale(point[3], hoverPingIndexes),
-        itemStyle: {
-            opacity: associationOpacity(point[3], hoverPingIndexes)
-        }
-    })
+    const styledScatterPoint = (point: number[]) => [
+        ...point,
+        associationOpacity(point[3], hoverPingIndexes),
+      ]
 
-    const styledXrayPoint = (point: number[]) => ({
-        value: point,
-        symbolSize: 15 * pingScale(point[3], hoverPingIndexes),
-        itemStyle: {
-            color: clusterColor(point[2]),
-            opacity: anchorOpacity(point[3], hoverPingIndexes)
-        }
-    })
+      const styledXrayPoint = (point: number[]) => [
+        ...point,
+        anchorOpacity(point[3], hoverPingIndexes),
+      ]
 
     return [
         {
@@ -197,13 +220,10 @@ export function buildDemoMapSeries({
         ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
         {
             id: "ghost-pings",
-            data: chartData.pingData.map((point) => ({
-                value: point,
-                symbolSize: 5 * pingScale(point[3], hoverPingIndexes),
-                itemStyle: {
-                    opacity: associatedWithHover(point[3], hoverPingIndexes) ? 1 : 0.18
-                }
-            }))
+            data: chartData.pingData.map((point) => [
+              ...point,
+              associatedWithHover(point[3], hoverPingIndexes) ? 1 : 0.18,
+            ]),
         },
         {
             id: "noise-pings",
@@ -276,31 +296,14 @@ export function buildDemoMapSeries({
         },
         {
             id: "current-ping",
-            data: [{
-                value: [
-                    chartData.pingData[latestPingIndex][0],
-                    chartData.pingData[latestPingIndex][1],
-                    showStops &&
-                        pingClassifiedAt(latestPingIndex, timestampSeconds, chartData)
-                        ? chartData.pingData[latestPingIndex][2]
-                        : -1,
-                    latestPingIndex,
-                    chartData.pingData[latestPingIndex][4]
-                ],
-                itemStyle: {
-                    opacity: associationOpacity(
-                        latestPingIndex,
-                        hoverPingIndexes
-                    )
-                }
-            }]
-        },
-        {
-            id: "current-ping-hole",
-            data: [[
-                chartData.pingData[latestPingIndex][0],
-                chartData.pingData[latestPingIndex][1]
-            ]]
+            data: currentPingData(
+              timestampSeconds,
+              chartData,
+              latestPingIndex,
+              showStops,
+              hoverPingIndexes,
+              pingFloatOffset,
+            ),
         },
         {
             id: "distance-circles",

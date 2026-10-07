@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Columns2, HelpCircle, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
@@ -283,26 +283,30 @@ export function MetricsView({
         </div>
       </div>
 
-      <div className={`${revealClass("panel", 2)} grid flex-none ${metricsCompareMode ? "grid-rows-[680px_auto]" : "grid-rows-[360px_auto]"} gap-3 overflow-visible lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_330px] lg:grid-rows-1 lg:items-stretch lg:overflow-hidden`}>
-        <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0 flex flex-col">
-          <CardContent className="min-h-0 flex-1 overflow-y-auto p-2">
-            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(320px,1fr)_minmax(320px,1fr)]" : "h-full"}`}>
-              <MetricsFrame src={leftMetricsPrototypeSrc} title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`} label={metricsLeftAlgorithm} showTourTargets />
+      <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_330px] lg:items-stretch`}>
+        <Card className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f8f9fc] py-0">
+          <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
+            <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
+              <MetricsFrame
+                src={leftMetricsPrototypeSrc}
+                title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`}
+                label={metricsLeftAlgorithm}
+                showTourTargets
+              />
 
               {metricsCompareMode && (
-                <MetricsFrame src={rightMetricsPrototypeSrc} title={`${metricsRightAlgorithm} ${metricsChartView} metrics`} label={metricsRightAlgorithm} />
+                <MetricsFrame
+                  src={rightMetricsPrototypeSrc}
+                  title={`${metricsRightAlgorithm} ${metricsChartView} metrics`}
+                  label={metricsRightAlgorithm}
+                />
               )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="min-h-0 overflow-visible bg-[#f8f9fc] py-0 lg:overflow-hidden" data-tour="metrics-controls">
-          <CardHeader className="shrink-0 px-5 py-3">
-            <CardTitle className="text-lg font-semibold text-[#3b1370]">
-              {metricsCompareMode ? `${metricsLeftAlgorithm} vs ${metricsRightAlgorithm}` : metricsLeftAlgorithm}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 space-y-2 overflow-visible px-5 pb-4 lg:overflow-y-auto">
+        <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-0" data-tour="metrics-controls">
+          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 pb-4 pt-4">
             <Button
               variant="outline"
               size="sm"
@@ -320,7 +324,7 @@ export function MetricsView({
                   aria-pressed={metricsChartView === "recall"}
                   onClick={() => setMetricsChartView("recall")}
                 >
-                  Minute recall
+                  By-minute recall
                 </Button>
                 <Button
                   variant={metricsChartView === "failures" ? "default" : "ghost"}
@@ -328,7 +332,7 @@ export function MetricsView({
                   aria-pressed={metricsChartView === "failures"}
                   onClick={() => setMetricsChartView("failures")}
                 >
-                  Failure types
+                  Failure modes
                 </Button>
               </div>
             </div>

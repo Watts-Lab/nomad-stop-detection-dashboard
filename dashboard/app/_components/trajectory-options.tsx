@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { Check, HelpCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { TRAJECTORY_OPTIONS } from "../_lib/dashboard-data"
 
 // Render the shared trajectory choices.
@@ -12,16 +13,19 @@ export function TrajectoryOptions({
   onChange: (trajectoryId: string) => void
   preview?: (trajectoryId: string) => ReactNode
 }) {
+  const descriptionIdPrefix = useId()
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
 
   return (
-    <div className="space-y-1.5">
+    <div className="overflow-hidden rounded-md border border-border/70 bg-background/30">
       {TRAJECTORY_OPTIONS.map((trajectory) => {
         const selected = value === trajectory.id
         const showingInfo = trajectoryInfoId === trajectory.id
+        const descriptionId = `${descriptionIdPrefix}-${trajectory.id}`
+
         return (
-          <div key={trajectory.id} className="space-y-1.5">
-            <div className="flex items-center gap-2">
+          <div key={trajectory.id} className="border-b border-border/70 last:border-b-0">
+            <div className={`flex items-center gap-2 px-3 py-1 ${selected ? "bg-[#e8d8fc]" : ""}`}>
               <button
                 type="button"
                 onClick={() => {
@@ -29,33 +33,32 @@ export function TrajectoryOptions({
                   onChange(trajectory.id)
                 }}
                 aria-pressed={selected}
-                className={`flex h-9 flex-1 items-center justify-between rounded-md px-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]/40 ${
+                className={`flex h-8 min-w-0 flex-1 items-center justify-between text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]/40 ${
                   selected
-                    ? "border-2 border-[#7629db] bg-[#e8d8fc] font-bold text-[#3b1370]"
-                    : "border border-[#d1d5db] bg-[#f8f9fc] font-medium text-foreground hover:bg-white"
+                    ? "font-semibold text-[#3b1370]"
+                    : "font-medium text-foreground hover:text-[#3b1370]"
                 }`}
-                >
-                  <span>{trajectory.name}</span>
-                  {selected && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
+              >
+                <span className="truncate">{trajectory.name}</span>
+                {selected && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
               </button>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="icon-sm"
                 onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
                 aria-expanded={showingInfo}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-                  showingInfo
-                    ? "border-[#7629db] bg-[#e8d8fc] text-[#3b1370]"
-                    : "border-[#d1d5db] bg-[#f8f9fc] text-[#3b1370] hover:bg-white"
-                }`}
+                aria-controls={descriptionId}
+                className={`rounded-full hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 aria-label={`Show ${trajectory.name} trajectory info`}
               >
                 <HelpCircle className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
             {showingInfo && (
-              <div className="mr-10 space-y-1.5">
+              <div id={descriptionId} className="mx-3 mb-3 space-y-1.5">
                 {preview?.(trajectory.id)}
-                <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] p-3 text-sm leading-relaxed text-foreground">
+                <div className="rounded-md border bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
                   {trajectory.note}
                 </div>
               </div>

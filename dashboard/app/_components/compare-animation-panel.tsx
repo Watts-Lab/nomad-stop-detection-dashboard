@@ -2403,7 +2403,7 @@ export function CompareAnimationPanel({
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-5">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-3">
         {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer

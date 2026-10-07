@@ -225,6 +225,16 @@ export function DemoSceneRenderer({
     verticalRunsByX.forEach((spans, x) => {
       mergeAxisRuns(spans).forEach(([minY, maxY]) => streetLanes.push([[x, minY], [x, maxY]]))
     })
+    const cityPoints = [
+      ...buildings.flatMap((building) => building.coords),
+      ...streets.flatMap((street) => street.coords),
+    ]
+    const cityBounds = {
+      minX: Math.min(...cityPoints.map(([x]) => x)),
+      minY: Math.min(...cityPoints.map(([, y]) => y)),
+      maxX: Math.max(...cityPoints.map(([x]) => x)),
+      maxY: Math.max(...cityPoints.map(([, y]) => y)),
+    }
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
@@ -244,6 +254,7 @@ export function DemoSceneRenderer({
       destinationBuildings,
       destinationDuration: destinationElapsed,
       destinationBounds,
+      cityBounds,
       timeSequence: Array.from(times).sort((a, b) => a - b),
     }
   }, [scene.buildings, scene.destinationDiary, scene.pings, scene.routes, scene.truth])
@@ -358,7 +369,6 @@ export function DemoSceneRenderer({
     const coreTimelineData = densityCorePointData.map((point) => [point[4] * 1000, point[2], point[3]])
     const focusBuildings = [
       ...sceneData.truthStops.flatMap((stop) => stop.location ? sceneData.buildingById.get(stop.location) ?? [] : []),
-      ...stops.flatMap((stop) => stop.destination.id ? sceneData.buildingById.get(stop.destination.id) ?? [] : []),
     ]
     const focusPoints = [
       ...pings.map((ping) => [ping.x, ping.y]),
@@ -392,6 +402,7 @@ export function DemoSceneRenderer({
       destinationBuildings: sceneData.destinationBuildings,
       destinationDuration: sceneData.destinationDuration,
       destinationBounds: sceneData.destinationBounds,
+      cityBounds: sceneData.cityBounds,
       focusBounds: {
         minX: Math.min(...focusXs),
         minY: Math.min(...focusYs),
@@ -425,6 +436,10 @@ export function DemoSceneRenderer({
     timelineEl.style.touchAction = "none"
     const mapChart = echarts.getInstanceByDom(mapEl) ?? echarts.init(mapEl, null, { renderer: "canvas" })
     const timelineChart = echarts.getInstanceByDom(timelineEl) ?? echarts.init(timelineEl, null, { renderer: "canvas" })
+    if (mode === "compare") {
+      mapChart.group = "compare-map"
+      echarts.connect(mapChart.group)
+    }
     const focusBounds = destinationPreview ? chartData.destinationBounds : chartData.focusBounds
     const minX = focusBounds.minX
     const minY = focusBounds.minY
@@ -434,27 +449,72 @@ export function DemoSceneRenderer({
     const ySpan = maxY - minY
     const xPad = Math.max(28, xSpan * 0.14)
     const yPad = Math.max(28, ySpan * 0.14)
-    const mapBounds = () => {
-      const mapZoom = 1.45
-      const baseX = xSpan + xPad * 2
-      const baseY = ySpan + yPad * 2
-      const plotRatio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
-      const xRange = (baseX / baseY < plotRatio ? baseY * plotRatio : baseX) / mapZoom
-      const yRange = (baseX / baseY < plotRatio ? baseY : baseX / plotRatio) / mapZoom
-      const xCenter = (minX + maxX) / 2
-      const yCenter = (minY + maxY) / 2
+    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+    const expandToRatio = (bounds: { minX: number, minY: number, maxX: number, maxY: number }, ratio: number) => {
+      const width = bounds.maxX - bounds.minX
+      const height = bounds.maxY - bounds.minY
+      const centerX = (bounds.minX + bounds.maxX) / 2
+      const centerY = (bounds.minY + bounds.maxY) / 2
+      const expandedWidth = width / height < ratio ? height * ratio : width
+      const expandedHeight = width / height < ratio ? height : width / ratio
       return {
-        xMin: xCenter - xRange / 2,
-        xMax: xCenter + xRange / 2,
-        yMin: yCenter - yRange / 2,
-        yMax: yCenter + yRange / 2,
+        minX: centerX - expandedWidth / 2,
+        maxX: centerX + expandedWidth / 2,
+        minY: centerY - expandedHeight / 2,
+        maxY: centerY + expandedHeight / 2,
+      }
+    }
+    const mapBounds = () => {
+      const plotRatio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
+      if (destinationPreview) {
+        const mapZoom = 1.45
+        const baseX = xSpan + xPad * 2
+        const baseY = ySpan + yPad * 2
+        const xRange = (baseX / baseY < plotRatio ? baseY * plotRatio : baseX) / mapZoom
+        const yRange = (baseX / baseY < plotRatio ? baseY : baseX / plotRatio) / mapZoom
+        const xCenter = (minX + maxX) / 2
+        const yCenter = (minY + maxY) / 2
+        const view = {
+          minX: xCenter - xRange / 2,
+          maxX: xCenter + xRange / 2,
+          minY: yCenter - yRange / 2,
+          maxY: yCenter + yRange / 2,
+        }
+        return { axis: view, view }
+      }
+
+      const world = expandToRatio(chartData.cityBounds, plotRatio)
+      const snug = expandToRatio(focusBounds, plotRatio)
+      const width = (snug.maxX - snug.minX) * 1.4
+      const height = (snug.maxY - snug.minY) * 1.4
+      const cityWidth = chartData.cityBounds.maxX - chartData.cityBounds.minX
+      const cityHeight = chartData.cityBounds.maxY - chartData.cityBounds.minY
+      const limits = width > cityWidth || height > cityHeight ? world : chartData.cityBounds
+      const centerX = (focusBounds.minX + focusBounds.maxX) / 2
+      const centerY = (focusBounds.minY + focusBounds.maxY) / 2
+      const viewMinX = clamp(centerX - width / 2, limits.minX, limits.maxX - width)
+      const viewMinY = clamp(centerY - height / 2, limits.minY, limits.maxY - height)
+      return {
+        axis: world,
+        view: {
+          minX: viewMinX,
+          maxX: viewMinX + width,
+          minY: viewMinY,
+          maxY: viewMinY + height,
+        },
       }
     }
     const applyMapBounds = () => {
       const bounds = mapBounds()
       mapChart.setOption({
-        xAxis: { min: bounds.xMin, max: bounds.xMax },
-        yAxis: { min: bounds.yMin, max: bounds.yMax },
+        xAxis: { min: bounds.axis.minX, max: bounds.axis.maxX },
+        yAxis: { min: bounds.axis.minY, max: bounds.axis.maxY },
+        ...(!destinationPreview && {
+          dataZoom: [
+            { id: "map-x-zoom", startValue: bounds.view.minX, endValue: bounds.view.maxX },
+            { id: "map-y-zoom", startValue: bounds.view.minY, endValue: bounds.view.maxY },
+          ],
+        }),
       })
     }
     const timeMin = destinationPreview ? 0 : scene.pings[0].timestamp * 1000
@@ -1498,10 +1558,34 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
 
-    // Resize both charts, recalculate map bounds, and reposition tooltips
+    // Preserve the map camera while matching its bounds to the resized plot.
     const resize = () => {
+      const dataZoom = mapChart.getOption().dataZoom
+      const [xZoom, yZoom] = Array.isArray(dataZoom) ? dataZoom : []
       mapChart.resize()
-      applyMapBounds()
+      if (!destinationPreview && xZoom && yZoom) {
+        const bounds = mapBounds()
+        const minX = Number(xZoom.startValue)
+        const maxX = Number(xZoom.endValue)
+        const minY = Number(yZoom.startValue)
+        const maxY = Number(yZoom.endValue)
+        const centerX = (minX + maxX) / 2
+        const centerY = (minY + maxY) / 2
+        const area = (maxX - minX) * (maxY - minY)
+        const ratio = Math.max(1, mapEl.clientWidth - 24) / Math.max(1, mapEl.clientHeight - 24)
+        const height = Math.sqrt(area / ratio)
+        const width = height * ratio
+        mapChart.setOption({
+          xAxis: { min: bounds.axis.minX, max: bounds.axis.maxX },
+          yAxis: { min: bounds.axis.minY, max: bounds.axis.maxY },
+          dataZoom: [
+            { id: "map-x-zoom", startValue: centerX - width / 2, endValue: centerX + width / 2 },
+            { id: "map-y-zoom", startValue: centerY - height / 2, endValue: centerY + height / 2 },
+          ],
+        })
+      } else {
+        applyMapBounds()
+      }
       timelineChart.resize()
       refreshTooltipLayout()
     }
@@ -1557,23 +1641,27 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       animation: false,
       animationDurationUpdate: 0,
       backgroundColor: "#f8f9fc",
-      grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
-      xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
-      yAxis: { type: "value", min: bounds.yMin, max: bounds.yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+      grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: false },
+      xAxis: { type: "value", min: bounds.axis.minX, max: bounds.axis.maxX, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+      yAxis: { type: "value", min: bounds.axis.minY, max: bounds.axis.maxY, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
       dataZoom: [
         {
+          id: "map-x-zoom",
           type: "inside",
           xAxisIndex: 0,
           filterMode: "none",
+          ...(!destinationPreview && { startValue: bounds.view.minX, endValue: bounds.view.maxX }),
           zoomOnMouseWheel: "ctrl",
           moveOnMouseMove: true,
           moveOnMouseWheel: false,
           preventDefaultMouseMove: true,
         },
         {
+          id: "map-y-zoom",
           type: "inside",
           yAxisIndex: 0,
           filterMode: "none",
+          ...(!destinationPreview && { startValue: bounds.view.minY, endValue: bounds.view.maxY }),
           zoomOnMouseWheel: "ctrl",
           moveOnMouseMove: true,
           moveOnMouseWheel: false,
@@ -2025,7 +2113,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
       animationEasingUpdate: "cubicOut",
       grid: destinationPreview
         ? { left: 0, right: 0, top: 0, bottom: 0 }
-        : { left: 34, right: 22, top: 0, bottom: 28 },
+        : { left: 28, right: 28, top: 0, bottom: 28 },
       dataZoom: [{
         id: "timeline-zoom",
         type: "inside",
@@ -2456,7 +2544,7 @@ export function CompareAnimationPanel({
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
-      <CardHeader className="py-3 px-4 shrink-0">
+      <CardHeader className="shrink-0 px-3 pt-2 pb-1">
       <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
@@ -2468,7 +2556,7 @@ export function CompareAnimationPanel({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-3">
+      <CardContent className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-0">
         {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer

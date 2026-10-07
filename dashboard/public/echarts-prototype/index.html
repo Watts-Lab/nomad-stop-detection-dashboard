@@ -95,26 +95,31 @@
           }))
           .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.recall))
           .sort((a, b) => a.user_id.localeCompare(b.user_id) || a.x - b.x);
+        const xValues = rows.map((d) => d.x);
+        const minX = Math.min(...xValues);
+        const maxX = Math.max(...xValues);
+        const axisMinX = xMinParam === null ? minX : Number(xMinParam);
+        const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
 
         if (chartView === "failures") {
           const failureTypes = [
-            { field: "missed_split_fraction", label: "Missed/split stops", color: "#f89540", description: "True stops the algorithm missed or divided into multiple stops." },
-            { field: "merged_fraction", label: "Merged stops", color: "#6b8e23", description: "Separate true stops the algorithm treated as one." },
+            { field: "missed_split_fraction", label: "% missed/split", color: "#f89540", description: "Percentage of true stops not detected or split as multiple correct stops." },
+            { field: "merged_fraction", label: "% merged", color: "#6b8e23", description: "Percentage of true stops (partially) detected as part of a stop in a different location." },
           ];
           const failureRowsByX = new Map();
           rows.forEach((row) => {
             failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
           });
-          const xValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
-          const failureData = failureTypes.map((failure) => xValues.map((x) => {
+          const failureXValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
+          const failureData = failureTypes.map((failure) => failureXValues.map((x) => {
             const values = failureRowsByX.get(x).map((row) => row[failure.field]);
-            return values.reduce((sum, value) => sum + value, 0) / values.length;
+            return [x, values.reduce((sum, value) => sum + value, 0) / values.length];
           }));
 
           chart.setOption({
             animationDurationUpdate: 0,
             grid: failureTypes.map((_, index) => ({
-              left: 52,
+              left: 28,
               right: 24,
               top: `${8 + index * 45}%`,
               height: "36%",
@@ -139,18 +144,25 @@
               formatter: (events) => {
                 const event = events[0];
                 const failure = failureTypes[event.seriesIndex];
-                return `<div style="box-sizing:border-box;width:220px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:6px"><span style="color:#9ca3af">True stops affected</span><span style="font-family:monospace">${(event.value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${event.name}</span></div><div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere">${failure.description}</div></div>`;
+                const [x, value] = event.value;
+                return `<div style="min-width:180px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:6px"><span style="color:#9ca3af">True stops affected</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div><div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere">${failure.description}</div></div>`;
               },
             },
             xAxis: failureTypes.map((_, index) => ({
-              type: "category",
-              data: xValues,
+              type: "value",
               gridIndex: index,
-              boundaryGap: false,
               name: index === failureTypes.length - 1 ? `Parameter: ${parameterLabel(xLabel)}` : "",
               nameLocation: "center",
-              nameGap: 16,
-              axisLabel: { fontSize: 11, show: index === failureTypes.length - 1 },
+              nameGap: 26,
+              min: axisMinX,
+              max: axisMaxX,
+              splitLine: {
+                lineStyle: {
+                  color: "#ddd",
+                  type: "dotted",
+                },
+              },
+              axisLabel: { fontSize: 13, show: index === failureTypes.length - 1 },
               axisTick: { show: index === failureTypes.length - 1 },
               nameTextStyle: {
                 fontSize: 14,
@@ -164,18 +176,19 @@
               name: failure.label,
               nameLocation: "middle",
               nameRotate: 90,
-              nameGap: 40,
-              nameTextStyle: { fontSize: 12, fontWeight: 600 },
+              nameGap: 48,
+              nameTextStyle: { fontSize: 14 },
               type: "value",
               gridIndex: index,
+              axisLine: { show: true },
               min: 0,
               max: 1,
               interval: 0.5,
               axisLabel: {
-                fontSize: 10,
+                fontSize: 13,
                 formatter: (value) => `${value * 100}%`,
               },
-              splitLine: { lineStyle: { color: "#e5e7eb" } },
+              splitLine: { lineStyle: { color: "#ddd", type: "dotted" } },
             })),
             series: failureTypes.map((failure, index) => ({
               name: failure.label,
@@ -234,11 +247,6 @@
             .map((userRows) => Math.max(...userRows.filter((d) => d.x <= x).map((d) => d.recall)))
             .reduce((sum, value) => sum + value, 0) / byUser.size,
         ]);
-        const xValues = rows.map((d) => d.x);
-        const minX = Math.min(...xValues);
-        const maxX = Math.max(...xValues);
-        const axisMinX = xMinParam === null ? minX : Number(xMinParam);
-        const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
         const meanPerUserMaxLabel = "Mean user max";
         const highestAverageLabel = "Best mean";
         const averageUserMaxLabel = "Avg user max";

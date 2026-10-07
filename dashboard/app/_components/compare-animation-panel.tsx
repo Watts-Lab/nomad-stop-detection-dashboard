@@ -33,11 +33,16 @@ import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./
 import { partialPath, routeProgressAt } from "./demo-viz/demo-route-animation"
 import { buildDemoMapSeries, resolveHoverPingIndexes } from "./demo-viz/demo-scene-render"
 
-const DEMO_CLUSTER_COLORS = [
-  "#f6d746", "#f89540", "#dc5039", "#a11b63", "#5d126e", "#1f4f99", "#149a8f", "#00a8cc", "#72b01d", "#8c6d31",
-  "#e377c2", "#9467bd", "#2ca02c", "#d62728", "#17becf", "#bcbd22", "#8c564b", "#ff6f91", "#6b8e23", "#00b894",
-  "#0984e3", "#6c5ce7", "#e17055", "#d63031", "#008080", "#c44569", "#4a69bd", "#f19066", "#b33771", "#218c74",
-]
+const CURRENT_PING_COLOR = "#d83832"
+// Hue of CURRENT_PING_COLOR, and the half-width of the arc around it kept free of cluster colors
+const CURRENT_PING_HUE = 2
+const CURRENT_PING_HUE_GUARD = 30
+// Cluster hues occupy the rest of the wheel, phased so the first stop lands on the yellow
+// the hand-picked palette used to start with
+const CLUSTER_HUE_START = CURRENT_PING_HUE + CURRENT_PING_HUE_GUARD
+const CLUSTER_HUE_SPAN = 360 - 2 * CURRENT_PING_HUE_GUARD
+const CLUSTER_HUE_PHASE = (49 - CLUSTER_HUE_START) / CLUSTER_HUE_SPAN
+const CLUSTER_HUE_PEAK = 55
 const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
@@ -52,7 +57,7 @@ const elapsedTimeLabel = (seconds: number) => {
 
 // Render and control the interactive map and timeline, 
 // including hover, selection, playback, and panel synchronization
-function DemoSceneRenderer({
+export function DemoSceneRenderer({
   panel,
   mode,
   currentTime,
@@ -76,7 +81,7 @@ function DemoSceneRenderer({
   showGroundTruth: boolean
   showStops: boolean
   showXray: boolean
-  variant?: "full" | "preview"
+  variant?: "full" | "preview" | "destination-preview"
   onPreviewComplete?: () => void
   previewRunId?: number
   onReplayStart?: () => void
@@ -84,6 +89,7 @@ function DemoSceneRenderer({
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const scene = panel.scene
+  const destinationPreview = variant === "destination-preview"
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
@@ -106,10 +112,15 @@ function DemoSceneRenderer({
   // Prepare scene-derived map and timeline data shared across algorithm and config results.
   const sceneData = useMemo(
     () => prepareDemoSceneData(scene),
-    [scene.buildings, scene.pings, scene.routes, scene.truth],
+    [
+      scene.buildings,
+      scene.destinationDiary,
+      scene.pings,
+      scene.routes,
+      scene.truth,
+    ],
   )
-
-  // Prepare algorithm-specific visualization data from the selected result and scene.
+  
   const resultData = useMemo(
     () => sceneData ? prepareDemoResultData(panel, sceneData) : null,
     [panel.algo, panel.params, panel.result, scene.pings, sceneData],
@@ -135,10 +146,11 @@ function DemoSceneRenderer({
     timelineEl.style.touchAction = "none"
     const mapChart = echarts.getInstanceByDom(mapEl) ?? echarts.init(mapEl, null, { renderer: "canvas" })
     const timelineChart = echarts.getInstanceByDom(timelineEl) ?? echarts.init(timelineEl, null, { renderer: "canvas" })
-    const minX = chartData.focusBounds.minX
-    const minY = chartData.focusBounds.minY
-    const maxX = chartData.focusBounds.maxX
-    const maxY = chartData.focusBounds.maxY
+    const focusBounds = destinationPreview ? chartData.destinationBounds : chartData.focusBounds
+    const minX = focusBounds.minX
+    const minY = focusBounds.minY
+    const maxX = focusBounds.maxX
+    const maxY = focusBounds.maxY
     const xSpan = maxX - minX
     const ySpan = maxY - minY
     const xPad = Math.max(28, xSpan * 0.14)
@@ -166,8 +178,8 @@ function DemoSceneRenderer({
         yAxis: { min: bounds.yMin, max: bounds.yMax },
       })
     }
-    const timeMin = scene.pings[0].timestamp * 1000
-    const timeMax = scene.pings[scene.pings.length - 1].timestamp * 1000
+    const timeMin = destinationPreview ? 0 : scene.pings[0].timestamp * 1000
+    const timeMax = destinationPreview ? chartData.destinationDuration : scene.pings[scene.pings.length - 1].timestamp * 1000
     const preparedSegments = chartData.segments.map((segment) => {
       let length = 0
       const cumulative = [0]
@@ -191,6 +203,8 @@ function DemoSceneRenderer({
     let nextPathVisible = false
     let pulsePhase = 0
     let pulseStrength = 0
+    let pingFloatPhase = 0
+    let pingFloatOffset = 0
     let previewing = false
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
@@ -214,13 +228,22 @@ function DemoSceneRenderer({
       onPlaybackStateChangeRef.current?.(nextState)
     }
 
-    const clusterColor = (cluster: number) => cluster < 0 ? "#1f2326" : DEMO_CLUSTER_COLORS[cluster % DEMO_CLUSTER_COLORS.length]
-    const isDensityAlgorithm = chartData.result.kind === "density"
+   // Spread cluster colors across a hue range that avoids the current ping's red.
+const clusterColor = (cluster: number) => {
+  if (cluster < 0) return "#1f2326"
+  const hue =
+    CLUSTER_HUE_START +
+    ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
+  const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
+  return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+}
+
+const isDensityAlgorithm = chartData.result.kind === "density"
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
-    const pingCircle = (api: EChartsApi) => {
+    const pingCircle = (api: EChartsApi, scale = 1) => {
       const center = api.coord([api.value(0), api.value(1)])
-      const edge = api.coord([api.value(0) + chartData.blockSide / 8, api.value(1)])
+      const edge = api.coord([api.value(0) + chartData.blockSide / 8 * scale, api.value(1)])
       return { center, radius: Math.abs(edge[0] - center[0]) }
     }
 
@@ -320,6 +343,23 @@ function DemoSceneRenderer({
     // Redraw map and timeline layers for the active time, visibility settings, hover, and selection
     // Synchronize route animations
     const renderScene = (timestampSeconds: number) => {
+      if (destinationPreview) {
+        mapChart.setOption({
+          series: [
+            {
+              id: "buildings",
+              data: [
+                ...chartData.buildings.map((_, index) => [index, 0, 0, -1, 1]),
+                ...chartData.destinationBuildings.map(([index, color, scale]) => [index, 0, 0, color, scale]),
+              ],
+            },
+          ],
+        })
+        timelineChart.setOption({
+          series: [{ id: "stop-bars", data: chartData.destinationStops }],
+        })
+        return
+      }
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds, scene.pings)
       const route = routeProgressAt(timestampSeconds, preparedSegments)
@@ -377,7 +417,7 @@ function DemoSceneRenderer({
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount)
+      const previewPings = chartData.pingData.slice(0, pingCount).map((point) => [...point, 1])
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -398,7 +438,6 @@ function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
-          { id: "current-ping-hole", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],
@@ -956,15 +995,26 @@ function DemoSceneRenderer({
         selectedTimestampRef.current ?? data.timeSequence[data.timeSequence.length - 1],
       )
     }
-    const initialTimestamp = variant === "preview"
-      ? chartData.timeSequence[0]
-      : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
+    const initialTimestamp = destinationPreview
+      ? 0
+      : variant === "preview"
+        ? chartData.timeSequence[0]
+        : selectedTimestampRef.current ?? chartData.timeSequence[chartData.timeSequence.length - 1]
     sequenceIndex = chartData.timeSequence.findIndex((timestamp) => timestamp >= initialTimestamp)
     if (sequenceIndex < 0) sequenceIndex = chartData.timeSequence.length - 1
     paused = true
     syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
     window.addEventListener("resize", resize)
+    if (destinationPreview) {
+      return () => {
+        window.removeEventListener("resize", resize)
+        updateResultRef.current = () => {}
+        renderSceneRef.current = null
+        mapEl.style.touchAction = previousTouchAction
+        timelineEl.style.touchAction = previousTimelineTouchAction
+      }
+    }
     window.addEventListener("nomad-tour-action", onTourAction)
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("pointerup", onMapSelectionPointerUp)
@@ -988,36 +1038,49 @@ function DemoSceneRenderer({
       if (previewing) return
       const timestampSeconds = selectedTimestampRef.current ?? chartData.timeSequence[sequenceIndex]
       const ended = timestampSeconds >= chartData.timeSequence[chartData.timeSequence.length - 1]
-      if (ended && pulseStrength === 0) return
+      pingFloatPhase += 0.350
+      pingFloatOffset = -3 + Math.sin(pingFloatPhase) * 3
       pulsePhase = ended ? 0 : pulsePhase + 0.24
       pulseStrength = ended ? 0 : (Math.sin(pulsePhase) + 1) / 2
       mapChart.setOption({
         series: [
-          { id: "streets", data: chartData.streets.map((_, index) => index) },
-          { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
-          {
-            id: "buildings", data: groundTruthBuildingsSeriesData(
-              timestampSeconds,
-              chartData,
-              layerStateRef.current.showGroundTruth,
-              pulseStrength,
-              hoverBuildingId,
-            )
-          },
-          {
-            id: "building-glow", data: groundTruthBuildingGlowData(
-              timestampSeconds,
-              chartData,
-              layerStateRef.current.showGroundTruth,
-              pulseStrength,
-              hoverBuildingId,
-            )
-          },
+...(ended ? [] : [
+  { id: "streets", data: chartData.streets.map((_, index) => index) },
+  { id: "street-lanes", data: chartData.streetLanes.map((_, index) => index) },
+  {
+    id: "buildings",
+    data: groundTruthBuildingsSeriesData(
+      timestampSeconds,
+      chartData,
+      layerStateRef.current.showGroundTruth,
+      pulseStrength,
+      hoverBuildingId,
+    ),
+  },
+  {
+    id: "building-glow",
+    data: groundTruthBuildingGlowData(
+      timestampSeconds,
+      chartData,
+      layerStateRef.current.showGroundTruth,
+      pulseStrength,
+      hoverBuildingId,
+    ),
+  },
+]),
+{ id: "current-ping", data: currentPingData(timestampSeconds) },
         ],
       })
-      timelineChart.setOption({
-        series: [{ id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] }],
-      })
+      if (!ended) {
+        timelineChart.setOption({
+          series: [{
+            id: "current-truth-stop",
+            data: layerStateRef.current.showGroundTruth
+              ? currentTruthStopData(timestampSeconds, chartData, pulseStrength)
+              : [],
+          }],
+        })
+      }
     }, 80)
 
     return () => {
@@ -1055,7 +1118,7 @@ function DemoSceneRenderer({
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
     }
-  }, [mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
 
   useEffect(() => {
     layerStateRef.current = { showGroundTruth, showStops, showXray }
@@ -1093,9 +1156,10 @@ function DemoSceneRenderer({
   }, [previewRunId, syncMaster])
 
   useEffect(() => {
+    if (destinationPreview) return
     if (!resultData || currentTime !== null) return
     onTimeChange(variant === "preview" ? resultData.timeSequence[0] : resultData.timeSequence[resultData.timeSequence.length - 1])
-  }, [currentTime, onTimeChange, resultData, variant])
+  }, [currentTime, destinationPreview, onTimeChange, resultData, variant])
 
   useEffect(() => {
     const data = resultDataRef.current
@@ -1115,7 +1179,7 @@ function DemoSceneRenderer({
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)]">
+    <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
       {(selectedPings || selectedPing) && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
           {selectedPings ? <>
@@ -1163,10 +1227,10 @@ function DemoSceneRenderer({
           </TooltipProvider>
         </div>
       )}
-      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" ? "tour-map" : undefined} />
-      <div className={`flex shrink-0 flex-col bg-[#f8f9fc] ${variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" ? "tour-timeline" : undefined}>
-        <div ref={timelineRef} className="min-h-0 flex-1" />
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
+      <div ref={mapRef} className="min-h-0 flex-1 border-b border-[#d7dbd2]" data-tour={mode === "single" && !destinationPreview ? "tour-map" : undefined} />
+      <div className={`flex shrink-0 flex-col bg-[#f8f9fc] ${destinationPreview ? "h-6 justify-center px-1.5" : variant === "preview" ? "h-20" : mode === "single" ? "h-28" : "h-24"}`} data-tour={mode === "single" && !destinationPreview ? "tour-timeline" : undefined}>
+        <div ref={timelineRef} className={destinationPreview ? "h-3 shrink-0 overflow-hidden border border-[#f8f9fc]" : "min-h-0 flex-1"} />
+        {!destinationPreview && <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#d7dbd2] bg-[#f8f9fc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#3b1370]">
           <span>Timeline</span>
           <span className="font-mono tracking-normal text-[#202124]">
             {currentTime ? new Date(currentTime * 1000).toISOString().slice(11, 19) : "--:--:--"}
@@ -1174,7 +1238,7 @@ function DemoSceneRenderer({
           {selectedPingIndexes.length > 0 && (
             <button type="button" onClick={() => clearSelectionRef.current()} className="rounded border border-[#bfc6bb] bg-[#f8f9fc] px-2 py-0.5 text-[10px] text-[#3b1370] hover:bg-white hover:border-[#7629db]">Clear selection</button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )
@@ -1225,14 +1289,11 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
-        {mode === "compare" && panel && (
-          <p className="text-xs text-white">{Object.entries(panel.params).map(([name, value]) => `${parameterDisplayName(name)}: ${value}`).join(" · ")}</p>
-        )}
         {sceneMetadata && (
           <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
         )}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-5">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-3">
         {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer

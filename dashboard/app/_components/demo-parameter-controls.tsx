@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react"
 import { HelpCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { DEMO_EDITABLE_PARAMS } from "../_lib/dashboard-data"
@@ -92,16 +93,18 @@ export function DemoParameterControls({
                         {rule && Number.isFinite(value) ? value : param.defaultValue}
                       </span>
                     )}
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="icon-sm"
                       onClick={() => setParameterInfoName(showingInfo ? null : param.name)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border transition hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                      className={`rounded-full hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                       aria-label={`Show ${param.name} parameter info`}
                       aria-expanded={showingInfo}
                       aria-controls={descriptionId}
                     >
                       <HelpCircle className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -126,7 +129,7 @@ export function DemoParameterControls({
                 )}
               </div>
               {showingInfo && (
-                <div id={descriptionId} className="mx-3 mb-3 rounded-md border bg-muted/40 p-3 text-sm leading-relaxed text-muted-foreground">
+                <div id={descriptionId} className="mx-3 mb-3 rounded-md border bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
                   {param.description}
                 </div>
               )}

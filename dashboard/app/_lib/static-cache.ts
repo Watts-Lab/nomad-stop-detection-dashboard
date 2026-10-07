@@ -61,7 +61,7 @@ type ConfigRow = {
   config_id: number
 }
 
-type SceneCache = Pick<CompareScene, "crs" | "source" | "bounds" | "buildings">
+type SceneCache = Pick<CompareScene, "crs" | "source" | "bounds" | "buildings" | "destinationDiary">
 
 type SeedScene = {
   response: CompareScene
@@ -312,6 +312,7 @@ async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: s
       user_id: userId,
       bounds: scene.bounds,
       buildings: scene.buildings,
+      destinationDiary: scene.destinationDiary,
       pings,
       truth: diary,
       routes,

@@ -34,6 +34,10 @@ export type CompareScene = {
     type: string
     rings: number[][][]
   }>
+  destinationDiary: Array<{
+    location: string
+    duration: number
+  }>
   pings: Array<{
     x: number
     y: number

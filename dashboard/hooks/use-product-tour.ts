@@ -68,10 +68,17 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     },
   },
   {
+    element: "[data-tour='tour-data']",
+    popover: {
+      title: "Choose the Scenario and Agent",
+      description: "Changing the trajectory automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+    },
+  },
+  {
     element: "[data-tour='tour-params']",
     popover: {
-      title: "Choose the Scenario, Algorithm, and Parameters",
-      description: "Changing the trajectory, algorithm, or any editable parameter automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+      title: "Choose the Algorithm and Parameters",
+      description: "Changing the algorithm or any editable parameter automatically reruns the visualization.",
     },
   },
   {
@@ -95,7 +102,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-chart']",
     popover: {
       title: "Read the Parameter Sweep",
-      description: "Each pale blue dot shows one person's result at one parameter setting. The horizontal axis shows the setting being tested, while the vertical axis shows how much of the known stop time the algorithm recovered. Higher values indicate better detection.",
+      description: "Each pale blue dot shows one person's result at one parameter setting. The horizontal axis shows the setting being tested, while the vertical axis shows how much of the true stop time the algorithm recovered. Higher values indicate better detection.",
     },
   },
   {
@@ -116,7 +123,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-controls']",
     popover: {
       title: "Choose and Compare Algorithms",
-      description: "Use the control panel to select an algorithm and review the settings held fixed during the experiment. Switch to Compare to place two plots top and bottom. Each plot names the parameter being varied, while the vertical axis provides a common measure for comparison.",
+      description: "Minute recall shows the share of true stop time recovered; higher is better. Failure types shows the average share of true stops missed or split (orange), and merged (green); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
     },
   },
 ]

@@ -2452,11 +2452,10 @@ export function CompareAnimationPanel({
   sharedPlaybackState?: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
-  const sceneMetadata = panel ? `Agent: ${panel.scene.user_id}` : null
   const learnAlgorithmId = panel?.algo
 
   return (
-    <Card className="h-full min-h-0 overflow-hidden bg-[#f8f9fc] py-0">
+    <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
       <CardHeader className="py-3 px-4 shrink-0">
       <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
@@ -2468,9 +2467,6 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
-        {sceneMetadata && (
-          <p className="text-xs text-[#87A0BE]">{sceneMetadata}</p>
-        )}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col p-3">
         {panel ? (

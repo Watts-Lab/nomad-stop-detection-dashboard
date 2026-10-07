@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import { TrajectoryOptions } from "./trajectory-options"
 import type { MetricsParameterNote } from "../_lib/types"
@@ -36,18 +36,18 @@ function PinnedAgentCard({
     <div className="space-y-2">
       <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
       {pinned ? (
-        <div className="space-y-2 rounded-md border-2 border-[#7629db] bg-[#e8d8fc] px-3 py-2">
+        <div className="space-y-2 rounded-md border border-[#7629db] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-bold text-[#3b1370]">Agent</span>
-            <span className="truncate text-xs font-mono font-bold text-[#3b1370]">{pinned.userId}</span>
+            <span className="text-xs font-semibold text-foreground">agent</span>
+            <span className="truncate text-xs font-mono text-foreground">{pinned.userId}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-bold text-[#3b1370]">Best {parameterDisplayName(pinned.param)}</span>
-            <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.value}</span>
+            <span className="text-xs font-semibold text-foreground">best parameter</span>
+            <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-bold text-[#3b1370]">Minute recall</span>
-            <span className="text-xs font-mono font-bold text-[#3b1370]">{pinned.recall.toFixed(3)}</span>
+            <span className="text-xs font-semibold text-foreground">minute recall</span>
+            <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
             Open in Demo

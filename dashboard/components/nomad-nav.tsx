@@ -19,7 +19,7 @@ const navItems = [
 export function NomadNav({ currentView }: { currentView: DashboardView | "about" }) {
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-white">
-      <div className="nomad-page-frame flex h-[clamp(5rem,4.5rem+1vw,6.5rem)] items-center justify-between gap-[clamp(1.5rem,2.5vw,4rem)]">
+      <div className="nomad-page-frame flex items-center justify-between gap-[clamp(1.5rem,2.5vw,4rem)] px-4 py-3 lg:px-5">
         <Link
           href="/"
           prefetch={false}
@@ -32,7 +32,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
             width={212}
             height={37}
             priority
-            className="h-[clamp(2.25rem,1.9rem+0.6vw,3rem)] w-auto"
+            className="h-[clamp(1.8rem,1.52rem+0.48vw,2.4rem)] w-auto"
           />
         </Link>
         <nav className="hidden flex-1 items-center justify-end gap-[clamp(1.5rem,2vw,3rem)] text-[clamp(0.875rem,0.75rem+0.25vw,1.125rem)] font-semibold uppercase tracking-[0.025em] text-[#3a465d] lg:flex">
@@ -52,12 +52,7 @@ export function NomadNav({ currentView }: { currentView: DashboardView | "about"
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Button asChild size="lg" className="hidden h-[clamp(3rem,2.6rem+0.6vw,3.75rem)] rounded-xl bg-muted-foreground px-[clamp(1.25rem,1.5vw,2.25rem)] text-[clamp(0.9375rem,0.82rem+0.25vw,1.125rem)] font-semibold text-primary-foreground shadow-none hover:bg-primary sm:inline-flex">
-            <Link href="/?view=demo" prefetch={false}>
-              <span>Run Demo</span>
-            </Link>
-          </Button>
+        <div className="flex items-center">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon-lg" className="border-border bg-white text-foreground hover:bg-accent hover:text-primary lg:hidden" aria-label="Open navigation">

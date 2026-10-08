@@ -156,6 +156,16 @@ export function prepareDemoSceneData(
     verticalRunsByX.forEach((spans, x) => {
         mergeAxisRuns(spans).forEach(([minY, maxY]) => streetLanes.push([[x, minY], [x, maxY]]))
     })
+    const cityPoints = [
+        ...buildings.flatMap((building) => building.coords),
+        ...streets.flatMap((street) => street.coords),
+    ]
+    const cityBounds = {
+        minX: Math.min(...cityPoints.map(([x]) => x)),
+        minY: Math.min(...cityPoints.map(([, y]) => y)),
+        maxX: Math.max(...cityPoints.map(([x]) => x)),
+        maxY: Math.max(...cityPoints.map(([, y]) => y)),
+    }
     const start = scene.pings[0].timestamp
     const end = scene.pings[scene.pings.length - 1].timestamp
     const times = new Set([start, end])
@@ -175,6 +185,7 @@ export function prepareDemoSceneData(
         destinationBuildings,
         destinationDuration: destinationElapsed,
         destinationBounds,
+        cityBounds,
         timeSequence: Array.from(times).sort((a, b) => a - b),
     }
 }

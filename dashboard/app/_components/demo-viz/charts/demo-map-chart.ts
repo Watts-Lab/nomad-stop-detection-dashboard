@@ -13,15 +13,20 @@ const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
 
 type MapBounds = {
-  xMin: number
-  xMax: number
-  yMin: number
-  yMax: number
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+type MapChartBounds = {
+  axis: MapBounds
+  view: MapBounds
 }
 
 type MapChartOptionsArgs = {
   getChartData: () => DemoResultData
-  bounds: MapBounds
+  bounds: MapChartBounds
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
@@ -122,23 +127,27 @@ export function createDemoMapChartOptions({
     animation: false,
     animationDurationUpdate: 0,
     backgroundColor: "#f8f9fc",
-    grid: { left: 12, right: 12, top: 12, bottom: 12, containLabel: false },
-    xAxis: { type: "value", min: bounds.xMin, max: bounds.xMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
-    yAxis: { type: "value", min: bounds.yMin, max: bounds.yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+    grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: false },
+    xAxis: { type: "value", min: bounds.axis.minX, max: bounds.axis.maxX, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+    yAxis: { type: "value", min: bounds.axis.minY, max: bounds.axis.maxY, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
     dataZoom: [
       {
+        id: "map-x-zoom",
         type: "inside",
         xAxisIndex: 0,
         filterMode: "none",
+        ...(!destinationPreview && { startValue: bounds.view.minX, endValue: bounds.view.maxX }),
         zoomOnMouseWheel: "ctrl",
         moveOnMouseMove: true,
         moveOnMouseWheel: false,
         preventDefaultMouseMove: true,
       },
       {
+        id: "map-y-zoom",
         type: "inside",
         yAxisIndex: 0,
         filterMode: "none",
+        ...(!destinationPreview && { startValue: bounds.view.minY, endValue: bounds.view.maxY }),
         zoomOnMouseWheel: "ctrl",
         moveOnMouseMove: true,
         moveOnMouseWheel: false,
@@ -647,4 +656,4 @@ export function createDemoMapChartOptions({
       }
     ]
   }
-}        
+}

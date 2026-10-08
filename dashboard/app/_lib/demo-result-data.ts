@@ -259,11 +259,6 @@ export function prepareDemoResultData(
                 ? (sceneData.buildingById.get(stop.location) ?? [])
                 : [],
         ),
-        ...stops.flatMap((stop) =>
-            stop.destination.id
-                ? (sceneData.buildingById.get(stop.destination.id) ?? [])
-                : [],
-        ),
     ]
 
     const focusPoints = [
@@ -307,6 +302,7 @@ export function prepareDemoResultData(
         destinationBuildings: sceneData.destinationBuildings,
         destinationDuration: sceneData.destinationDuration,
         destinationBounds: sceneData.destinationBounds,
+        cityBounds: sceneData.cityBounds,
         focusBounds: {
             minX: Math.min(...focusXs),
             minY: Math.min(...focusYs),

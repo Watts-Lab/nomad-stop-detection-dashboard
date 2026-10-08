@@ -21,24 +21,13 @@ const teamGroups = [
         ],
       },
       {
-        name: "Lorenzo Santos",
-        initials: "LS",
-        photo: publicPath("/headshots/Lorenzo_Santos.jpg"),
-        role: "Researcher",
+        name: "Anoushka Menon",
+        initials: "AM",
+        photo: publicPath("/headshots/Anoushka_Menon.png"),
+        role: "M.S.E. Data Science · 2026",
         links: [
-          { label: "GitHub", href: "https://github.com/santosl529", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/lorenzo-santos-de", icon: Linkedin },
-        ],
-      },
-      {
-        name: "Darren Wang",
-        initials: "DW",
-        photo: publicPath("/headshots/Darren_Wang.png"),
-        role: "Researcher",
-        links: [
-          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
-          { label: "Personal website", href: "https://darren-wang.dev", icon: Globe },
+          { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
         ],
       },
       {
@@ -52,13 +41,13 @@ const teamGroups = [
         ],
       },
       {
-        name: "Anoushka Menon",
-        initials: "AM",
-        photo: publicPath("/headshots/Anoushka_Menon.png"),
-        role: "M.S.E. Data Science · 2026",
+        name: "Lorenzo Santos",
+        initials: "LS",
+        photo: publicPath("/headshots/Lorenzo_Santos.jpg"),
+        role: "Researcher",
         links: [
-          { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
+          { label: "GitHub", href: "https://github.com/santosl529", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/lorenzo-santos-de", icon: Linkedin },
         ],
       },
       {
@@ -77,6 +66,16 @@ const teamGroups = [
     title: "Alumni",
     members: [
       {
+        name: "Carol Tu",
+        initials: "CT",
+        photo: publicPath("/headshots/Carol_Tu.png"),
+        role: "B.S.E. Computer Science · 2026",
+        links: [
+          { label: "GitHub", href: "https://github.com/caroltuu", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/caroltuu", icon: Linkedin },
+        ],
+      },
+      {
         name: "Celia Tung",
         initials: "CT",
         photo: null,
@@ -87,13 +86,14 @@ const teamGroups = [
         ],
       },
       {
-        name: "Carol Tu",
-        initials: "CT",
-        photo: publicPath("/headshots/Carol_Tu.png"),
-        role: "B.S.E. Computer Science · 2026",
+        name: "Darren Wang",
+        initials: "DW",
+        photo: publicPath("/headshots/Darren_Wang.png"),
+        role: "Researcher",
         links: [
-          { label: "GitHub", href: "https://github.com/caroltuu", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/caroltuu", icon: Linkedin },
+          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
+          { label: "Personal website", href: "https://darren-wang.dev", icon: Globe },
         ],
       },
     ],

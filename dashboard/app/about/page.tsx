@@ -42,16 +42,6 @@ const teamGroups = [
         ],
       },
       {
-        name: "Celia Tung",
-        initials: "CT",
-        photo: null,
-        role: "Researcher",
-        links: [
-          { label: "GitHub", href: "https://github.com/cetung-gif", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/celia-tung-a76338308", icon: Linkedin },
-        ],
-      },
-      {
         name: "Tina Ni",
         initials: "TN",
         photo: publicPath("/headshots/Tina_Ni.jpg"),
@@ -61,11 +51,6 @@ const teamGroups = [
           { label: "LinkedIn", href: "https://www.linkedin.com/in/tina-ni-795838284", icon: Linkedin },
         ],
       },
-    ],
-  },
-  {
-    title: "Alumni",
-    members: [
       {
         name: "Anoushka Menon",
         initials: "AM",
@@ -74,6 +59,31 @@ const teamGroups = [
         links: [
           { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
+        ],
+      },
+      {
+        name: "Ruiqi Pan",
+        initials: "RP",
+        photo: null,
+        role: "Researcher",
+        links: [
+          { label: "GitHub", href: "https://github.com/ruiqipan", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/ruiqipan", icon: Linkedin },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Alumni",
+    members: [
+      {
+        name: "Celia Tung",
+        initials: "CT",
+        photo: null,
+        role: "Researcher",
+        links: [
+          { label: "GitHub", href: "https://github.com/cetung-gif", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/celia-tung-a76338308", icon: Linkedin },
         ],
       },
       {

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
+import { HelpCircle, Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -95,6 +95,7 @@ export function DemoSceneRenderer({
   const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => { })
   const replayRef = useRef<() => void>(() => { })
+  const stepToPingRef = useRef<(direction: number) => void>(() => { })
   const previewRef = useRef<() => void>(() => { })
   const clearSelectionRef = useRef<() => void>(() => { })
   const onReplayStartRef = useRef(onReplayStart)
@@ -851,17 +852,18 @@ export function DemoSceneRenderer({
     let dragging = false
 
     // Seek continuously as the pointer drags across the timeline
-    const onPointerMove = (event: MouseEvent) => {
+    const onPointerMove = (event: PointerEvent) => {
       if (!dragging || !timelineRef.current) return
       const rect = timelineRef.current.getBoundingClientRect()
       seekTo(timestampFromOffset(event.clientX - rect.left, event.clientY - rect.top))
     }
 
-    // End timeline dragging and remove its temporary mouse listeners
+    // End timeline dragging and remove its temporary pointer listeners
     const onPointerUp = () => {
       dragging = false
-      window.removeEventListener("mousemove", onPointerMove)
-      window.removeEventListener("mouseup", onPointerUp)
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerUp)
     }
 
     // Pause playback, seek to the pressed timeline position, and attach drag listeners
@@ -873,8 +875,9 @@ export function DemoSceneRenderer({
       seekTo(timestampFromOffset(event.offsetX, event.offsetY))
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
-      window.addEventListener("mousemove", onPointerMove)
-      window.addEventListener("mouseup", onPointerUp)
+      window.addEventListener("pointermove", onPointerMove)
+      window.addEventListener("pointerup", onPointerUp)
+      window.addEventListener("pointercancel", onPointerUp)
     }
     let wheelGesturePixels = 0
     let wheelDirection = 0
@@ -1080,6 +1083,7 @@ export function DemoSceneRenderer({
 
     toggleRef.current = toggle
     replayRef.current = replay
+    stepToPingRef.current = stepToPing
     previewRef.current = playLocalPreview
     clearSelectionRef.current = clearSelectedPings
     renderSceneRef.current = (timestampSeconds) => {
@@ -1202,10 +1206,12 @@ export function DemoSceneRenderer({
       window.removeEventListener("pointerup", onMapSelectionPointerUp)
       window.removeEventListener("pointercancel", onMapSelectionPointerCancel)
       mapEl.removeEventListener("pointerdown", onMapSelectionPointerDown)
-      window.removeEventListener("mousemove", onPointerMove)
-      window.removeEventListener("mouseup", onPointerUp)
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerUp)
       toggleRef.current = () => { }
       replayRef.current = () => { }
+      stepToPingRef.current = () => { }
       previewRef.current = () => { }
       clearSelectionRef.current = () => { }
       updateResultRef.current = () => { }
@@ -1302,6 +1308,19 @@ export function DemoSceneRenderer({
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
             <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => stepToPingRef.current(-1)}
+                    aria-label="Previous ping"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                  >
+                    <StepBack className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Previous ping</TooltipContent>
+              </Tooltip>
               {playbackState !== "complete" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1317,6 +1336,19 @@ export function DemoSceneRenderer({
                   <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
                 </Tooltip>
               )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => stepToPingRef.current(1)}
+                    aria-label="Next ping"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                  >
+                    <StepForward className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Next ping</TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

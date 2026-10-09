@@ -25,7 +25,7 @@ import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
-  scrubPlaybackTimestamp
+  scrubPlaybackTimestamp, wheelDeltaPixels, wheelScrubSeconds
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
@@ -859,12 +859,12 @@ export function DemoSceneRenderer({
       window.addEventListener("mousemove", onPointerMove)
       window.addEventListener("mouseup", onPointerUp)
     }
-    let wheelStepSeconds = 60
+    let wheelGesturePixels = 0
     let wheelDirection = 0
     let lastWheelTime = 0
 
     // Pause and scrub time by scrolling
-    // First scroll from the initial end view returns to the start, repeated scrolling accelerates
+    // First scroll from the initial end view returns to the start, continued scrolling accelerates
     const onTimelineWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
@@ -876,21 +876,20 @@ export function DemoSceneRenderer({
       const initializedAtEnd = wheelStartsAtEndRef.current && activeTime === maxTime
       wheelStartsAtEndRef.current = false
       if (initializedAtEnd) {
-        wheelStepSeconds = 60
+        wheelGesturePixels = 0
         wheelDirection = 0
         lastWheelTime = 0
         seekTo(minTime)
       } else {
-        const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
-        const direction = Math.sign(delta)
+        const deltaPixels = wheelDeltaPixels(event)
+        const direction = Math.sign(deltaPixels)
         const wheelTime = event.timeStamp
-        wheelStepSeconds = direction !== wheelDirection || wheelTime - lastWheelTime > 200
-          ? 60
-          : Math.min(wheelStepSeconds * 1.2, Math.max(60, (maxTime - minTime) / 15))
+        if (direction !== wheelDirection || wheelTime - lastWheelTime > 200) wheelGesturePixels = 0
+        const deltaSeconds = wheelScrubSeconds(deltaPixels, wheelGesturePixels, chartData.timeSequence)
+        wheelGesturePixels += Math.abs(deltaPixels)
         wheelDirection = direction
         lastWheelTime = wheelTime
-        const nextTimestamp = scrubPlaybackTimestamp(activeTime, direction * wheelStepSeconds, chartData.timeSequence)
-        seekTo(nextTimestamp)
+        seekTo(scrubPlaybackTimestamp(activeTime, deltaSeconds, chartData.timeSequence))
       }
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")

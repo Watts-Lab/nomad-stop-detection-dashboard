@@ -25,7 +25,7 @@ import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
-  scrubPlaybackTimestamp, wheelDeltaPixels, wheelScrubSeconds
+  scrubPlaybackTimestamp, wheelDeltaPixels, wheelScrubSeconds, adjacentPingTimestamp
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
@@ -784,7 +784,19 @@ export function DemoSceneRenderer({
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
 
-    // Use Space for playback/replay and arrow keys to move the second selected ping
+    // Pause and seek to the previous or next ping, staying put at either end
+    const stepToPing = (direction: number) => {
+      const pingTimestamp = adjacentPingTimestamp(activeTimestamp(), scene.pings, direction)
+      if (pingTimestamp === undefined) return
+      window.clearTimeout(timer)
+      paused = true
+      seekTo(pingTimestamp)
+      setPlaybackState("paused")
+      onPlaybackStateChangeRef.current?.("paused")
+    }
+
+    // Use Space for playback/replay and arrow keys to step between pings,
+    // or to move the second selected ping when two are selected
     // Ignore keyboard input on interactive controls
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
       if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
@@ -800,8 +812,13 @@ export function DemoSceneRenderer({
       }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
       const selected = selectedPingIndexesRef.current
-      if (selected.length !== 2) return
       const direction = event.key === "ArrowRight" ? 1 : -1
+      if (selected.length !== 2) {
+        if (!syncMaster || variant !== "full") return
+        event.preventDefault()
+        stepToPing(direction)
+        return
+      }
       let nextPingIndex = selected[1] + direction
       if (nextPingIndex === selected[0]) nextPingIndex += direction
       if (nextPingIndex < 0 || nextPingIndex >= chartData.pings.length) return

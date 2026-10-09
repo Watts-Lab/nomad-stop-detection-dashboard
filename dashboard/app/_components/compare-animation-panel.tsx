@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
+import { HelpCircle, MapPin, Pause, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -1366,19 +1366,80 @@ export function CompareAnimationPanel({
 }) {
   const learnAlgorithmId = panel?.algo
 
+  const xrayLegendLabel =
+    panel?.result.kind === "density"
+      ? "Core point"
+      : panel?.algo === "sequential_centroid"
+        ? "Centroid anchor"
+        : panel?.algo.startsWith("sequential_")
+          ? "Anchor point"
+          : "Cached anchor"
+
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
       <CardHeader className="shrink-0 px-3 pt-2 pb-1">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
-          {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
-          {learnAlgorithmId && (
-            <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
-              <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>
-                <HelpCircle className="h-4 w-4" />
-              </Link>
-            </Button>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
+            {panel?.title ?? (
+              <>
+                <Spinner className="text-[#8acac8]" />
+                Loading visualization
+              </>
+            )}
+
+            {learnAlgorithmId && (
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                title="Learn about this algorithm"
+                aria-label={`Learn about ${panel?.title}`}
+                className="h-8 w-8"
+              >
+                <Link
+                  href={`/?view=learn&algo=${learnAlgorithmId}`}
+                  prefetch={false}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
+          </CardTitle>
+
+          {panel && (
+            <div
+              role="group"
+              aria-label="Map legend"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-[#e6dffc] bg-white px-2.5 py-1.5 text-[11px] text-[#202124]"
+            >
+              <span
+                className="flex items-center gap-1.5"
+                title="Most recent GPS observation at or before the current playback time."
+              >
+                <MapPin
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0"
+                  fill="#d83832"
+                  stroke="#202124"
+                  strokeWidth={1.2}
+                />
+                <span>Last observed location</span>
+              </span>
+
+              {showXray && (
+                <span className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#8b8b8b]"
+                  >
+                    <span className="h-3 w-3 rounded-full border-2 border-white bg-[#dbc2fa]" />
+                  </span>
+                  <span>{xrayLegendLabel}</span>
+                </span>
+              )}
+            </div>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-0">
         {panel ? (

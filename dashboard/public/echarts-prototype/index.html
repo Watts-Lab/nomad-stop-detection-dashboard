@@ -51,7 +51,6 @@
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
     const demoAlgoId = params.get("algo") || "";
     const frameId = params.get("frame") || "left";
-    const initialUserId = params.get("user");
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -63,14 +62,14 @@
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
     const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread", "Pinned user hit area"]);
 
-    // Build agent, minute-recall, and parameter details for maximum points and highlighted curves
+    // Build agent, by-minute recall, and parameter details for maximum points and highlighted curves
     const pointTooltip = (event) => {
       if (!tooltipSeries.has(event.seriesName)) return "";
       const [pointX, recall, userId] = event.value;
       const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
         .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
         .join("");
-      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
+      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">By-minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
     };
     let pendingTourFocus = null;
 
@@ -633,7 +632,7 @@
         // green line survives mouse movement until it is unpinned or replaced.
         let hoveredPoint = null;
         let hoveredPinnedPoint = null;
-        let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
+        let pinnedPoint = null;
 
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
@@ -642,7 +641,7 @@
         // agent's curve, which covers that agent's own individual points while it is pinned
         const isRunSelectSeries = (name) => name === "Individual" || name === "Pinned user hit area";
 
-        // Get the selected agent's minute-recall values across the parameter sweep
+        // Get the selected agent's by-minute recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
         // Draw hovered and pinned agent curves and emphasize their maximum points
@@ -692,10 +691,13 @@
           }, window.location.origin);
         };
 
-        if (pinnedPoint) {
+        window.addEventListener("message", (event) => {
+          if (event.origin !== window.location.origin || event.data?.type !== "nomad-metrics-restore-pin") return;
+          pinnedPoint = perUserMaxData.find((point) => point[2] === event.data.userId) || null;
           renderHighlight();
           postPinChange();
-        }
+        });
+        window.parent.postMessage({ type: "nomad-metrics-ready", frame: frameId }, window.location.origin);
 
         chart.on("mouseover", (event) => {
         if (event.seriesName === "Pinned user hit area") {

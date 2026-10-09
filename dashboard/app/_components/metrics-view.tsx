@@ -30,13 +30,15 @@ type MetricsChartView = "recall" | "failures"
 function PinnedAgentCard({
   pinned,
   openDemo,
+  label,
 }: {
   pinned: PinnedAgent | null
   openDemo: (pinned: PinnedAgent) => void
+  label?: string
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
+      {label && <h5 className="text-xs font-semibold text-[#3b1370]">{label}</h5>}
       {pinned ? (
         <div className="space-y-2 rounded-md border border-[#7629db] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
@@ -48,7 +50,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-foreground">minute recall</span>
+            <span className="text-xs font-semibold text-foreground">by-minute recall</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
@@ -187,7 +189,7 @@ function MetricsFrame({
 }
 
 // Render single or comparison Metrics charts and their controls,
-// and maintain the selected-agent cards using messages from the charts.
+// and maintain the selected-agent sections using messages from the charts.
 export function MetricsView({
   metricsCompareMode,
   metricsAlgorithms,
@@ -231,23 +233,32 @@ export function MetricsView({
 }) {
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
   const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
+  const [selectedLeftUserId, setSelectedLeftUserId] = useState<string | null>(selectedUserId ?? null)
+  const [selectedRightUserId, setSelectedRightUserId] = useState<string | null>(selectedUserId ?? null)
   const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
 
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}`
 
   useEffect(() => {
 
-    // Receive same-origin pin updates and update the matching agent card.
-    // Clear the card when the message lacks a string agent ID or finite metrics.
+    // Restore each chart's selection after its data is ready.
     const handlePinChange = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
+      if (event.data?.type === "nomad-metrics-ready") {
+        event.source?.postMessage({
+          type: "nomad-metrics-restore-pin",
+          userId: event.data.frame === "right" ? selectedRightUserId : selectedLeftUserId,
+        }, { targetOrigin: window.location.origin })
+        return
+      }
       if (event.data?.type !== "nomad-metrics-pin-change") return
       const { frame, algoId, userId, param, value, recall, fixed } = event.data
       const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
+      const setSelected = frame === "right" ? setSelectedRightUserId : setSelectedLeftUserId
+      setSelected(typeof userId === "string" ? userId : null)
       setPinned(
         typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
           ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
@@ -256,11 +267,7 @@ export function MetricsView({
     }
     window.addEventListener("message", handlePinChange)
     return () => window.removeEventListener("message", handlePinChange)
-  }, [])
-
-  // Each chart reloads (and drops its pin) whenever its src changes.
-  useEffect(() => setPinnedLeftAgent(null), [leftMetricsPrototypeSrc])
-  useEffect(() => setPinnedRightAgent(null), [rightMetricsPrototypeSrc, metricsCompareMode])
+  }, [selectedLeftUserId, selectedRightUserId])
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3 lg:overflow-hidden">
@@ -360,7 +367,6 @@ export function MetricsView({
               </Select>
             </div>
             <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
-            {metricsChartView === "recall" && <PinnedAgentCard pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />}
 
             {metricsCompareMode && (
               <>
@@ -380,11 +386,17 @@ export function MetricsView({
                   </Select>
                 </div>
                 <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
-                {metricsChartView === "recall" && <PinnedAgentCard pinned={pinnedRightAgent} openDemo={openPinnedAgent} />}
               </>
             )}
 
             {metricsError && <p className="text-xs text-red-500">{metricsError}</p>}
+            {metricsChartView === "recall" && (
+              <div className="space-y-3 rounded-md border border-[#d1d5db] p-3">
+                <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
+                <PinnedAgentCard label={metricsCompareMode ? "Top" : undefined} pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />
+                {metricsCompareMode && <PinnedAgentCard label="Bottom" pinned={pinnedRightAgent} openDemo={openPinnedAgent} />}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

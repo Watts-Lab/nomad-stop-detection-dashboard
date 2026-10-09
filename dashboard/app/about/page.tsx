@@ -24,7 +24,7 @@ const teamGroups = [
         name: "Anoushka Menon",
         initials: "AM",
         photo: publicPath("/headshots/Anoushka_Menon.png"),
-        role: "M.S.E. Data Science · 2026",
+        role: "M.S.E. Data Science · 2027",
         links: [
           { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
@@ -53,8 +53,8 @@ const teamGroups = [
       {
         name: "Ruiqi Pan",
         initials: "RP",
-        photo: null,
-        role: "Researcher",
+        photo: publicPath("/headshots/Ruiqi_Pan.jpg"),
+        role: "M.A.S. Computer Science · 2027",
         links: [
           { label: "GitHub", href: "https://github.com/ruiqipan", icon: Github },
           { label: "LinkedIn", href: "https://www.linkedin.com/in/ruiqipan", icon: Linkedin },

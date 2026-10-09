@@ -123,7 +123,7 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-controls']",
     popover: {
       title: "Choose and Compare Algorithms",
-      description: "Minute recall shows the share of true stop time recovered; higher is better. Failure types shows the average share of true stops missed or split (orange), and merged (green); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
+      description: "By-minute recall shows the share of true stop time recovered; higher is better. The Failure modes view shows separate missed (orange) and split (purple) shares, plus merged (green); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
     },
   },
 ]

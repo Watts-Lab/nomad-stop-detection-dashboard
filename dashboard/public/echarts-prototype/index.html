@@ -90,7 +90,8 @@
             user_id: d.user_id,
             x: Number(d[xField]),
             recall: Number(d.recall),
-            missed_split_fraction: Number(d.missed_fraction) + Number(d.split_fraction),
+            missed_fraction: Number(d.missed_fraction),
+            split_fraction: Number(d.split_fraction),
             merged_fraction: Number(d.merged_fraction),
           }))
           .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.recall))
@@ -102,27 +103,30 @@
         const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
 
         if (chartView === "failures") {
-          const failureTypes = [
-            { field: "missed_split_fraction", label: "% missed/split", color: "#f89540", description: "Percentage of true stops not detected or split as multiple correct stops." },
-            { field: "merged_fraction", label: "% merged", color: "#6b8e23", description: "Percentage of true stops (partially) detected as part of a stop in a different location." },
-          ];
+          const failureTypes = ["% of true stops", "% merged"];
           const failureRowsByX = new Map();
           rows.forEach((row) => {
             failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
           });
           const failureXValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
-          const failureData = failureTypes.map((failure) => failureXValues.map((x) => {
-            const values = failureRowsByX.get(x).map((row) => row[failure.field]);
-            return [x, values.reduce((sum, value) => sum + value, 0) / values.length];
-          }));
+          const failureData = failureXValues.map((x) => {
+            const values = failureRowsByX.get(x);
+            const mean = (field) => values.reduce((sum, row) => sum + row[field], 0) / values.length;
+            return { x, missed: mean("missed_fraction"), split: mean("split_fraction"), merged: mean("merged_fraction") };
+          });
 
           chart.setOption({
             animationDurationUpdate: 0,
+            legend: {
+              data: ["% missed", "% split"],
+              top: 0,
+              textStyle: { fontSize: 12 },
+            },
             grid: failureTypes.map((_, index) => ({
               left: 28,
               right: 24,
-              top: `${8 + index * 45}%`,
-              height: "36%",
+              top: `${14 + index * 43}%`,
+              height: "31%",
               containLabel: true,
             })),
             tooltip: {
@@ -143,9 +147,14 @@
               },
               formatter: (events) => {
                 const event = events[0];
-                const failure = failureTypes[event.seriesIndex];
-                const [x, value] = event.value;
-                return `<div style="min-width:180px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.label}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:6px"><span style="color:#9ca3af">True stops affected</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div><div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere">${failure.description}</div></div>`;
+                if (!event) return "";
+                const [x] = event.value;
+                const values = failureData.find((row) => row.x === x);
+                if (!values) return "";
+                const metricRows = event.axisIndex === 0
+                  ? [["% missed", values.missed], ["% split", values.split], ["% missed + split", values.missed + values.split]]
+                  : [["% merged", values.merged]];
+                return `<div style="min-width:180px;white-space:normal"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div>${metricRows.map(([label, value]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px"><span>${label}</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div>`).join("")}</div>`;
               },
             },
             xAxis: failureTypes.map((_, index) => ({
@@ -172,8 +181,8 @@
                 },
               },
             })),
-            yAxis: failureTypes.map((failure, index) => ({
-              name: failure.label,
+            yAxis: failureTypes.map((label, index) => ({
+              name: label,
               nameLocation: "middle",
               nameRotate: 90,
               nameGap: 48,
@@ -190,12 +199,17 @@
               },
               splitLine: { lineStyle: { color: "#ddd", type: "dotted" } },
             })),
-            series: failureTypes.map((failure, index) => ({
-              name: failure.label,
+            series: [
+              { name: "% missed", field: "missed", color: "#f89540", index: 0, stack: "missed-split" },
+              { name: "% split", field: "split", color: "#a855a1", index: 0, stack: "missed-split" },
+              { name: "% merged", field: "merged", color: "#6b8e23", index: 1 },
+            ].map((failure) => ({
+              name: failure.name,
               type: "line",
-              xAxisIndex: index,
-              yAxisIndex: index,
-              data: failureData[index],
+              stack: failure.stack,
+              xAxisIndex: failure.index,
+              yAxisIndex: failure.index,
+              data: failureData.map((row) => [row.x, row[failure.field]]),
               symbol: "circle",
               symbolSize: 7,
               lineStyle: { color: failure.color, width: 2 },

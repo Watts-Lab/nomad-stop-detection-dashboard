@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DemoView } from "./_components/demo-view"
 import { HomeView } from "./_components/home-view"
@@ -10,7 +10,6 @@ import {
   DEMO_ALGORITHM_IDS,
   FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
-  METRICS_SWEEP_PARAMETERS,
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
@@ -59,8 +58,6 @@ function NomadDashboard() {
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
-  const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
-  const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
@@ -193,11 +190,9 @@ function NomadDashboard() {
 
     if (leftMetricsAlgorithm) {
       setMetricsLeftAlgorithm(leftMetricsAlgorithm)
-      setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[leftMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     if (rightMetricsAlgorithm) {
       setMetricsRightAlgorithm(rightMetricsAlgorithm)
-      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[rightMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
@@ -305,8 +300,6 @@ function NomadDashboard() {
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
-  const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
-  const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
 
@@ -368,24 +361,6 @@ function NomadDashboard() {
   useEffect(() => {
     void loadMetricsOptions()
   }, [loadMetricsOptions])
-
-  useEffect(() => {
-
-    // Keep the left Metrics sweep parameter valid for its algorithm, 
-    // selecting the first available option or a fallback when needed
-    if (!leftSweepParameters.some((param) => param.value === metricsLeftParameter)) {
-      setMetricsLeftParameter(leftSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [leftSweepParameters, metricsLeftParameter])
-
-  useEffect(() => {
-
-    // Keep the right metrics sweep parameter valid for its algorithm, 
-    // selecting the first available option or a fallback when needed 
-    if (!rightSweepParameters.some((param) => param.value === metricsRightParameter)) {
-      setMetricsRightParameter(rightSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [rightSweepParameters, metricsRightParameter])
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
@@ -449,8 +424,6 @@ function NomadDashboard() {
           metricsAlgorithms={metricsAlgorithms}
           metricsLeftAlgorithm={metricsLeftAlgorithm}
           metricsRightAlgorithm={metricsRightAlgorithm}
-          metricsLeftParameter={metricsLeftParameter}
-          metricsRightParameter={metricsRightParameter}
           metricsTrajectory={metricsTrajectory}
           selectedUserId={compareApiData?.left.scene?.user_id}
           leftParameterNote={leftParameterNote}
@@ -459,8 +432,6 @@ function NomadDashboard() {
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
           setMetricsRightAlgorithm={setMetricsRightAlgorithm}
-          setMetricsLeftParameter={setMetricsLeftParameter}
-          setMetricsRightParameter={setMetricsRightParameter}
           setMetricsTrajectory={setMetricsTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}

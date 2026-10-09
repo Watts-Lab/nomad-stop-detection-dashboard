@@ -796,13 +796,17 @@ export function DemoSceneRenderer({
       onPlaybackStateChangeRef.current?.("paused")
     }
 
-    // Use Space for playback/replay and arrow keys to step between pings,
-    // or to move the second selected ping when two are selected
+    // Use Space for playback/replay, Escape to clear selected pings, and arrow keys
+    // to step between pings, or to move the second selected ping when two are selected
     // Ignore keys that interactive controls handle themselves: Space on buttons and links,
     // and any key on form fields and sliders
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
       const target = event.target instanceof Element ? event.target : null
       if (target?.closest("input, select, textarea, [role='slider']")) return
+      if (event.key === "Escape") {
+        if (selectedPingIndexesRef.current.length) clearSelectedPings()
+        return
+      }
       if (event.key === " ") {
         if (target?.closest("button, a") || !syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()

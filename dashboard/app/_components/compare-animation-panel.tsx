@@ -1303,6 +1303,8 @@ export function DemoSceneRenderer({
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
+  // Derived from the shared time so the end state holds however it was reached
+  const atLastPing = currentTime !== null && adjacentPingTimestamp(currentTime, scene.pings, 1) === undefined
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
@@ -1334,28 +1336,28 @@ export function DemoSceneRenderer({
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Previous ping</TooltipContent>
               </Tooltip>
-              {playbackState !== "complete" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => toggleRef.current()}
-                      aria-label={playbackState === "playing" ? "Pause" : "Play"}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
-                    >
-                      {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
-                </Tooltip>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => toggleRef.current()}
+                    disabled={atLastPing && playbackState !== "playing"}
+                    aria-label={playbackState === "playing" ? "Pause" : "Play"}
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db] disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={() => stepToPingRef.current(1)}
+                    disabled={atLastPing}
                     aria-label="Next ping"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db] disabled:pointer-events-none disabled:opacity-40"
                   >
                     <StepForward className="h-4 w-4" />
                   </button>

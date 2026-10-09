@@ -798,11 +798,13 @@ export function DemoSceneRenderer({
 
     // Use Space for playback/replay and arrow keys to step between pings,
     // or to move the second selected ping when two are selected
-    // Ignore keyboard input on interactive controls
+    // Ignore keys that interactive controls handle themselves: Space on buttons and links,
+    // and any key on form fields and sliders
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
-      if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest("input, select, textarea, [role='slider']")) return
       if (event.key === " ") {
-        if (!syncMaster || variant !== "full" || event.repeat) return
+        if (target?.closest("button, a") || !syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()
         if (paused && isPlaybackComplete(sequenceIndex, chartData.timeSequence.length)
         ) {

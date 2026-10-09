@@ -220,7 +220,7 @@ export const algorithms = [
     shortDesc: "Greedy sequential parsing with roaming-distance and duration thresholds.",
     description: "Lachesis scans pings in time order and grows a candidate stop while the observed movement remains within a roaming-distance threshold, temporal gaps stay bounded, and the accumulated dwell time reaches a minimum duration.",
     source: "Hariharan and Toyama (2004), Project Lachesis",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.sequential_algs.html#nomad.stop_detection.sequential_algs.lachesis",
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
@@ -236,7 +236,7 @@ export const algorithms = [
     shortDesc: "Sequential stop detection anchored by the evolving candidate centroid.",
     description: "The centroid-anchored sequential method scans pings chronologically and updates the candidate stop center as the group grows. A stop is retained when the candidate satisfies the configured roaming-distance, gap, and dwell-time constraints.",
     source: "NOMAD sequential stop detection, method='centroid'",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.sequential_algs.html#nomad.stop_detection.sequential_algs.detect_stops_labels",
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
@@ -253,7 +253,7 @@ export const algorithms = [
     shortDesc: "Sequential stop detection anchored by the first ping in the candidate stop.",
     description: "The first-anchored sequential method scans pings chronologically and compares new pings with the first ping in the active candidate stop. This copy is provisional until the exact source language is added.",
     source: "NOMAD sequential stop detection, method='sliding' (placeholder source)",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.sequential_algs.html#nomad.stop_detection.sequential_algs.detect_stops",
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
@@ -270,7 +270,7 @@ export const algorithms = [
     shortDesc: "Cell-based dwell detection over a spatial grid.",
     description: "Grid-Based stop detection assigns pings to spatial cells and identifies stops from sustained dwell within a cell. This copy is provisional until the final source text is added.",
     source: "NOMAD grid-based stop detection",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.sequential_algs.html#nomad.stop_detection.sequential_algs.grid_based",
     cardDiagramSrc: SEQUENTIAL_CARD_DIAGRAM,
     expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
     parameters: [
@@ -286,7 +286,7 @@ export const algorithms = [
     shortDesc: "Density-based clustering with spatial and temporal neighborhood thresholds.",
     description: "ST-DBSCAN extends DBSCAN with a temporal scale so pings must be close in both space and time to form stop clusters. The dashboard copy should later be aligned with the exact implementation notes.",
     source: "Birant and Kut (2007), ST-DBSCAN",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.st_hdbscan",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
@@ -302,7 +302,7 @@ export const algorithms = [
     shortDesc: "Density-based stop detection with distance, time, and duration constraints.",
     description: "DBSTOP identifies dense groups of pings as stops using spatial distance, temporal neighborhood, minimum point count, and minimum duration parameters. This text is provisional until the final NOMAD reference copy is added.",
     source: "NOMAD DBSTOP implementation notes",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.dbstop",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
@@ -319,7 +319,7 @@ export const algorithms = [
     shortDesc: "Density-based sequential scan with temporal separation between stops.",
     description: "SeqScan applies density-based clustering within a moving temporal context, expanding active clusters while preserving temporal separation between detected stops.",
     source: "NOMAD SeqScan implementation notes",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.seqscan",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [
@@ -336,7 +336,7 @@ export const algorithms = [
     shortDesc: "Hierarchical density-based clustering for variable-density stop patterns.",
     description: "HDBSCAN extends density-based clustering hierarchically, allowing stop clusters of varying density. In this dashboard it is swept over the same spatial/temporal thresholds as the other density methods.",
     source: "Campello, Moulavi, and Sander (2013), HDBSCAN",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/nomad.stop_detection.html",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.hdbscan_labels",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [

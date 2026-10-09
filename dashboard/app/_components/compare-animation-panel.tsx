@@ -462,7 +462,7 @@ export function DemoSceneRenderer({
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
           { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] },
           { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
-          { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] }
+          { id: "cursor", data: [[timestampSeconds * 1000]] }
         ]
       }, { lazyUpdate: true })
     }
@@ -867,17 +867,22 @@ export function DemoSceneRenderer({
     }
 
     // Pause playback, seek to the pressed timeline position, and attach drag listeners
-    const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent }) => {
+    // Grabbing the cursor itself keeps the current time until the pointer moves
+    const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent; target?: { name?: string } }) => {
       event.event?.preventDefault()
       window.clearTimeout(timer)
       paused = true
       dragging = true
-      seekTo(timestampFromOffset(event.offsetX, event.offsetY))
+      if (event.target?.name !== "cursor-grab") seekTo(timestampFromOffset(event.offsetX, event.offsetY))
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
       window.addEventListener("pointermove", onPointerMove)
       window.addEventListener("pointerup", onPointerUp)
       window.addEventListener("pointercancel", onPointerUp)
+    }
+    // Show a drag cursor over the time cursor, which echarts would render with a pointer cursor
+    const onTimelineHover = (event: { target?: { name?: string } }) => {
+      if (event.target?.name === "cursor-grab") timelineChart.getZr().setCursorStyle("ew-resize")
     }
     let wheelGesturePixels = 0
     let wheelDirection = 0
@@ -1132,6 +1137,7 @@ export function DemoSceneRenderer({
     timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.on("click", onTimelineClick)
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
+    timelineChart.getZr().on("mousemove", onTimelineHover)
     mapEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
@@ -1225,6 +1231,7 @@ export function DemoSceneRenderer({
       timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.off("click", onTimelineClick)
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
+      timelineChart.getZr().off("mousemove", onTimelineHover)
       mapEl.removeEventListener("wheel", onTimelineWheel, true)
       timelineEl.removeEventListener("wheel", onTimelineWheel, true)
       renderSceneRef.current = null

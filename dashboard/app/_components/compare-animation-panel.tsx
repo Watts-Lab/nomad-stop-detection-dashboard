@@ -20,7 +20,7 @@ import {
   groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
 import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
-import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
+import { detectedCountFor, pingClassifiedAt } from "./demo-viz/overlays/demo-detected-stops"
 import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
@@ -416,6 +416,16 @@ export function DemoSceneRenderer({
       const route = routeProgressAt(timestampSeconds, preparedSegments)
       const detectedStopCount = detectedCountFor(timestampSeconds, chartData)
       const anchorFrames = xrayAnchorFramesAt(timestampSeconds, chartData)
+      const hoveredCluster = hoverPingIndex !== null && pingClassifiedAt(hoverPingIndex, timestampSeconds, chartData)
+        ? chartData.pingData[hoverPingIndex][2]
+        : -1
+      const currentPing = chartData.pingData[latestPingIndex]
+      const currentCluster = currentPing[2] >= 0 && timestampSeconds - currentPing[4] <= Number(panel.params.dt_max ?? 60) * 60
+        ? currentPing[2]
+        : -1
+      const lachesisCluster = panel.algo === "lachesis" && layerStateRef.current.showXray
+        ? hoveredCluster >= 0 ? hoveredCluster : currentCluster
+        : -1
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
@@ -447,6 +457,7 @@ export function DemoSceneRenderer({
           pulseStrength,
           pingFloatOffset,
           isDensityAlgorithm,
+          lachesisCluster,
           clusterColor
         })
       }, { lazyUpdate: true })
@@ -490,6 +501,7 @@ export function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "lachesis-containment", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],
@@ -1209,7 +1221,7 @@ export function DemoSceneRenderer({
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
     }
-  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, panel.params.dt_max, scene.pings, syncMaster, variant])
 
   useEffect(() => {
     layerStateRef.current = { showGroundTruth, showStops, showXray }

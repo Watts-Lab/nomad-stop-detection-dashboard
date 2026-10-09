@@ -388,84 +388,88 @@ function NomadDashboard() {
   }, [rightSweepParameters, metricsRightParameter])
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
+    <div className="nomad-shell flex min-h-dvh flex-col">
       <NomadNav currentView={activeView} />
+      <div className="nomad-viewport">
+        <div className="nomad-dashboard bg-background">
 
-      {activeView === "home" && (
-        <HomeView navigateTo={navigateTo} />
-      )}
+          {activeView === "home" && (
+            <HomeView navigateTo={navigateTo} />
+          )}
 
-      {activeView === "learn" && (
-        <LearnView
-          expandedAlgorithm={expandedAlgorithm}
-          setExpandedAlgorithm={setExpandedAlgorithm}
-          syncUrl={syncUrl}
-          openLearnAlgorithm={openLearnAlgorithm}
-          openLearnDemo={openLearnDemo}
-          openLearnDocumentation={openLearnDocumentation}
-        />
-      )}
+          {activeView === "learn" && (
+            <LearnView
+              expandedAlgorithm={expandedAlgorithm}
+              setExpandedAlgorithm={setExpandedAlgorithm}
+              syncUrl={syncUrl}
+              openLearnAlgorithm={openLearnAlgorithm}
+              openLearnDemo={openLearnDemo}
+              openLearnDocumentation={openLearnDocumentation}
+            />
+          )}
 
-      {activeView === "demo" && (
-        <DemoView
-          compareMode={compareMode}
-          showGroundTruth={showGroundTruth}
-          showStops={showStops}
-          showXray={showXray}
-          leftAlgo={leftAlgo}
-          rightAlgo={rightAlgo}
-          demoAlgorithms={demoAlgorithms}
-          leftAlgorithm={leftAlgorithm}
-          rightAlgorithm={rightAlgorithm}
-          leftParams={leftParams}
-          rightParams={rightParams}
-          leftParamErrors={leftParamErrors}
-          rightParamErrors={rightParamErrors}
-          demoTrajectory={demoTrajectory}
-          compareApiData={compareApiData}
-          compareError={compareError}
-          demoTime={demoTime}
-          setDemoTime={handleDemoTimeChange}
-          setShowGroundTruth={setShowGroundTruth}
-          setShowStops={setShowStops}
-          setShowXray={setShowXray}
-          setLeftParams={setLeftParams}
-          setRightParams={setRightParams}
-          setLeftParamErrors={setLeftParamErrors}
-          setRightParamErrors={setRightParamErrors}
-          setDemoTrajectory={setDemoTrajectory}
-          handleCompareModeToggle={handleCompareModeToggle}
-          handleLeftAlgorithmChange={handleLeftAlgorithmChange}
-          handleRightAlgorithmChange={handleRightAlgorithmChange}
-          handleNewTrajectory={handleNewTrajectory}
-          openMetricsFromDemo={openMetricsFromDemo}
-          startTour={startTour}
-        />
-      )}
+          {activeView === "demo" && (
+            <DemoView
+              compareMode={compareMode}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              showXray={showXray}
+              leftAlgo={leftAlgo}
+              rightAlgo={rightAlgo}
+              demoAlgorithms={demoAlgorithms}
+              leftAlgorithm={leftAlgorithm}
+              rightAlgorithm={rightAlgorithm}
+              leftParams={leftParams}
+              rightParams={rightParams}
+              leftParamErrors={leftParamErrors}
+              rightParamErrors={rightParamErrors}
+              demoTrajectory={demoTrajectory}
+              compareApiData={compareApiData}
+              compareError={compareError}
+              demoTime={demoTime}
+              setDemoTime={handleDemoTimeChange}
+              setShowGroundTruth={setShowGroundTruth}
+              setShowStops={setShowStops}
+              setShowXray={setShowXray}
+              setLeftParams={setLeftParams}
+              setRightParams={setRightParams}
+              setLeftParamErrors={setLeftParamErrors}
+              setRightParamErrors={setRightParamErrors}
+              setDemoTrajectory={setDemoTrajectory}
+              handleCompareModeToggle={handleCompareModeToggle}
+              handleLeftAlgorithmChange={handleLeftAlgorithmChange}
+              handleRightAlgorithmChange={handleRightAlgorithmChange}
+              handleNewTrajectory={handleNewTrajectory}
+              openMetricsFromDemo={openMetricsFromDemo}
+              startTour={startTour}
+            />
+          )}
 
-      {activeView === "metrics" && (
-        <MetricsView
-          metricsCompareMode={metricsCompareMode}
-          metricsAlgorithms={metricsAlgorithms}
-          metricsLeftAlgorithm={metricsLeftAlgorithm}
-          metricsRightAlgorithm={metricsRightAlgorithm}
-          metricsLeftParameter={metricsLeftParameter}
-          metricsRightParameter={metricsRightParameter}
-          metricsTrajectory={metricsTrajectory}
-          selectedUserId={compareApiData?.left.scene?.user_id}
-          leftParameterNote={leftParameterNote}
-          rightParameterNote={rightParameterNote}
-          metricsError={metricsError}
-          setMetricsCompareMode={setMetricsCompareMode}
-          setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
-          setMetricsRightAlgorithm={setMetricsRightAlgorithm}
-          setMetricsLeftParameter={setMetricsLeftParameter}
-          setMetricsRightParameter={setMetricsRightParameter}
-          setMetricsTrajectory={setMetricsTrajectory}
-          openPinnedAgent={handleMetricsPointSelect}
-          startTour={startMetricsTour}
-        />
-      )}
+          {activeView === "metrics" && (
+            <MetricsView
+              metricsCompareMode={metricsCompareMode}
+              metricsAlgorithms={metricsAlgorithms}
+              metricsLeftAlgorithm={metricsLeftAlgorithm}
+              metricsRightAlgorithm={metricsRightAlgorithm}
+              metricsLeftParameter={metricsLeftParameter}
+              metricsRightParameter={metricsRightParameter}
+              metricsTrajectory={metricsTrajectory}
+              selectedUserId={compareApiData?.left.scene?.user_id}
+              leftParameterNote={leftParameterNote}
+              rightParameterNote={rightParameterNote}
+              metricsError={metricsError}
+              setMetricsCompareMode={setMetricsCompareMode}
+              setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
+              setMetricsRightAlgorithm={setMetricsRightAlgorithm}
+              setMetricsLeftParameter={setMetricsLeftParameter}
+              setMetricsRightParameter={setMetricsRightParameter}
+              setMetricsTrajectory={setMetricsTrajectory}
+              openPinnedAgent={handleMetricsPointSelect}
+              startTour={startMetricsTour}
+            />
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -286,7 +286,7 @@ export const algorithms = [
     shortDesc: "Density-based clustering with spatial and temporal neighborhood thresholds.",
     description: "ST-DBSCAN extends DBSCAN with a temporal scale so pings must be close in both space and time to form stop clusters. The dashboard copy should later be aligned with the exact implementation notes.",
     source: "Birant and Kut (2007), ST-DBSCAN",
-    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.st_hdbscan",
+    documentationUrl: "https://watts-lab.github.io/nomad/api/generated/nomad.stop_detection.density_algs.html#nomad.stop_detection.density_algs.ta_dbscan",
     cardDiagramSrc: DENSITY_CARD_DIAGRAM,
     expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
     parameters: [

@@ -63,14 +63,14 @@
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
     const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread", "Pinned user hit area"]);
 
-    // Build agent, minute-recall, and parameter details for maximum points and highlighted curves
+    // Build agent, by-minute recall, and parameter details for maximum points and highlighted curves
     const pointTooltip = (event) => {
       if (!tooltipSeries.has(event.seriesName)) return "";
       const [pointX, recall, userId] = event.value;
       const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
         .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
         .join("");
-      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
+      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">By-minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
     };
     let pendingTourFocus = null;
 
@@ -103,7 +103,10 @@
         const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
 
         if (chartView === "failures") {
-          const failureTypes = ["% of true stops", "% merged"];
+          const failureTypes = [
+            { label: "% missed/split", title: "Missed and split stops", description: "Missed stops were not detected; split stops were detected as multiple correct stops." },
+            { label: "% merged", title: "Merged stops", description: "True stops (partially) detected as part of a stop in a different location." },
+          ];
           const failureRowsByX = new Map();
           rows.forEach((row) => {
             failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
@@ -119,7 +122,9 @@
             animationDurationUpdate: 0,
             legend: {
               data: ["% missed", "% split"],
-              top: 0,
+              left: "center",
+              // Center the 24px legend in the 14%-high space above the first grid.
+              top: chart.getHeight() * 0.07 - 12,
               textStyle: { fontSize: 12 },
             },
             grid: failureTypes.map((_, index) => ({
@@ -151,10 +156,11 @@
                 const [x] = event.value;
                 const values = failureData.find((row) => row.x === x);
                 if (!values) return "";
+                const failure = failureTypes[event.axisIndex];
                 const metricRows = event.axisIndex === 0
                   ? [["% missed", values.missed], ["% split", values.split], ["% missed + split", values.missed + values.split]]
                   : [["% merged", values.merged]];
-                return `<div style="min-width:180px;white-space:normal"><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div>${metricRows.map(([label, value]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px"><span>${label}</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div>`).join("")}</div>`;
+                return `<div style="min-width:180px;max-width:300px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.title}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:4px">TRUE STOPS AFFECTED</div>${metricRows.map(([label, value]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px"><span>${label}</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div>`).join("")}<div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere;margin-top:6px">${failure.description}</div></div>`;
               },
             },
             xAxis: failureTypes.map((_, index) => ({
@@ -181,8 +187,8 @@
                 },
               },
             })),
-            yAxis: failureTypes.map((label, index) => ({
-              name: label,
+            yAxis: failureTypes.map((failure, index) => ({
+              name: failure.label,
               nameLocation: "middle",
               nameRotate: 90,
               nameGap: 48,
@@ -200,9 +206,9 @@
               splitLine: { lineStyle: { color: "#ddd", type: "dotted" } },
             })),
             series: [
-              { name: "% missed", field: "missed", color: "#f89540", index: 0, stack: "missed-split" },
-              { name: "% split", field: "split", color: "#a855a1", index: 0, stack: "missed-split" },
-              { name: "% merged", field: "merged", color: "#6b8e23", index: 1 },
+              { name: "% missed", field: "missed", color: "#715599", index: 0, stack: "missed-split" },
+              { name: "% split", field: "split", color: "#C58B00", index: 0, stack: "missed-split" },
+              { name: "% merged", field: "merged", color: "#008C73", index: 1 },
             ].map((failure) => ({
               name: failure.name,
               type: "line",
@@ -214,7 +220,7 @@
               symbolSize: 7,
               lineStyle: { color: failure.color, width: 2 },
               itemStyle: { color: failure.color },
-              areaStyle: { color: failure.color, opacity: 0.14 },
+              areaStyle: { color: failure.color, opacity: 0.22 },
               emphasis: {
                 itemStyle: {
                   borderColor: failure.color,
@@ -223,7 +229,10 @@
               },
             })),
           });
-          new ResizeObserver(() => chart.resize()).observe(document.getElementById("chart"));
+          new ResizeObserver(() => {
+            chart.resize();
+            chart.setOption({ legend: { top: chart.getHeight() * 0.07 - 12 } });
+          }).observe(document.getElementById("chart"));
           return;
         }
 
@@ -656,7 +665,7 @@
         // agent's curve, which covers that agent's own individual points while it is pinned
         const isRunSelectSeries = (name) => name === "Individual" || name === "Pinned user hit area";
 
-        // Get the selected agent's minute-recall values across the parameter sweep
+        // Get the selected agent's by-minute recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
         // Draw hovered and pinned agent curves and emphasize their maximum points

@@ -48,7 +48,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-foreground">minute recall</span>
+            <span className="text-xs font-semibold text-foreground">by-minute recall</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">

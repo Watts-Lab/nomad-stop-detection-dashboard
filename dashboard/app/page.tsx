@@ -286,12 +286,6 @@ function NomadDashboard() {
     syncUrl("demo", null, "single")
   }, [syncUrl])
 
-  // Smoothly scroll the requested algorithm's documentation section into view,
-  // if its element is present on the page.
-  const openLearnDocumentation = useCallback((algorithmId: string) => {
-    document.getElementById(`learn-documentation-${algorithmId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-  }, [])
-
   // Store the playback timestamp reported by a Demo animation panel
   // so the panels can use the shared time.
   const handleDemoTimeChange = useCallback((timestamp: number) => {
@@ -402,7 +396,6 @@ function NomadDashboard() {
           syncUrl={syncUrl}
           openLearnAlgorithm={openLearnAlgorithm}
           openLearnDemo={openLearnDemo}
-          openLearnDocumentation={openLearnDocumentation}
         />
       )}
 

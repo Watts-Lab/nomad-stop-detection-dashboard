@@ -199,54 +199,54 @@ function MetricsFrame({
 export function MetricsView({
   metricsCompareMode,
   metricsAlgorithms,
-  metricsLeftAlgorithm,
-  metricsRightAlgorithm,
-  metricsLeftParameter,
-  metricsRightParameter,
+  metricsTopAlgorithm,
+  metricsBottomAlgorithm,
+  metricsTopParameter,
+  metricsBottomParameter,
   metricsTrajectory,
   selectedUserId,
-  leftParameterNote,
-  rightParameterNote,
+  topParameterNote,
+  bottomParameterNote,
   metricsError,
   setMetricsCompareMode,
-  setMetricsLeftAlgorithm,
-  setMetricsRightAlgorithm,
-  setMetricsLeftParameter,
-  setMetricsRightParameter,
+  setMetricsTopAlgorithm,
+  setMetricsBottomAlgorithm,
+  setMetricsTopParameter,
+  setMetricsBottomParameter,
   setMetricsTrajectory,
   openPinnedAgent,
   startTour,
 }: {
   metricsCompareMode: boolean
   metricsAlgorithms: string[]
-  metricsLeftAlgorithm: string
-  metricsRightAlgorithm: string
-  metricsLeftParameter: string
-  metricsRightParameter: string
+  metricsTopAlgorithm: string
+  metricsBottomAlgorithm: string
+  metricsTopParameter: string
+  metricsBottomParameter: string
   metricsTrajectory: string
   selectedUserId?: string
-  leftParameterNote: MetricsParameterNote | undefined
-  rightParameterNote: MetricsParameterNote | undefined
+  topParameterNote: MetricsParameterNote | undefined
+  bottomParameterNote: MetricsParameterNote | undefined
   metricsError: string | null
   setMetricsCompareMode: (value: boolean) => void
-  setMetricsLeftAlgorithm: (algorithm: string) => void
-  setMetricsRightAlgorithm: (algorithm: string) => void
-  setMetricsLeftParameter: (parameter: string) => void
-  setMetricsRightParameter: (parameter: string) => void
+  setMetricsTopAlgorithm: (algorithm: string) => void
+  setMetricsBottomAlgorithm: (algorithm: string) => void
+  setMetricsTopParameter: (parameter: string) => void
+  setMetricsBottomParameter: (parameter: string) => void
   setMetricsTrajectory: (trajectory: string) => void
   openPinnedAgent: (pinned: PinnedAgent) => void
   startTour: () => void
 }) {
-  const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
-  const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
-  const [selectedLeftUserId, setSelectedLeftUserId] = useState<string | null>(selectedUserId ?? null)
-  const [selectedRightUserId, setSelectedRightUserId] = useState<string | null>(selectedUserId ?? null)
+  const [pinnedTopAgent, setPinnedTopAgent] = useState<PinnedAgent | null>(null)
+  const [pinnedBottomAgent, setPinnedBottomAgent] = useState<PinnedAgent | null>(null)
+  const [selectedTopUserId, setSelectedTopUserId] = useState<string | null>(selectedUserId ?? null)
+  const [selectedBottomUserId, setSelectedBottomUserId] = useState<string | null>(selectedUserId ?? null)
   const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
 
-  const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}`
+  const topFixedParameters = topParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
+  const bottomFixedParameters = bottomParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
+  const topMetricsPrototypeSrc = `${prototypeChartSrc(metricsTopAlgorithm, metricsTopParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsTopAlgorithm])}&view=${metricsChartView}&frame=top&${topFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const bottomMetricsPrototypeSrc = `${prototypeChartSrc(metricsBottomAlgorithm, metricsBottomParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsBottomAlgorithm])}&view=${metricsChartView}&frame=bottom&${bottomFixedParameters}`
 
   useEffect(() => {
 
@@ -256,17 +256,17 @@ export function MetricsView({
       if (event.data?.type === "nomad-metrics-ready") {
         event.source?.postMessage({
           type: "nomad-metrics-restore-pin",
-          userId: event.data.frame === "right" ? selectedRightUserId : selectedLeftUserId,
+          userId: event.data.frame === "bottom" ? selectedBottomUserId : selectedTopUserId,
         }, { targetOrigin: window.location.origin })
         return
       }
       if (event.data?.type !== "nomad-metrics-pin-change") return
       const { frame, algoId, userId, param, value, recall, fixed } = event.data
-      const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
+      const setPinned = frame === "bottom" ? setPinnedBottomAgent : setPinnedTopAgent
       if (!event.data.restored) {
         const selected = typeof userId === "string" ? userId : null
-        if (frame === "right" || metricsCompareMode) setSelectedRightUserId(selected)
-        if (frame !== "right" || metricsCompareMode) setSelectedLeftUserId(selected)
+        if (frame === "bottom" || metricsCompareMode) setSelectedBottomUserId(selected)
+        if (frame !== "bottom" || metricsCompareMode) setSelectedTopUserId(selected)
       }
       setPinned(
         typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
@@ -276,7 +276,7 @@ export function MetricsView({
     }
     window.addEventListener("message", handlePinChange)
     return () => window.removeEventListener("message", handlePinChange)
-  }, [metricsCompareMode, selectedLeftUserId, selectedRightUserId])
+  }, [metricsCompareMode, selectedTopUserId, selectedBottomUserId])
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3 lg:overflow-hidden">
@@ -306,19 +306,19 @@ export function MetricsView({
           <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
             <div className={`grid min-h-0 gap-2 ${metricsCompareMode ? "h-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)]" : "h-full"}`}>
               <MetricsFrame
-                src={leftMetricsPrototypeSrc}
-                title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`}
-                label={metricsLeftAlgorithm}
+                src={topMetricsPrototypeSrc}
+                title={`${metricsTopAlgorithm} ${metricsChartView} metrics`}
+                label={metricsTopAlgorithm}
                 showTourTargets
-                selectedUserId={selectedLeftUserId}
+                selectedUserId={selectedTopUserId}
               />
 
               {metricsCompareMode && (
                 <MetricsFrame
-                  src={rightMetricsPrototypeSrc}
-                  title={`${metricsRightAlgorithm} ${metricsChartView} metrics`}
-                  label={metricsRightAlgorithm}
-                  selectedUserId={selectedRightUserId}
+                  src={bottomMetricsPrototypeSrc}
+                  title={`${metricsBottomAlgorithm} ${metricsChartView} metrics`}
+                  label={metricsBottomAlgorithm}
+                  selectedUserId={selectedBottomUserId}
                 />
               )}
             </div>
@@ -331,7 +331,7 @@ export function MetricsView({
               variant="outline"
               size="sm"
               onClick={() => {
-                if (!metricsCompareMode) setSelectedRightUserId(selectedLeftUserId)
+                if (!metricsCompareMode) setSelectedBottomUserId(selectedTopUserId)
                 setMetricsCompareMode(!metricsCompareMode)
               }}
               className="gap-2 border-[#d1d5db] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:text-[#3b1370]"
@@ -368,10 +368,10 @@ export function MetricsView({
                 {metricsCompareMode ? "Top" : "Algorithm"}
               </label>
               <Select
-                value={metricsLeftAlgorithm}
+                value={metricsTopAlgorithm}
                 onValueChange={(algorithm) => {
-                  setMetricsLeftAlgorithm(algorithm)
-                  setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                  setMetricsTopAlgorithm(algorithm)
+                  setMetricsTopParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
                 }}
               >
                 <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
@@ -380,17 +380,17 @@ export function MetricsView({
                 </SelectContent>
               </Select>
             </div>
-            <MetricsParameterRows algorithm={metricsLeftAlgorithm} note={leftParameterNote} />
+            <MetricsParameterRows algorithm={metricsTopAlgorithm} note={topParameterNote} />
 
             {metricsCompareMode && (
               <>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-[#3b1370]">Bottom</label>
                   <Select
-                    value={metricsRightAlgorithm}
+                    value={metricsBottomAlgorithm}
                     onValueChange={(algorithm) => {
-                      setMetricsRightAlgorithm(algorithm)
-                      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
+                      setMetricsBottomAlgorithm(algorithm)
+                      setMetricsBottomParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
                     }}
                   >
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
@@ -399,7 +399,7 @@ export function MetricsView({
                     </SelectContent>
                   </Select>
                 </div>
-                <MetricsParameterRows algorithm={metricsRightAlgorithm} note={rightParameterNote} />
+                <MetricsParameterRows algorithm={metricsBottomAlgorithm} note={bottomParameterNote} />
               </>
             )}
 
@@ -407,8 +407,8 @@ export function MetricsView({
             {metricsChartView === "recall" && (
               <div className="space-y-3 rounded-md border border-[#d1d5db] p-3">
                 <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
-                <PinnedAgentCard label={metricsCompareMode ? "Top" : undefined} pinned={pinnedLeftAgent} openDemo={openPinnedAgent} />
-                {metricsCompareMode && <PinnedAgentCard label="Bottom" pinned={pinnedRightAgent} openDemo={openPinnedAgent} />}
+                <PinnedAgentCard label={metricsCompareMode ? "Top" : undefined} pinned={pinnedTopAgent} openDemo={openPinnedAgent} />
+                {metricsCompareMode && <PinnedAgentCard label="Bottom" pinned={pinnedBottomAgent} openDemo={openPinnedAgent} />}
               </div>
             )}
           </CardContent>

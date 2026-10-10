@@ -50,7 +50,7 @@
     const xMaxParam = params.get("xmax");
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
     const demoAlgoId = params.get("algo") || "";
-    const frameId = params.get("frame") || "left";
+    const frameId = params.get("frame") || "top";
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));

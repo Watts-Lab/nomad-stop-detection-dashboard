@@ -57,10 +57,10 @@ function NomadDashboard() {
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
-  const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
-  const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
-  const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
-  const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
+  const [metricsTopAlgorithm, setMetricsTopAlgorithm] = useState("Lachesis")
+  const [metricsBottomAlgorithm, setMetricsBottomAlgorithm] = useState("Sequential (Centroid)")
+  const [metricsTopParameter, setMetricsTopParameter] = useState("delta_roam")
+  const [metricsBottomParameter, setMetricsBottomParameter] = useState("delta_roam")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
@@ -146,7 +146,7 @@ function NomadDashboard() {
   }, [])
 
   // Load the cached Metrics configuration, including available algorithms
-  // parameter notes and default left/right algorithms
+  // parameter notes and default top/bottom algorithms
   // Clear any previous Metrics error and report a filure if loading fails
   const loadMetricsOptions = useCallback(async () => {
     try {
@@ -158,8 +158,8 @@ function NomadDashboard() {
       }
       const data = (await res.json()) as MetricsOptionsResponse
       setMetricsOptions(data)
-      setMetricsLeftAlgorithm(data.defaults.left_algorithm ?? "Lachesis")
-      setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential (Centroid)")
+      setMetricsTopAlgorithm(data.defaults.top_algorithm ?? "Lachesis")
+      setMetricsBottomAlgorithm(data.defaults.bottom_algorithm ?? "Sequential (Centroid)")
     } catch (err) {
       setMetricsError(err instanceof Error ? err.message : "Failed to load metrics options")
     }
@@ -185,21 +185,21 @@ function NomadDashboard() {
 
   // Open Aggregated Metrics using the Metrics equivalents of the Demo algorithms.
   // For each available mapping, select its initial sweep parameter.
-  // Enable Metrics comparison when Demo comparison is active and the right
+  // Enable Metrics comparison when Demo comparison is active and the bottom
   // algorithm has a Metrics mapping, then update the active view and URL.
   const openMetricsFromDemo = useCallback(() => {
-    const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
-    const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
+    const topMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
+    const bottomMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
 
-    if (leftMetricsAlgorithm) {
-      setMetricsLeftAlgorithm(leftMetricsAlgorithm)
-      setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[leftMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
+    if (topMetricsAlgorithm) {
+      setMetricsTopAlgorithm(topMetricsAlgorithm)
+      setMetricsTopParameter(METRICS_SWEEP_PARAMETERS[topMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
-    if (rightMetricsAlgorithm) {
-      setMetricsRightAlgorithm(rightMetricsAlgorithm)
-      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[rightMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
+    if (bottomMetricsAlgorithm) {
+      setMetricsBottomAlgorithm(bottomMetricsAlgorithm)
+      setMetricsBottomParameter(METRICS_SWEEP_PARAMETERS[bottomMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
-    setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
+    setMetricsCompareMode(compareMode && Boolean(bottomMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
     setActiveView("metrics")
     syncUrl("metrics")
@@ -303,10 +303,10 @@ function NomadDashboard() {
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
   const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential (Centroid)"]
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
-  const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
-  const rightParameterNote = parameterNotes[metricsRightAlgorithm]
-  const leftSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsLeftAlgorithm] ?? [], [metricsLeftAlgorithm])
-  const rightSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsRightAlgorithm] ?? [], [metricsRightAlgorithm])
+  const topParameterNote = parameterNotes[metricsTopAlgorithm]
+  const bottomParameterNote = parameterNotes[metricsBottomAlgorithm]
+  const topSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsTopAlgorithm] ?? [], [metricsTopAlgorithm])
+  const bottomSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsBottomAlgorithm] ?? [], [metricsBottomAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
 
@@ -371,21 +371,21 @@ function NomadDashboard() {
 
   useEffect(() => {
 
-    // Keep the left Metrics sweep parameter valid for its algorithm, 
+    // Keep the top Metrics sweep parameter valid for its algorithm,
     // selecting the first available option or a fallback when needed
-    if (!leftSweepParameters.some((param) => param.value === metricsLeftParameter)) {
-      setMetricsLeftParameter(leftSweepParameters[0]?.value ?? "dist_thresh")
+    if (!topSweepParameters.some((param) => param.value === metricsTopParameter)) {
+      setMetricsTopParameter(topSweepParameters[0]?.value ?? "dist_thresh")
     }
-  }, [leftSweepParameters, metricsLeftParameter])
+  }, [topSweepParameters, metricsTopParameter])
 
   useEffect(() => {
 
-    // Keep the right metrics sweep parameter valid for its algorithm, 
+    // Keep the bottom Metrics sweep parameter valid for its algorithm,
     // selecting the first available option or a fallback when needed 
-    if (!rightSweepParameters.some((param) => param.value === metricsRightParameter)) {
-      setMetricsRightParameter(rightSweepParameters[0]?.value ?? "dist_thresh")
+    if (!bottomSweepParameters.some((param) => param.value === metricsBottomParameter)) {
+      setMetricsBottomParameter(bottomSweepParameters[0]?.value ?? "dist_thresh")
     }
-  }, [rightSweepParameters, metricsRightParameter])
+  }, [bottomSweepParameters, metricsBottomParameter])
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
@@ -447,20 +447,20 @@ function NomadDashboard() {
         <MetricsView
           metricsCompareMode={metricsCompareMode}
           metricsAlgorithms={metricsAlgorithms}
-          metricsLeftAlgorithm={metricsLeftAlgorithm}
-          metricsRightAlgorithm={metricsRightAlgorithm}
-          metricsLeftParameter={metricsLeftParameter}
-          metricsRightParameter={metricsRightParameter}
+          metricsTopAlgorithm={metricsTopAlgorithm}
+          metricsBottomAlgorithm={metricsBottomAlgorithm}
+          metricsTopParameter={metricsTopParameter}
+          metricsBottomParameter={metricsBottomParameter}
           metricsTrajectory={metricsTrajectory}
           selectedUserId={compareApiData?.left.scene?.user_id}
-          leftParameterNote={leftParameterNote}
-          rightParameterNote={rightParameterNote}
+          topParameterNote={topParameterNote}
+          bottomParameterNote={bottomParameterNote}
           metricsError={metricsError}
           setMetricsCompareMode={setMetricsCompareMode}
-          setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
-          setMetricsRightAlgorithm={setMetricsRightAlgorithm}
-          setMetricsLeftParameter={setMetricsLeftParameter}
-          setMetricsRightParameter={setMetricsRightParameter}
+          setMetricsTopAlgorithm={setMetricsTopAlgorithm}
+          setMetricsBottomAlgorithm={setMetricsBottomAlgorithm}
+          setMetricsTopParameter={setMetricsTopParameter}
+          setMetricsBottomParameter={setMetricsBottomParameter}
           setMetricsTrajectory={setMetricsTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}

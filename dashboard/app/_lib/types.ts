@@ -84,8 +84,8 @@ export type MetricsOptionsResponse = {
   }>
   defaults: {
     mode: "single" | "compare"
-    left_algorithm: string
-    right_algorithm: string
+    top_algorithm: string
+    bottom_algorithm: string
   }
 }
 

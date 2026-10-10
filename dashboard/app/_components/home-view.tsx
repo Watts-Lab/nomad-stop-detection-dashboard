@@ -41,10 +41,10 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
       <section className="nomad-hero min-h-[calc(100vh-74px)] border-b border-border py-6">
         <div className="nomad-page-frame grid min-h-[calc(100vh-122px)] items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="max-w-2xl">
-          <h1 className="home-copy-reveal text-5xl font-bold tracking-normal text-[#3b1370] sm:text-6xl md:text-7xl">
+          <h1 className="home-copy-reveal text-5xl font-bold tracking-normal text-[#3b1370] sm:text-6xl">
               Stop Detection Dashboard
             </h1>
-            <p className="home-copy-reveal home-copy-reveal-2 mt-7 text-2xl font-semibold tracking-normal text-foreground md:text-3xl">
+            <p className="home-copy-reveal home-copy-reveal-2 mt-7 text-2xl font-semibold tracking-normal text-foreground">
               Explore and compare algorithms that turn noisy GPS traces into meaningful stops.
             </p>
             <div className="mt-7 grid gap-5 text-left">

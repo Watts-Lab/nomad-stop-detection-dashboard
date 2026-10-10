@@ -107,8 +107,8 @@ export default function AboutPage() {
       <main className="nomad-page-frame grid gap-12 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(32rem,1.15fr)] lg:gap-16 lg:py-14">
         <div className="space-y-12 lg:sticky lg:top-[131px] lg:self-start">
           <section className={`${revealClass()} space-y-5`}>
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#3b1370]">About NOMAD</p>
-          <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-[#3b1370] sm:text-5xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#3b1370]">About NOMAD</p>
+          <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-[#3b1370]">
               We create tools for analysis of human mobility
             </h1>
             <div className="max-w-xl space-y-5 text-sm leading-relaxed text-foreground sm:text-base">
@@ -156,7 +156,7 @@ export default function AboutPage() {
             <section key={group.title} className="space-y-4" aria-labelledby={`${group.title.toLowerCase()}-heading`}>
               <h2
                 id={`${group.title.toLowerCase()}-heading`}
-                className={`${revealClass("up", groupIndex + 1)} text-2xl font-semibold tracking-tight`}
+                className={`${revealClass("up", groupIndex + 1)} text-xl font-semibold tracking-tight`}
               >
                 {group.title}
               </h2>

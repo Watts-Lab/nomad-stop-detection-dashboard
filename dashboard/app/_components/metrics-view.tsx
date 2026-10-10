@@ -103,11 +103,13 @@ function MetricsFrame({
   title,
   label,
   showTourTargets = false,
+  selectedUserId,
 }: {
   src: string
   title: string
   label?: string
   showTourTargets?: boolean
+  selectedUserId: string | null
 }) {
   const [loading, setLoading] = useState(true)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -156,6 +158,10 @@ function MetricsFrame({
     window.addEventListener(METRICS_TOUR_FOCUS_EVENT, handleTourFocus)
     return () => window.removeEventListener(METRICS_TOUR_FOCUS_EVENT, handleTourFocus)
   }, [showTourTargets])
+
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "nomad-metrics-restore-pin", userId: selectedUserId }, window.location.origin)
+  }, [selectedUserId])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-[#f8f9fc]" data-tour={showTourTargets ? "metrics-chart" : undefined}>
@@ -257,8 +263,11 @@ export function MetricsView({
       if (event.data?.type !== "nomad-metrics-pin-change") return
       const { frame, algoId, userId, param, value, recall, fixed } = event.data
       const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
-      const setSelected = frame === "right" ? setSelectedRightUserId : setSelectedLeftUserId
-      setSelected(typeof userId === "string" ? userId : null)
+      if (!event.data.restored) {
+        const selected = typeof userId === "string" ? userId : null
+        if (frame === "right" || metricsCompareMode) setSelectedRightUserId(selected)
+        if (frame !== "right" || metricsCompareMode) setSelectedLeftUserId(selected)
+      }
       setPinned(
         typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
           ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
@@ -267,7 +276,7 @@ export function MetricsView({
     }
     window.addEventListener("message", handlePinChange)
     return () => window.removeEventListener("message", handlePinChange)
-  }, [selectedLeftUserId, selectedRightUserId])
+  }, [metricsCompareMode, selectedLeftUserId, selectedRightUserId])
 
   return (
     <div className="nomad-page-frame flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3 lg:overflow-hidden">
@@ -301,6 +310,7 @@ export function MetricsView({
                 title={`${metricsLeftAlgorithm} ${metricsChartView} metrics`}
                 label={metricsLeftAlgorithm}
                 showTourTargets
+                selectedUserId={selectedLeftUserId}
               />
 
               {metricsCompareMode && (
@@ -308,6 +318,7 @@ export function MetricsView({
                   src={rightMetricsPrototypeSrc}
                   title={`${metricsRightAlgorithm} ${metricsChartView} metrics`}
                   label={metricsRightAlgorithm}
+                  selectedUserId={selectedRightUserId}
                 />
               )}
             </div>
@@ -319,7 +330,10 @@ export function MetricsView({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMetricsCompareMode(!metricsCompareMode)}
+              onClick={() => {
+                if (!metricsCompareMode) setSelectedRightUserId(selectedLeftUserId)
+                setMetricsCompareMode(!metricsCompareMode)
+              }}
               className="gap-2 border-[#d1d5db] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:text-[#3b1370]"
             >
               {metricsCompareMode ? <><Square className="h-4 w-4" /> Single</> : <><Columns2 className="h-4 w-4" /> Compare</>}

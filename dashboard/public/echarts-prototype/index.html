@@ -678,10 +678,11 @@
         };
 
         // Notify the parent Metrics view of the pinned agent and settings, or send null values when unpinned
-        const postPinChange = () => {
+        const postPinChange = (restored = false) => {
           window.parent.postMessage({
             type: "nomad-metrics-pin-change",
             frame: frameId,
+            restored,
             algoId: demoAlgoId,
             param: xField,
             userId: pinnedPoint ? pinnedPoint[2] : null,
@@ -695,7 +696,7 @@
           if (event.origin !== window.location.origin || event.data?.type !== "nomad-metrics-restore-pin") return;
           pinnedPoint = perUserMaxData.find((point) => point[2] === event.data.userId) || null;
           renderHighlight();
-          postPinChange();
+          postPinChange(true);
         });
         window.parent.postMessage({ type: "nomad-metrics-ready", frame: frameId }, window.location.origin);
 

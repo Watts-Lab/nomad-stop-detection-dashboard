@@ -104,8 +104,8 @@
 
         if (chartView === "failures") {
           const failureTypes = [
-            { label: "% missed/split", title: "Missed and split stops", description: "Missed stops were not detected; split stops were detected as multiple correct stops." },
-            { label: "% merged", title: "Merged stops", description: "True stops (partially) detected as part of a stop in a different location." },
+            { label: "% missed/split", title: "Missed and split stops", description: "Percentage of true stops not detected or split as multiple correct stops." },
+            { label: "% merged", title: "Merged stops", description: "Percentage of true stops (partially) detected as part of a stop in a different location." },
           ];
           const failureRowsByX = new Map();
           rows.forEach((row) => {

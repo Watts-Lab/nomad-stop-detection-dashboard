@@ -1472,7 +1472,9 @@ export function CompareAnimationPanel({
         </CardTitle>
         {panel && pings && (
           <TooltipProvider delayDuration={200}>
-            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-[repeat(4,minmax(min-content,1fr))]" : "grid-cols-[repeat(7,minmax(min-content,1fr))]"}`}>
+            {/* Compare panels are too narrow for one row: the four accuracy stats
+                fill the first row and the three trajectory stats the second */}
+            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-12 [&>*:nth-child(-n+4)]:col-span-3 [&>*:nth-child(n+5)]:col-span-4" : "grid-cols-[repeat(7,minmax(min-content,1fr))]"}`}>
               <PanelStat icon={Target} label="min-by-min recall" value={percent(panel.metrics.recall)} />
               <PanelStat
                 icon={Split}

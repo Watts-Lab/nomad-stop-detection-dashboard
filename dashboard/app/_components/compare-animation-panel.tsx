@@ -1398,23 +1398,24 @@ export function DemoSceneRenderer({
   )
 }
 
-// Display one run statistic in the panel header, with an optional explanation
+// Display one run statistic as a labeled cell of a panel-header stat group,
+// with an optional explanation behind a help icon
 function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
   return (
-    <span className="flex items-center gap-1 text-xs">
-      <span className="font-semibold text-foreground">{label}</span>
+    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 ${help ? "pr-5" : "pr-2.5"}`}>
+      <span className="text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground">{label}</span>
       {help && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="text-muted-foreground hover:text-[#3b1370]">
-              <HelpCircle className="h-3.5 w-3.5" />
+            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-muted-foreground hover:text-[#3b1370]">
+              <HelpCircle className="h-3 w-3" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-56">{help}</TooltipContent>
         </Tooltip>
       )}
-      <span className="font-mono text-foreground">{value}</span>
-    </span>
+      <span className="font-mono text-sm font-semibold text-[#3b1370]">{value}</span>
+    </div>
   )
 }
 
@@ -1453,7 +1454,7 @@ export function CompareAnimationPanel({
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
-      <CardHeader className="flex shrink-0 flex-row flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-2 pb-1">
+      <CardHeader className="flex shrink-0 flex-row flex-wrap items-center gap-x-4 gap-y-2 px-3 pt-2 pb-2">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
@@ -1466,8 +1467,8 @@ export function CompareAnimationPanel({
         </CardTitle>
         {panel && pings && (
           <TooltipProvider delayDuration={200}>
-            <div className="ml-auto flex flex-col items-end gap-y-0.5">
-              <div className="flex flex-wrap justify-end gap-x-3">
+            <div className={`flex w-full gap-2 ${mode === "compare" ? "flex-col" : ""}`}>
+              <div className="grid min-w-0 flex-[4] grid-cols-4 divide-x divide-border/70 rounded-md border border-border/70 bg-background/60">
                 <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
                 <PanelStat
                   label="stops split"
@@ -1485,7 +1486,7 @@ export function CompareAnimationPanel({
                   value={percent(panel.metrics.merged_fraction)}
                 />
               </div>
-              <div className="flex flex-wrap justify-end gap-x-3">
+              <div className="grid min-w-0 flex-[3] grid-cols-3 divide-x divide-border/70 rounded-md border border-border/70 bg-background/60">
                 <PanelStat label="number of pings" value={String(pings.length)} />
                 <PanelStat
                   label="frequency"

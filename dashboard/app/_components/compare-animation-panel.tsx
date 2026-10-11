@@ -1398,11 +1398,12 @@ export function DemoSceneRenderer({
   )
 }
 
-// Display one run statistic as a labeled cell of a panel-header stat group,
-// with an optional explanation behind a help icon
+// Display one run statistic as a labeled cell of the panel-header stat strip,
+// with an optional explanation behind a help icon. The cell draws its own left
+// and top divider so the lines stay correct when the strip wraps.
 function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
   return (
-    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 ${help ? "pr-5" : "pr-2.5"}`}>
+    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-5" : "pr-2.5"}`}>
       <span className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#3b1370]/80">{label}</span>
       {help && (
         <Tooltip>
@@ -1467,36 +1468,32 @@ export function CompareAnimationPanel({
         </CardTitle>
         {panel && pings && (
           <TooltipProvider delayDuration={200}>
-            <div className={`flex w-full gap-2 ${mode === "compare" ? "flex-col" : ""}`}>
-              <div className="grid min-w-0 flex-[4] grid-cols-4 divide-x divide-[#d1d5db] rounded-md border border-[#d1d5db] bg-white">
-                <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
-                <PanelStat
-                  label="stops split"
-                  help="Share of true stops detected as more than one stop at the correct location."
-                  value={percent(panel.metrics.split_fraction)}
-                />
-                <PanelStat
-                  label="stops missing"
-                  help="Share of true stops not overlapped by any detected stop."
-                  value={percent(panel.metrics.missed_fraction)}
-                />
-                <PanelStat
-                  label="stops merged"
-                  help="Share of detected true stops that also overlap a detected stop at a different location."
-                  value={percent(panel.metrics.merged_fraction)}
-                />
-              </div>
-              <div className="grid min-w-0 flex-[3] grid-cols-3 divide-x divide-[#d1d5db] rounded-md border border-[#d1d5db] bg-white">
-                <PanelStat label="number of pings" value={String(pings.length)} />
-                <PanelStat
-                  label="frequency"
-                  value={`${(pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)}/hr`}
-                />
-                <PanelStat
-                  label="stops detected"
-                  value={String(new Set(panel.result.cluster.filter((label) => label >= 0)).size)}
-                />
-              </div>
+            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-4" : "grid-cols-7"}`}>
+              <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
+              <PanelStat
+                label="stops split"
+                help="Share of true stops detected as more than one stop at the correct location."
+                value={percent(panel.metrics.split_fraction)}
+              />
+              <PanelStat
+                label="stops missing"
+                help="Share of true stops not overlapped by any detected stop."
+                value={percent(panel.metrics.missed_fraction)}
+              />
+              <PanelStat
+                label="stops merged"
+                help="Share of detected true stops that also overlap a detected stop at a different location."
+                value={percent(panel.metrics.merged_fraction)}
+              />
+              <PanelStat label="number of pings" value={String(pings.length)} />
+              <PanelStat
+                label="frequency"
+                value={`${(pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)}/hr`}
+              />
+              <PanelStat
+                label="stops detected"
+                value={String(new Set(panel.result.cluster.filter((label) => label >= 0)).size)}
+              />
             </div>
           </TooltipProvider>
         )}

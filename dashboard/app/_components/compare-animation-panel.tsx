@@ -1403,11 +1403,11 @@ export function DemoSceneRenderer({
 function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
   return (
     <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 ${help ? "pr-5" : "pr-2.5"}`}>
-      <span className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-foreground/75">{label}</span>
+      <span className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#3b1370]/80">{label}</span>
       {help && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-foreground/60 hover:text-[#3b1370]">
+            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-[#3b1370]/60 hover:text-[#3b1370]">
               <HelpCircle className="h-3 w-3" />
             </button>
           </TooltipTrigger>

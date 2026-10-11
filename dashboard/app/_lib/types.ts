@@ -14,6 +14,12 @@ export type ComparePanelResponse = {
   scene: CompareScene
   params: Record<string, number>
   result: AlignedStopResult
+  metrics: {
+    recall: number
+    missed_fraction: number
+    merged_fraction: number
+    split_fraction: number
+  }
 }
 
 export type CompareApiResponse = {

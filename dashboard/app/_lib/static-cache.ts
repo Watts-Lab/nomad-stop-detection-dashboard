@@ -38,6 +38,7 @@ type ManifestEntry = {
   result_kind: AlignedStopResult["kind"]
   configs: string
   results: string
+  metrics: string
 }
 
 type Manifest = {
@@ -224,6 +225,24 @@ function loadResults(
   return results
 }
 
+function loadMetrics(cacheRoot: string, metricsPath: string, userId: string, configId: number, rowIndex: number) {
+  return readParquet(cacheRoot, metricsPath, {
+    columns: ["user_id", "config_id", "recall", "missed_fraction", "merged_fraction", "split_fraction"],
+    rowStart: rowIndex,
+    rowEnd: rowIndex + 1,
+  }).then(([row]) => {
+    if (String(row?.user_id) !== userId || Number(row.config_id) !== configId) {
+      throw new Error("Cached metrics do not match selected user " + userId)
+    }
+    return {
+      recall: Number(row.recall),
+      missed_fraction: Number(row.missed_fraction),
+      merged_fraction: Number(row.merged_fraction),
+      split_fraction: Number(row.split_fraction),
+    }
+  })
+}
+
 function resolveConfig(configs: ConfigRow[], params: Record<string, number>) {
   const requested = Object.entries(params)
   if (requested.some(([, value]) => !Number.isFinite(value))) {
@@ -260,15 +279,18 @@ async function resultForUser(
 
   const configs = await loadConfigs(cacheRoot, entry.configs)
   const config = resolveConfig(configs, params)
-  const rows = await loadResults(
-    cacheRoot,
-    algorithm,
-    entry.results,
-    entry.result_kind,
-    userId,
-    userIndex,
-    configs.length,
-  )
+  const [rows, metrics] = await Promise.all([
+    loadResults(
+      cacheRoot,
+      algorithm,
+      entry.results,
+      entry.result_kind,
+      userId,
+      userIndex,
+      configs.length,
+    ),
+    loadMetrics(cacheRoot, entry.metrics, userId, config.config_id, userIndex * configs.length + configs.indexOf(config)),
+  ])
   const row = rows.find((candidate) => Number(candidate.config_id) === config.config_id)
   if (!row) throw new Error("Cached result is missing config_id " + config.config_id)
 
@@ -290,7 +312,7 @@ async function resultForUser(
   } else {
     throw new Error("Unsupported result kind for " + algorithm + ": " + entry.result_kind)
   }
-  return { displayName: entry.display_name, result }
+  return { displayName: entry.display_name, result, metrics }
 }
 
 async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: string) {
@@ -343,6 +365,7 @@ async function buildPanel(
     scene: scene.response,
     params: params ?? {},
     result: cachedResult.result,
+    metrics: cachedResult.metrics,
   } satisfies ComparePanelResponse
 }
 

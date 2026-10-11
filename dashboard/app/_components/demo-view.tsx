@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CompareAnimationPanel, DemoSceneRenderer } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { TrajectoryOptions } from "./trajectory-options"
@@ -15,7 +14,7 @@ import { algorithms } from "../_lib/dashboard-data"
 import { revealClass, validateAlgorithmParams } from "../_lib/dashboard-utils"
 import type { ParamStateSetter } from "./demo-parameter-controls"
 import type { AlgorithmDefinition } from "../_lib/dashboard-data"
-import type { CompareApiResponse, ComparePanelResponse } from "../_lib/types"
+import type { CompareApiResponse } from "../_lib/types"
 
 // Keep preview loading independent of the active demo and its playback state.
 function DestinationPreview({ trajectory }: { trajectory: string }) {
@@ -58,31 +57,6 @@ function DestinationPreview({ trajectory }: { trajectory: string }) {
           </p>
         )}
       </div>
-    </div>
-  )
-}
-
-// Display one trajectory statistic, with an optional explanation,
-// and one value per Demo panel so compared algorithms line up in columns.
-function InformationRow({ label, help, values }: { label: string; help?: string; values: string[] }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="font-semibold text-foreground">{label}</span>
-      {help && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="text-muted-foreground hover:text-[#3b1370]">
-              <HelpCircle className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-56">{help}</TooltipContent>
-        </Tooltip>
-      )}
-      <span className="ml-auto flex gap-1.5">
-        {values.map((value, index) => (
-          <span key={index} className="min-w-9 text-right font-mono text-foreground">{value}</span>
-        ))}
-      </span>
     </div>
   )
 }
@@ -159,11 +133,6 @@ export function DemoView({
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const scene = compareApiData?.left.scene
-  const runPanels = compareApiData
-    ? [compareApiData.left, ...(compareMode && compareApiData.right ? [compareApiData.right] : [])]
-    : []
-  const percentValues = (metric: keyof ComparePanelResponse["metrics"]) =>
-    runPanels.map((panel) => `${Math.round(panel.metrics[metric] * 100)}%`)
   const dataPanel = (
     <Card className="self-start overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-data">
       <CardContent className="flex flex-col gap-3 px-4">
@@ -190,44 +159,14 @@ export function DemoView({
               <RefreshCw className="h-4 w-4" />
               New Agent
             </Button>
-          </div>
-        </div>
-        {scene && (
-          <TooltipProvider delayDuration={200}>
-            <div className="space-y-1.5 rounded-md border border-border/70 bg-background/30 px-3 py-2">
-              {runPanels.length > 1 && <InformationRow label="" values={["Left", "Right"]} />}
-              <InformationRow label="min-by-min recall" values={percentValues("recall")} />
-              <InformationRow
-                label="stops split"
-                help="Share of true stops detected as more than one stop at the correct location."
-                values={percentValues("split_fraction")}
-              />
-              <InformationRow
-                label="stops missing"
-                help="Share of true stops not overlapped by any detected stop."
-                values={percentValues("missed_fraction")}
-              />
-              <InformationRow
-                label="stops merged"
-                help="Share of detected true stops that also overlap a detected stop at a different location."
-                values={percentValues("merged_fraction")}
-              />
+            {scene && (
               <Button variant="outline" size="sm" onClick={() => openMetricsFromDemo(scene.user_id)} className="w-full text-xs">
                 <BarChart3 className="h-4 w-4" />
                 Metrics for parameter sweep
               </Button>
-              <InformationRow label="number of pings" values={[String(scene.pings.length)]} />
-              <InformationRow
-                label="frequency"
-                values={[`${(scene.pings.length / ((scene.pings[scene.pings.length - 1].timestamp - scene.pings[0].timestamp) / 3600)).toFixed(1)}/hr`]}
-              />
-              <InformationRow
-                label="stops detected"
-                values={runPanels.map((panel) => String(new Set(panel.result.cluster.filter((label) => label >= 0)).size))}
-              />
-            </div>
-          </TooltipProvider>
-        )}
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

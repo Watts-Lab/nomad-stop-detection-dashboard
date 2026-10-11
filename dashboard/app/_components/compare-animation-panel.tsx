@@ -1398,8 +1398,28 @@ export function DemoSceneRenderer({
   )
 }
 
+// Display one run statistic in the panel header, with an optional explanation
+function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      <span className="font-semibold text-foreground">{label}</span>
+      {help && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label={`About ${label}`} className="text-muted-foreground hover:text-[#3b1370]">
+              <HelpCircle className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-56">{help}</TooltipContent>
+        </Tooltip>
+      )}
+      <span className="font-mono text-foreground">{value}</span>
+    </span>
+  )
+}
+
 // Wrap the scene renderer with the algorithm title, 
-// Learn link, agent details, and loading placeholders
+// Learn link, run statistics, and loading placeholders
 export function CompareAnimationPanel({
   panel,
   mode = "compare",
@@ -1428,10 +1448,12 @@ export function CompareAnimationPanel({
   onPlaybackStateChange?: (state: PlaybackState) => void
 }) {
   const learnAlgorithmId = panel?.algo
+  const pings = panel?.scene.pings
+  const percent = (value: number) => `${Math.round(value * 100)}%`
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
-      <CardHeader className="shrink-0 px-3 pt-2 pb-1">
+      <CardHeader className="flex shrink-0 flex-row flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-2 pb-1">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
@@ -1442,6 +1464,41 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
+        {panel && pings && (
+          <TooltipProvider delayDuration={200}>
+            <div className="ml-auto flex flex-col items-end gap-y-0.5">
+              <div className="flex flex-wrap justify-end gap-x-3">
+                <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
+                <PanelStat
+                  label="stops split"
+                  help="Share of true stops detected as more than one stop at the correct location."
+                  value={percent(panel.metrics.split_fraction)}
+                />
+                <PanelStat
+                  label="stops missing"
+                  help="Share of true stops not overlapped by any detected stop."
+                  value={percent(panel.metrics.missed_fraction)}
+                />
+                <PanelStat
+                  label="stops merged"
+                  help="Share of detected true stops that also overlap a detected stop at a different location."
+                  value={percent(panel.metrics.merged_fraction)}
+                />
+              </div>
+              <div className="flex flex-wrap justify-end gap-x-3">
+                <PanelStat label="number of pings" value={String(pings.length)} />
+                <PanelStat
+                  label="frequency"
+                  value={`${(pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)}/hr`}
+                />
+                <PanelStat
+                  label="stops detected"
+                  value={String(new Set(panel.result.cluster.filter((label) => label >= 0)).size)}
+                />
+              </div>
+            </div>
+          </TooltipProvider>
+        )}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-0">
         {panel ? (

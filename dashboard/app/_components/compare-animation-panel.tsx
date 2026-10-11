@@ -4,7 +4,8 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { HelpCircle, Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react"
+import { Activity, HelpCircle, MapPin, MapPinOff, Merge, Pause, Play, Radio, RotateCcw, Split, StepBack, StepForward, Target } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -1401,21 +1402,24 @@ export function DemoSceneRenderer({
 // Display one run statistic as a labeled cell of the panel-header stat strip,
 // with an optional explanation behind a help icon. The cell draws its own left
 // and top divider so the lines stay correct when the strip wraps.
-function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
+function PanelStat({ icon: Icon, label, help, value }: { icon: LucideIcon; label: string; help?: string; value: string }) {
   return (
-    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-5" : "pr-2.5"}`}>
-      <span className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#3b1370]/80">{label}</span>
+    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-4" : "pr-1.5"}`}>
+      <span className="text-[10px] font-semibold uppercase leading-tight tracking-[0.02em] text-[#3b1370]/80">{label}</span>
       {help && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-[#3b1370]/60 hover:text-[#3b1370]">
+            <button type="button" aria-label={`About ${label}`} className="absolute right-1 top-1 text-[#3b1370]/60 hover:text-[#3b1370]">
               <HelpCircle className="h-3 w-3" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-56">{help}</TooltipContent>
         </Tooltip>
       )}
-      <span className="font-mono text-sm font-bold text-[#3b1370]">{value}</span>
+      <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-[#3b1370]">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-[#7629db]" aria-hidden="true" />
+        {value}
+      </span>
     </div>
   )
 }
@@ -1468,29 +1472,34 @@ export function CompareAnimationPanel({
         </CardTitle>
         {panel && pings && (
           <TooltipProvider delayDuration={200}>
-            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-4" : "grid-cols-7"}`}>
-              <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
+            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-[repeat(4,minmax(min-content,1fr))]" : "grid-cols-[repeat(7,minmax(min-content,1fr))]"}`}>
+              <PanelStat icon={Target} label="min-by-min recall" value={percent(panel.metrics.recall)} />
               <PanelStat
+                icon={Split}
                 label="stops split"
                 help="Share of true stops detected as more than one stop at the correct location."
                 value={percent(panel.metrics.split_fraction)}
               />
               <PanelStat
+                icon={MapPinOff}
                 label="stops missing"
                 help="Share of true stops not overlapped by any detected stop."
                 value={percent(panel.metrics.missed_fraction)}
               />
               <PanelStat
+                icon={Merge}
                 label="stops merged"
                 help="Share of detected true stops that also overlap a detected stop at a different location."
                 value={percent(panel.metrics.merged_fraction)}
               />
-              <PanelStat label="number of pings" value={String(pings.length)} />
+              <PanelStat icon={Radio} label="number of pings" value={String(pings.length)} />
               <PanelStat
+                icon={Activity}
                 label="frequency"
                 value={`${(pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)}/hr`}
               />
               <PanelStat
+                icon={MapPin}
                 label="stops detected"
                 value={String(new Set(panel.result.cluster.filter((label) => label >= 0)).size)}
               />

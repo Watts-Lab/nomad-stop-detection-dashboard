@@ -1403,18 +1403,18 @@ export function DemoSceneRenderer({
 function PanelStat({ label, help, value }: { label: string; help?: string; value: string }) {
   return (
     <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2.5 ${help ? "pr-5" : "pr-2.5"}`}>
-      <span className="text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-foreground/75">{label}</span>
       {help && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-muted-foreground hover:text-[#3b1370]">
+            <button type="button" aria-label={`About ${label}`} className="absolute right-1.5 top-1 text-foreground/60 hover:text-[#3b1370]">
               <HelpCircle className="h-3 w-3" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-56">{help}</TooltipContent>
         </Tooltip>
       )}
-      <span className="font-mono text-sm font-semibold text-[#3b1370]">{value}</span>
+      <span className="font-mono text-sm font-bold text-[#3b1370]">{value}</span>
     </div>
   )
 }
@@ -1468,7 +1468,7 @@ export function CompareAnimationPanel({
         {panel && pings && (
           <TooltipProvider delayDuration={200}>
             <div className={`flex w-full gap-2 ${mode === "compare" ? "flex-col" : ""}`}>
-              <div className="grid min-w-0 flex-[4] grid-cols-4 divide-x divide-border/70 rounded-md border border-border/70 bg-background/60">
+              <div className="grid min-w-0 flex-[4] grid-cols-4 divide-x divide-[#d1d5db] rounded-md border border-[#d1d5db] bg-white">
                 <PanelStat label="min-by-min recall" value={percent(panel.metrics.recall)} />
                 <PanelStat
                   label="stops split"
@@ -1486,7 +1486,7 @@ export function CompareAnimationPanel({
                   value={percent(panel.metrics.merged_fraction)}
                 />
               </div>
-              <div className="grid min-w-0 flex-[3] grid-cols-3 divide-x divide-border/70 rounded-md border border-border/70 bg-background/60">
+              <div className="grid min-w-0 flex-[3] grid-cols-3 divide-x divide-[#d1d5db] rounded-md border border-[#d1d5db] bg-white">
                 <PanelStat label="number of pings" value={String(pings.length)} />
                 <PanelStat
                   label="frequency"

@@ -382,8 +382,10 @@ function NomadDashboard() {
   }, [rightSweepParameters, metricsRightParameter])
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
+    <div className="nomad-shell flex min-h-dvh flex-col">
       <NomadNav currentView={activeView} />
+      <div className="nomad-viewport">
+        <div className="nomad-dashboard bg-background">
 
       {activeView === "home" && (
         <HomeView navigateTo={navigateTo} />
@@ -459,6 +461,8 @@ function NomadDashboard() {
           startTour={startMetricsTour}
         />
       )}
+        </div>
+      </div>
     </div>
   )
 }

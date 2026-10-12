@@ -195,10 +195,20 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_312px] gap-3 items-stretch`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_264px] gap-3 items-stretch`}>
           {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
-            <CompareAnimationPanel panel={compareApiData?.left} mode="single" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} />
+            <div className="aspect-[2/3] min-h-0 lg:flex-1 lg:aspect-auto">
+              <CompareAnimationPanel
+                panel={compareApiData?.left}
+                mode="single"
+                currentTime={demoTime}
+                onTimeChange={setDemoTime}
+                showGroundTruth={showGroundTruth}
+                showStops={showStops}
+                showXray={showXray}
+              />
+            </div>
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-params">
@@ -250,40 +260,66 @@ export function DemoView({
           </Card>
         </div>
       ) : (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_312px] gap-3 items-stretch overflow-hidden`}>
-          {dataPanel}
-          <div className="flex min-h-0 flex-col gap-3">
-          <div className="grid min-h-0 flex-1 items-stretch grid-cols-1 lg:grid-cols-2 gap-3">
-              <CompareAnimationPanel panel={compareApiData?.left} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} syncMaster={false} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} previewRunId={comparePreviewRunId} sharedPlaybackState={comparePlaybackState} />
-              <CompareAnimationPanel panel={compareApiData?.right} mode="compare" currentTime={demoTime} onTimeChange={setDemoTime} showGroundTruth={showGroundTruth} showStops={showStops} showXray={showXray} onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)} onPlaybackStateChange={setComparePlaybackState} />
-            </div>
-            {compareError && <p className="text-xs text-red-500">{compareError}</p>}
+        <div className={`${revealClass("panel", 2)} grid grid-cols-1 content-start gap-3 md:grid-cols-6 xl:grid-cols-[264px_minmax(0,1fr)_minmax(0,1fr)_264px]`}>
+          <div className="order-1 min-w-0 md:col-span-2 xl:col-span-1">
+            {dataPanel}
           </div>
-          <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-4">
-            <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4">
-              <div className="flex justify-start">
-              <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
-                <Square className="h-4 w-4" />
-                Single
-              </Button>
+          <div className="order-3 mx-6 aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-0 md:ml-20 xl:order-2 xl:col-span-1 xl:mx-0">
+            <CompareAnimationPanel
+              panel={compareApiData?.left}
+              mode="compare"
+              currentTime={demoTime}
+              onTimeChange={setDemoTime}
+              syncMaster={false}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              showXray={showXray}
+              previewRunId={comparePreviewRunId}
+              sharedPlaybackState={comparePlaybackState}
+            />
+          </div>
+          <div className="order-4 mx-6 aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-20 md:ml-0 xl:order-3 xl:col-span-1 xl:mx-0">
+            <CompareAnimationPanel
+              panel={compareApiData?.right}
+              mode="compare"
+              currentTime={demoTime}
+              onTimeChange={setDemoTime}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              showXray={showXray}
+              onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)}
+              onPlaybackStateChange={setComparePlaybackState}
+            />
+          </div>
+          <Card className="order-2 min-h-0 overflow-hidden bg-[#f8f9fc] py-4 md:col-span-4 xl:order-4 xl:col-span-1">
+            <CardContent className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
+              <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-center md:justify-between xl:col-span-1 xl:flex-col xl:items-stretch">
+                <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
+                  <Square className="h-4 w-4" />
+                  Single
+                </Button>
+                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action">
+                  <BarChart3 className="h-4 w-4" />
+                  Aggregated Metrics
+                </Button>
               </div>
               <div className="space-y-2">
-              <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
+                <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
-                  {demoAlgorithms.map((a) => (
-                    <SelectItem
-                      key={a.id}
-                      value={a.id}
-                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
-                    >
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                  <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                    {demoAlgorithms.map((a) => (
+                      <SelectItem
+                        key={a.id}
+                        value={a.id}
+                        className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                      >
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
                 <DemoParameterControls
                   key={`left-${leftAlgorithm}`}
@@ -296,22 +332,22 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2">
-              <h4 className="text-sm font-medium text-[#3b1370]">Right</h4>
+                <h4 className="text-sm font-medium text-[#3b1370]">Right</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
-                <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
-                  {demoAlgorithms.map((a) => (
-                    <SelectItem
-                      key={a.id}
-                      value={a.id}
-                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
-                    >
-                     {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                  <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                    {demoAlgorithms.map((a) => (
+                      <SelectItem
+                        key={a.id}
+                        value={a.id}
+                        className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                      >
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
                 <DemoParameterControls
                   key={`right-${rightAlgorithm}`}
@@ -323,14 +359,9 @@ export function DemoView({
                   setErrors={setRightParamErrors}
                 />
               </div>
-              <div className="space-y-2 pt-2">
-                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full">
-                  <BarChart3 className="h-4 w-4" />
-                  Aggregated Metrics
-                </Button>
-              </div>
             </CardContent>
           </Card>
+          {compareError && <p className="order-5 text-xs text-red-500 md:col-span-2 xl:col-start-2 xl:col-span-2">{compareError}</p>}
         </div>
       )}
     </div>

@@ -76,7 +76,7 @@ export function DemoParameterControls({
                           })
                         }}
                       >
-                        <SelectTrigger className="h-8 w-24 text-sm" aria-label={`${param.name} parameter`}>
+                        <SelectTrigger className="h-8 w-16 text-sm" aria-label={`${param.name} parameter`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

@@ -264,7 +264,7 @@ export function DemoView({
           <div className="order-1 min-w-0 md:col-span-2 xl:col-span-1">
             {dataPanel}
           </div>
-          <div className="order-3 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-0 md:ml-20 xl:order-2 xl:col-span-1 xl:mr-0 xl:ml-[10%]">
+          <div className="order-3 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-0 md:ml-20 xl:order-2 xl:col-span-1 xl:mx-0">
             <CompareAnimationPanel
               panel={compareApiData?.left}
               mode="compare"
@@ -278,7 +278,7 @@ export function DemoView({
               sharedPlaybackState={comparePlaybackState}
             />
           </div>
-          <div className="order-4 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-20 md:ml-0 xl:order-3 xl:col-span-1 xl:mr-[10%] xl:ml-0">
+          <div className="order-4 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-20 md:ml-0 xl:order-3 xl:col-span-1 xl:mx-0">
             <CompareAnimationPanel
               panel={compareApiData?.right}
               mode="compare"

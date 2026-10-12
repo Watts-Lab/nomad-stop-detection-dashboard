@@ -398,7 +398,6 @@ function NomadDashboard() {
           syncUrl={syncUrl}
           openLearnAlgorithm={openLearnAlgorithm}
           openLearnDemo={openLearnDemo}
-          openLearnDocumentation={openLearnDocumentation}
         />
       )}
 

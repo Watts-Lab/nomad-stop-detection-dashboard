@@ -169,7 +169,7 @@ export function DemoView({
     <div className="nomad-page-frame flex min-w-0 flex-1 flex-col gap-3 pt-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
+          <h2 className="text-3xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           {!compareMode && (
 
             /* Start the Demo guided tour. */

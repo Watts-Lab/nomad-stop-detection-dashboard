@@ -21,6 +21,26 @@ const teamGroups = [
         ],
       },
       {
+        name: "Anoushka Menon",
+        initials: "AM",
+        photo: publicPath("/headshots/Anoushka_Menon.png"),
+        role: "M.S.E. Data Science · 2027",
+        links: [
+          { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
+        ],
+      },
+      {
+        name: "Tina Ni",
+        initials: "TN",
+        photo: publicPath("/headshots/Tina_Ni.jpg"),
+        role: "Researcher",
+        links: [
+          { label: "GitHub", href: "https://github.com/tina-ni", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/tina-ni-795838284", icon: Linkedin },
+        ],
+      },
+      {
         name: "Lorenzo Santos",
         initials: "LS",
         photo: publicPath("/headshots/Lorenzo_Santos.jpg"),
@@ -31,14 +51,28 @@ const teamGroups = [
         ],
       },
       {
-        name: "Darren Wang",
-        initials: "DW",
-        photo: publicPath("/headshots/Darren_Wang.png"),
-        role: "Researcher",
+        name: "Ruiqi Pan",
+        initials: "RP",
+        photo: publicPath("/headshots/Ruiqi_Pan.jpg"),
+        role: "M.A.S. Computer Science · 2027",
         links: [
-          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
-          { label: "Personal website", href: "https://darren-wang.dev", icon: Globe },
+          { label: "GitHub", href: "https://github.com/ruiqipan", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/ruiqipan", icon: Linkedin },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Alumni",
+    members: [
+      {
+        name: "Carol Tu",
+        initials: "CT",
+        photo: publicPath("/headshots/Carol_Tu.png"),
+        role: "B.S.E. Computer Science · 2026",
+        links: [
+          { label: "GitHub", href: "https://github.com/caroltuu", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/caroltuu", icon: Linkedin },
         ],
       },
       {
@@ -52,38 +86,14 @@ const teamGroups = [
         ],
       },
       {
-        name: "Tina Ni",
-        initials: "TN",
-        photo: publicPath("/headshots/Tina_Ni.jpg"),
+        name: "Darren Wang",
+        initials: "DW",
+        photo: publicPath("/headshots/Darren_Wang.png"),
         role: "Researcher",
         links: [
-          { label: "GitHub", href: "https://github.com/tina-ni", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/tina-ni-795838284", icon: Linkedin },
-        ],
-      },
-    ],
-  },
-  {
-    title: "Alumni",
-    members: [
-      {
-        name: "Anoushka Menon",
-        initials: "AM",
-        photo: publicPath("/headshots/Anoushka_Menon.png"),
-        role: "M.S.E. Data Science · 2026",
-        links: [
-          { label: "GitHub", href: "https://github.com/anoushkamenonn", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/anoushka-menon", icon: Linkedin },
-        ],
-      },
-      {
-        name: "Carol Tu",
-        initials: "CT",
-        photo: publicPath("/headshots/Carol_Tu.png"),
-        role: "B.S.E. Computer Science · 2026",
-        links: [
-          { label: "GitHub", href: "https://github.com/caroltuu", icon: Github },
-          { label: "LinkedIn", href: "https://www.linkedin.com/in/caroltuu", icon: Linkedin },
+          { label: "GitHub", href: "https://github.com/DPnimo11", icon: Github },
+          { label: "LinkedIn", href: "https://www.linkedin.com/in/darren-wang-penn", icon: Linkedin },
+          { label: "Personal website", href: "https://darren-wang.dev", icon: Globe },
         ],
       },
     ],
@@ -94,11 +104,11 @@ export default function AboutPage() {
   return (
     <div className="nomad-shell h-screen overflow-y-auto bg-background text-foreground">
       <NomadNav currentView="about" />
-      <main className="nomad-page-frame mx-auto grid max-w-[1440px] gap-12 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(32rem,1.15fr)] lg:gap-16 lg:py-14">
+      <main className="nomad-page-frame grid gap-12 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(32rem,1.15fr)] lg:gap-16 lg:py-14">
         <div className="space-y-12 lg:sticky lg:top-[131px] lg:self-start">
           <section className={`${revealClass()} space-y-5`}>
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#3b1370]">About NOMAD</p>
-            <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-[#3b1370] sm:text-5xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#3b1370]">About NOMAD</p>
+          <h1 className="max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-[#3b1370]">
               We create tools for analysis of human mobility
             </h1>
             <div className="max-w-xl space-y-5 text-sm leading-relaxed text-foreground sm:text-base">
@@ -146,7 +156,7 @@ export default function AboutPage() {
             <section key={group.title} className="space-y-4" aria-labelledby={`${group.title.toLowerCase()}-heading`}>
               <h2
                 id={`${group.title.toLowerCase()}-heading`}
-                className={`${revealClass("up", groupIndex + 1)} text-2xl font-semibold tracking-tight`}
+                className={`${revealClass("up", groupIndex + 1)} text-xl font-semibold tracking-tight`}
               >
                 {group.title}
               </h2>

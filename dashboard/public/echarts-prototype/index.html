@@ -61,17 +61,6 @@
 
     // Format the parameter name as plain text for tooltips
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
-    const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread", "Pinned user hit area"]);
-
-    // Build agent, minute-recall, and parameter details for maximum points and highlighted curves
-    const pointTooltip = (event) => {
-      if (!tooltipSeries.has(event.seriesName)) return "";
-      const [pointX, recall, userId] = event.value;
-      const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
-        .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
-        .join("");
-      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">Minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
-    };
     let pendingTourFocus = null;
 
     window.addEventListener("message", (event) => {
@@ -321,19 +310,6 @@
             bottom: reserveLegendSpace ? 60 : 36,
             containLabel: true,
           },
-          tooltip: {
-            trigger: "item",
-            confine: true,
-            backgroundColor: "rgba(17, 24, 39, 0.96)",
-            borderColor: "#4b5563",
-            borderWidth: 1,
-            padding: 10,
-            textStyle: {
-              color: "#f3f4f6",
-              fontSize: 12,
-            },
-            formatter: pointTooltip,
-          },
           xAxis: {
             type: "value",
             name: `Parameter: ${parameterLabel(xLabel)}`,
@@ -404,9 +380,6 @@
                 itemStyle: {
                   opacity: 0.025,
                 },
-              },
-              tooltip: {
-                show: false,
               },
               z: 3,
             },
@@ -481,33 +454,6 @@
                 disabled: true,
               },
               z: 7,
-            },
-            {
-              name: "Hovered user spread",
-              id: "highlighted-user-line",
-              type: "line",
-              data: emptyHighlight,
-              animation: false,
-              symbol: "circle",
-              symbolSize: 6,
-              lineStyle: {
-                color: "rgba(44, 160, 33, 0.6)",
-                width: 2,
-                type: "dashed",
-              },
-              itemStyle: {
-                color: "rgba(44, 160, 44, 0.6)",
-              },
-              emphasis: {
-                scale: 1.8,
-                itemStyle: {
-                  borderColor: "#ffffff",
-                  borderWidth: 2,
-                  shadowBlur: 8,
-                  shadowColor: "rgba(0, 0, 0, 0.55)",
-                },
-              },
-              z: 9,
             },
             {
               name: "Pinned user spread",
@@ -632,8 +578,8 @@
         });
         applyTourFocus(pendingTourFocus);
 
-        // A hovered point only previews a user's spread; a clicked point pins it so the
-        // green line survives mouse movement until it is unpinned or replaced.
+        // Hovering a point only enlarges it to invite a click; clicking a maximum point pins
+        // that agent, drawing its curve and filling the side card until it is unpinned or replaced.
         let hoveredPoint = null;
         let hoveredPinnedPoint = null;
         let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
@@ -648,15 +594,12 @@
         // Get the selected agent's minute-recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
-        // Draw hovered and pinned agent curves and emphasize their maximum points
-        // Restore tour styling when neither is active
+        // Enlarge the hovered maximum point, draw the pinned agent's curve, and dim the
+        // other points while either is active; restore tour styling when neither is
         const renderHighlight = () => {
-          // A pinned user stays drawn while hovering another one, so both spreads show at once.
-          const hovered = hoveredPoint;
-          if (!hovered && !pinnedPoint) {
+          if (!hoveredPoint && !pinnedPoint) {
             chart.setOption({
               series: [
-                { id: "highlighted-user-line", data: emptyHighlight },
                 { id: "hovered-per-user-max", data: emptyHighlight },
                 { id: "pinned-user-line", data: emptyHighlight },
                 { id: "pinned-user-hit-area", data: emptyHighlight },
@@ -671,8 +614,7 @@
             series: [
               { id: "individual-results", itemStyle: { opacity: 0.08 } },
               { id: "per-user-max", itemStyle: { opacity: 0.08 } },
-              { id: "highlighted-user-line", data: hovered ? userLineFor(hovered) : emptyHighlight },
-              { id: "hovered-per-user-max", data: hovered ? [hovered] : emptyHighlight },
+              { id: "hovered-per-user-max", data: hoveredPoint ? [hoveredPoint] : emptyHighlight },
               { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
               { id: "pinned-user-hit-area", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
               { id: "hovered-pinned-point", data: hoveredPinnedPoint ? [hoveredPinnedPoint] : emptyHighlight },

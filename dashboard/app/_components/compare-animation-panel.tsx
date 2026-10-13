@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
-import type { TooltipComponentPositionCallback } from "echarts"
 import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,7 +28,6 @@ import {
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
-import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./demo-viz/demo-tooltip-layout"
 import { partialPath, routeProgressAt } from "./demo-viz/demo-route-animation"
 import { buildDemoMapSeries, resolveHoverPingIndexes, currentPingData } from "./demo-viz/demo-scene-render"
 
@@ -47,6 +45,15 @@ const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
 type PlaybackState = "playing" | "paused" | "complete"
+
+const clusterColor = (cluster: number) => {
+  if (cluster < 0) return "#626760"
+  const hue =
+    CLUSTER_HUE_START +
+    ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
+  const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
+  return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+}
 
 // Format elapsed seconds as minutes and seconds for the ping-comparison tooltip
 const elapsedTimeLabel = (seconds: number) => {
@@ -92,7 +99,6 @@ export function DemoSceneRenderer({
   const destinationPreview = variant === "destination-preview"
   const mapRef = useRef<HTMLDivElement | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
-  const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => { })
   const replayRef = useRef<() => void>(() => { })
   const previewRef = useRef<() => void>(() => { })
@@ -107,7 +113,6 @@ export function DemoSceneRenderer({
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
-  const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
 
   // Prepare scene-derived map and timeline data shared across algorithm and config results.
   const sceneData = useMemo(
@@ -260,11 +265,9 @@ export function DemoSceneRenderer({
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
-    let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
     let backgroundClearFrame = 0
-    let pingTooltipElement: HTMLDivElement | null = null
     let hoverBuildingId = ""
     let tourActionActive = false
     const frameDelay = variant === "preview" ? 30 : 60
@@ -277,16 +280,6 @@ export function DemoSceneRenderer({
       const nextState = playbackStateFor(paused, sequenceIndex, chartData.timeSequence.length)
       setPlaybackState(nextState)
       onPlaybackStateChangeRef.current?.(nextState)
-    }
-
-    // Spread cluster colors across a hue range that avoids the current ping's red.
-    const clusterColor = (cluster: number) => {
-      if (cluster < 0) return "#1f2326"
-      const hue =
-        CLUSTER_HUE_START +
-        ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
-      const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
-      return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
     }
 
     const isDensityAlgorithm = chartData.result.kind === "density"
@@ -460,6 +453,13 @@ export function DemoSceneRenderer({
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
           { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] },
           { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
+          {
+            id: "selected-ping-times",
+            data: selectedPingIndexesRef.current.map((pingIndex, selectionIndex) => {
+              const ping = chartData.pings[pingIndex]
+              return [ping.t * 1000, ping.cluster, selectionIndex]
+            }),
+          },
           { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] }
         ]
       }, { lazyUpdate: true })
@@ -501,6 +501,7 @@ export function DemoSceneRenderer({
           { id: "next-truth-stop", data: [] },
           { id: "current-truth-stop", data: [] },
           { id: "stop-bars", data: [] },
+          { id: "selected-ping-times", data: [] },
           { id: "cursor", data: [] },
         ],
       }, { lazyUpdate: true })
@@ -526,8 +527,7 @@ export function DemoSceneRenderer({
     }
     const activeTimestamp = () => activePlaybackTimestamp(selectedTimestampRef.current, sequenceIndex, chartData.timeSequence)
 
-    // Update the hovered ping and its ground-truth building, 
-    // Redraw highlights and reposition tooltips
+    // Update the hovered ping and its ground-truth building, then redraw highlights.
     const setHoveredPing = (pingIndex: number | null) => {
       const ping = pingIndex === null ? null : chartData.pings[pingIndex]
       const buildingId = ping ? groundTruthAt(ping.t, chartData).current?.location ?? "" : ""
@@ -536,7 +536,6 @@ export function DemoSceneRenderer({
       hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
     }
 
     // Update the hovered edge, clear ping/building hover
@@ -550,7 +549,6 @@ export function DemoSceneRenderer({
       hoverPingIndex = null
       hoverBuildingId = ""
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
     }
 
     // Highlight a building while clearing ping and edge hover
@@ -560,71 +558,6 @@ export function DemoSceneRenderer({
       hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
-    }
-
-    // Calculate selection coordinates and candidate tooltip positions,
-    // checking for overlap with points, selection lines, and other tooltips.
-    const selectedPingPixels = () => selectedPingIndexesRef.current.map((pingIndex) => {
-      const ping = chartData.pings[pingIndex]
-      return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
-    })
-
-    const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
-      if (!element || element.style.visibility === "hidden") return false
-      return !(
-        left + width + gap <= element.offsetLeft ||
-        left >= element.offsetLeft + element.offsetWidth + gap ||
-        top + height + gap <= element.offsetTop ||
-        top >= element.offsetTop + element.offsetHeight + gap
-      )
-    }
-
-    // Position the selection tooltip without covering selected pings, their connecting line, 
-    // the pointer, or the hover tooltip; hide it if no position fits
-    const positionComparisonTooltip = () => {
-      const selected = selectedPingIndexesRef.current
-      const tooltip = comparisonTooltipRef.current
-      if (!selected.length || !tooltip) return
-      const points = selectedPingPixels()
-      const hoveredPoint = hoverPingIndex === null ? null : (() => {
-        const ping = chartData.pings[hoverPingIndex]
-        return mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
-      })()
-      const padding = 12
-      const gap = 16
-      const tooltipWidth = tooltip.offsetWidth
-      const tooltipHeight = tooltip.offsetHeight
-      const position = tooltipPositions(tooltipWidth, tooltipHeight, padding, gap, points, mapEl.clientWidth, mapEl.clientHeight)
-        .find((candidate) =>
-          !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
-          (!hoveredPoint || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, hoveredPoint)) &&
-          (!mapMousePosition || !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, mapMousePosition)) &&
-          !boxOverlapsElement(candidate, tooltipWidth, tooltipHeight, pingTooltipElement, 10)
-        )
-      tooltip.style.visibility = position ? "visible" : "hidden"
-      if (position) {
-        tooltip.style.left = `${position[0]}px`
-        tooltip.style.top = `${position[1]}px`
-      }
-      setComparisonTooltipPosition((current) => {
-        if (!position) return current.visibility === "hidden" ? current : { ...current, visibility: "hidden" }
-        if (current.left === position[0] && current.top === position[1] && current.visibility === "visible") return current
-        return { left: position[0], top: position[1], visibility: "visible" }
-      })
-    }
-
-    // Hide and reposition tooltips after chart or interaction changes
-    // Restore the hovered ping's tooltip
-    const refreshTooltipLayout = () => {
-      mapChart.dispatchAction({ type: "hideTip" })
-      if (comparisonTooltipRef.current) comparisonTooltipRef.current.style.visibility = "hidden"
-      window.requestAnimationFrame(() => {
-        positionComparisonTooltip()
-        window.requestAnimationFrame(() => {
-          if (hoverPingIndex !== null) showMapPingTip(hoverPingIndex)
-        })
-      })
     }
 
     // Toggle ping selection; allow two selected pings
@@ -637,7 +570,6 @@ export function DemoSceneRenderer({
       selectedPingIndexesRef.current = next
       setSelectedPingIndexes(next)
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
     }
 
     // Clear selected pings and redraw the scene without selection highlighting
@@ -685,12 +617,6 @@ export function DemoSceneRenderer({
       }
     }
 
-    // Track the pointer position and move the comparison tooltip out of its way
-    const onMapPointerMove: (event: { offsetX: number; offsetY: number }) => void = (event) => {
-      mapMousePosition = [event.offsetX, event.offsetY]
-      if (selectedPingIndexesRef.current.length) positionComparisonTooltip()
-    }
-
     // Record where the pointer press begins so background clicks can be distinguished from drags
     const onMapSelectionPointerDown: (event: PointerEvent) => void = (event) => {
       if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
@@ -724,9 +650,7 @@ export function DemoSceneRenderer({
 
     // Clear map hover when leaving an item or the chart, unless a tour highlight is active
     const onMapMouseOut = () => {
-      mapMousePosition = null
       if (!tourActionActive) setHoveredEdge(null)
-      else positionComparisonTooltip()
     }
 
     // Select a clicked map ping or anchor and prevent the click from being treated as a background click
@@ -745,15 +669,8 @@ export function DemoSceneRenderer({
       }
     }
 
-    // Ask ECharts to show the tooltip for the specified ping's hit area
-    const showMapPingTip = (pingIndex: number) => {
-      if (pingHitAreaSeriesIndex < 0) return
-      mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex: pingIndex })
-    }
-
     // Link timeline hover to the corresponding map ping, core point, or ground-truth building
     const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
-      mapMousePosition = null
       const value = paramsValue(params)
       if (params.seriesId === "ping-ticks") {
         const pingIndex = Number(value[0])
@@ -768,11 +685,10 @@ export function DemoSceneRenderer({
       if (params.seriesId === "next-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
     }
 
-    // Clear timeline-driven hover and hide the ping tooltip unless a tour highlight is active
+    // Clear timeline-driven hover unless a tour highlight is active.
     const onTimelineMouseOut = () => {
       if (!tourActionActive) {
         setHoveredPing(null)
-        mapChart.dispatchAction({ type: "hideTip" })
       }
     }
 
@@ -809,7 +725,6 @@ export function DemoSceneRenderer({
       selectedPingIndexesRef.current = next
       setSelectedPingIndexes(next)
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
     }
 
     // Align the playback sequence index with the supplied timestamp
@@ -1003,53 +918,6 @@ export function DemoSceneRenderer({
         (defaultBounds.view.maxX - defaultBounds.view.minX)
       syncMapLineStyles()
       timelineChart.resize()
-      refreshTooltipLayout()
-    }
-
-    // Position the hover tooltip within the chart while avoiding the hovered point, 
-    // selection, and comparison tooltip
-    const pingTooltipPosition: TooltipComponentPositionCallback = (point, _params, element, _rect, size) => {
-      const padding = 8
-      const gap = 16
-      const tooltipWidth = size.contentSize[0]
-      const tooltipHeight = size.contentSize[1]
-      const points = selectedPingPixels()
-      const maxLeft = Math.max(padding, size.viewSize[0] - tooltipWidth - padding)
-      const maxTop = Math.max(padding, size.viewSize[1] - tooltipHeight - padding)
-      const clamp: (position: number[]) => number[] = ([left, top]) => [
-        Math.max(padding, Math.min(left, maxLeft)),
-        Math.max(padding, Math.min(top, maxTop)),
-      ]
-      const positions = [gap, gap + 24, gap + 48].flatMap((offset) => [
-        [point[0] + offset, point[1] - tooltipHeight / 2],
-        [point[0] - offset - tooltipWidth, point[1] - tooltipHeight / 2],
-        [point[0] - tooltipWidth / 2, point[1] + offset],
-        [point[0] - tooltipWidth / 2, point[1] - offset - tooltipHeight],
-        [point[0] + offset, point[1] + offset],
-        [point[0] - offset - tooltipWidth, point[1] + offset],
-        [point[0] + offset, point[1] - offset - tooltipHeight],
-        [point[0] - offset - tooltipWidth, point[1] - offset - tooltipHeight],
-      ]).map(clamp)
-      const comparisonTooltip = comparisonTooltipRef.current
-      const overlapsComparison: (position: number[]) => boolean = ([left, top]) => {
-        if (!comparisonTooltip || comparisonTooltip.style.visibility === "hidden") return false
-        return !(
-          left + tooltipWidth + gap <= comparisonTooltip.offsetLeft ||
-          left >= comparisonTooltip.offsetLeft + comparisonTooltip.offsetWidth + gap ||
-          top + tooltipHeight + gap <= comparisonTooltip.offsetTop ||
-          top >= comparisonTooltip.offsetTop + comparisonTooltip.offsetHeight + gap
-        )
-      }
-      const position = positions.find((candidate) =>
-        !boxIntersectsPoint(candidate, tooltipWidth, tooltipHeight, point) &&
-        !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
-        !overlapsComparison(candidate)
-      )
-      if (element instanceof HTMLDivElement) {
-        pingTooltipElement = element
-        element.style.visibility = position ? "visible" : "hidden"
-      }
-      return position ?? positions[0]
     }
 
     const bounds = mapBounds()
@@ -1062,8 +930,6 @@ export function DemoSceneRenderer({
         bounds,
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
-        pingTooltipPosition,
-        algorithm: panel.algo,
         getShowXray: () => layerStateRef.current.showXray,
         getShowStops: () => layerStateRef.current.showStops,
         getActiveTimestamp: activeTimestamp,
@@ -1072,9 +938,6 @@ export function DemoSceneRenderer({
         clusterColor
       })
     )
-    const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
-      .findIndex((series) => series.id === "ping-hit-area")
-
     timelineChart.setOption(
       createDemoTimelineChartOptions({
         getChartData: () => chartData,
@@ -1133,10 +996,8 @@ export function DemoSceneRenderer({
     mapChart.on("click", onMapClick)
     const onMapZoom = () => {
       syncMapLineStyles()
-      refreshTooltipLayout()
     }
     mapChart.on("dataZoom", onMapZoom)
-    mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.on("click", onTimelineClick)
@@ -1227,7 +1088,6 @@ export function DemoSceneRenderer({
       mapChart.off("globalout", onMapMouseOut)
       mapChart.off("click", onMapClick)
       mapChart.off("dataZoom", onMapZoom)
-      mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.off("click", onTimelineClick)
@@ -1302,32 +1162,23 @@ export function DemoSceneRenderer({
     const result = resultData.result
     const promotionTime = result.aux_time[selectedPing.i]
     const classifiedAt = Math.max(selectedPing.t, promotionTime ?? selectedPing.t)
-    const parameters = [
-      `Distance threshold: ${panel.params.dist_thresh} m`,
-      `Time threshold: ${panel.params.time_thresh}`,
-      `Minimum points: ${panel.params.min_pts}`,
-      `Minimum duration: ${panel.params.dur_min} min`,
-    ]
 
     if (currentTime !== null && classifiedAt > currentTime) {
       return {
         title: "Not classified yet",
-        summary: `Ping ${selectedPing.i + 1} has arrived, but DBSTOP does not reveal its final assignment until ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}.`,
-        evidence: parameters,
+        summary: "DBSTOP has not assigned this point at the current playback time.",
       }
     }
     if (selectedPing.cluster < 0) {
       return {
         title: "Not assigned to a stop",
-        summary: `DBSTOP returned Ping ${selectedPing.i + 1} as noise. It did not become a core point or connect to a qualifying core point under the current settings.`,
-        evidence: [...parameters, "The cache does not record which individual requirement failed."],
+        summary: "Noise point: it was neither a core point nor within range of a qualifying core point.",
       }
     }
     if (result.core[selectedPing.i] >= 0) {
       return {
-        title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
-        summary: `DBSTOP found enough nearby pings to satisfy the current density settings: at least ${panel.params.min_pts} points within the ${panel.params.dist_thresh} m distance threshold and configured time window. This made Ping ${selectedPing.i + 1} a core point for Stop ${selectedPing.cluster}.`,
-        evidence: ["Classification: Core point", ...parameters, `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`],
+        title: "Core point",
+        summary: `Met the minimum of ${panel.params.min_pts} nearby points within ${panel.params.dist_thresh} m.`,
       }
     }
 
@@ -1335,48 +1186,55 @@ export function DemoSceneRenderer({
       const coreClassifiedAt = Math.max(ping.t, result.aux_time[ping.i] ?? ping.t)
       const distance = Math.hypot(selectedPing.x - ping.x, selectedPing.y - ping.y)
       return ping.cluster === selectedPing.cluster && result.core[ping.i] >= 0 && coreClassifiedAt <= classifiedAt && distance <= Number(panel.params.dist_thresh)
-        ? [{ ping, distance }]
+        ? [{ distance }]
         : []
     }).sort((a, b) => a.distance - b.distance)[0]
     if (!core) {
       return {
-        title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
-        summary: `DBSTOP connected Ping ${selectedPing.i + 1} to a qualifying core point in Stop ${selectedPing.cluster}, so it was included in the same stop as a border point.`,
-        evidence: ["Classification: Border point", ...parameters, `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`],
+        title: "Part of this stop",
+        summary: `Within ${panel.params.dist_thresh} m of a qualifying core point.`,
       }
     }
     return {
-      title: `Why Ping ${selectedPing.i + 1} is in Stop ${selectedPing.cluster}`,
-      summary: `Ping ${selectedPing.i + 1} is part of Stop ${selectedPing.cluster} because its nearest eligible core point, Ping ${core.ping.i + 1}, is ${core.distance.toFixed(1)} m away, which is within the ${panel.params.dist_thresh} m distance threshold. Since that core point belongs to Stop ${selectedPing.cluster}, this ping was included as a border point.`,
-      evidence: [
-        "Classification: Border point",
-        `Nearest eligible core: Ping ${core.ping.i + 1}`,
-        `Distance check: ${core.distance.toFixed(1)} m <= ${panel.params.dist_thresh} m`,
-        `Assignment revealed at ${new Date(classifiedAt * 1000).toISOString().slice(11, 19)}`,
-        `Time threshold: ${panel.params.time_thresh} | Minimum points: ${panel.params.min_pts} | Minimum duration: ${panel.params.dur_min} min`,
-      ],
+      title: "Part of this stop",
+      summary: `${core.distance.toFixed(1)} m from a core point, within the ${panel.params.dist_thresh} m threshold.`,
     }
   }, [currentTime, panel.algo, panel.params, resultData, selectedPing])
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
       {(selectedPings || selectedPing) && (
-        <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
+        <div className="pointer-events-none absolute left-3 top-3 z-10 w-[min(280px,calc(100%-24px))] rounded-sm bg-[rgba(32,33,36,0.92)] px-2.5 py-2 text-sm text-white shadow-md">
           {selectedPings ? <>
-            <div>Ping comparison</div>
-            <div>Ping {selectedPings[0].i + 1}: {selectedPings[0].time}</div>
-            <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
+            <div className="font-semibold">Selected point comparison</div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 border border-white/70" style={{ backgroundColor: clusterColor(selectedPings[0].cluster) }} />
+              <span>First selected point</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 border border-white/70" style={{ backgroundColor: clusterColor(selectedPings[1].cluster) }} />
+              <span>Second selected point</span>
+            </div>
             <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
             <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
           </> : dbstopExplanation ? (
-            <div className="max-w-[340px] space-y-1.5 text-xs leading-4">
-              <div className="font-semibold text-[#8acac8]">{dbstopExplanation.title}</div>
-              <div>{dbstopExplanation.summary}</div>
-              <div className="space-y-0.5 border-t border-white/20 pt-1.5 text-[11px] text-white/80">
-                {dbstopExplanation.evidence.map((line) => <div key={line}>{line}</div>)}
+            <div className="space-y-1 text-xs leading-4">
+              <div className="flex items-center gap-1.5 font-semibold text-[#8acac8]">
+                <span
+                  className={`h-2.5 w-2.5 shrink-0 ${selectedPing!.cluster < 0 ? "border border-white/70 bg-transparent" : "border border-white/70"}`}
+                  style={selectedPing!.cluster < 0 ? undefined : { backgroundColor: clusterColor(selectedPing!.cluster) }}
+                />
+                <span>{dbstopExplanation.title}</span>
               </div>
+              <div>{dbstopExplanation.summary}</div>
             </div>
-          ) : <div>Ping {selectedPing!.i + 1} selected</div>}
+          ) : <div className="flex items-center gap-1.5">
+            <span
+              className={`h-2.5 w-2.5 ${selectedPing!.cluster < 0 ? "border border-white/70 bg-transparent" : "border border-white/70"}`}
+              style={selectedPing!.cluster < 0 ? undefined : { backgroundColor: clusterColor(selectedPing!.cluster) }}
+            />
+            <span>{selectedPing!.cluster < 0 ? "Not assigned to a stop" : "Selected point in detected stop"}</span>
+          </div>}
         </div>
       )}
       {syncMaster && variant === "full" && (

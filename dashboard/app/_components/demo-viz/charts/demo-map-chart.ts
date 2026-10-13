@@ -1,6 +1,5 @@
 /* OWN ECHARTS MAP CONFIGURATION */
 
-import * as echarts from "echarts"
 import type { EChartsApi, EChartsParams } from "../../../_lib/types"
 import type { DemoResultData } from "../../../_lib/demo-result-data"
 import { associatedWithHover, pingScale } from "../demo-interactions"
@@ -29,8 +28,6 @@ type MapChartOptionsArgs = {
   bounds: MapChartBounds
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
-  pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
-  algorithm: string
   getShowXray: () => boolean
   getShowStops: () => boolean
   destinationPreview: boolean
@@ -44,8 +41,6 @@ export function createDemoMapChartOptions({
   bounds,
   getHoverBuildingId,
   getHoverPingIndexes,
-  pingTooltipPosition,
-  algorithm,
   getShowXray,
   getShowStops,
   getActiveTimestamp,
@@ -123,15 +118,6 @@ export function createDemoMapChartOptions({
     }
   }
 
-  const paramsValue = (params: { data?: unknown; value?: unknown }) =>
-    (
-      params.value ??
-      (params.data as { value?: number[] }).value ??
-      params.data
-    ) as number[]
-
-  const isDensityAlgorithm = () => getChartData().result.kind === "density"
-
   return {
     animation: false,
     animationDurationUpdate: 0,
@@ -163,47 +149,7 @@ export function createDemoMapChartOptions({
         preventDefaultMouseMove: true,
       },
     ],
-    tooltip: {
-      trigger: "item",
-      renderMode: "html",
-      borderWidth: 0,
-      confine: true,
-      backgroundColor: "rgba(32, 33, 36, 0.92)",
-      textStyle: { color: "#ffffff" },
-      extraCssText: "pointer-events: none;",
-      position: pingTooltipPosition,
-      formatter(params: EChartsParams) {
-        const result = getChartData().result
-        const value = paramsValue(params)
-        if (params.seriesId === "core-points") {
-          const ping = getChartData().pings[value[3]]
-          return `Core point for Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}<br>Distance threshold: ${getChartData().distanceThreshold}`
-        }
-        if (params.seriesId === "anchor-points") {
-          const ping = getChartData().pings[value[3]]
-          const label = algorithm === "sequential_centroid"
-            ? "Centroid anchor for"
-            : algorithm.startsWith("sequential_")
-              ? "Anchor for"
-              : "Cached anchor for"
-          return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
-        }
-        if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
-          const ping = getChartData().pings[value[3]]
-          const classified = pingClassifiedAt(ping.i, getActiveTimestamp(), getChartData())
-          const cluster = !classified
-            ? "Unclassified"
-            : ping.cluster < 0
-              ? "Noise"
-              : isDensityAlgorithm() && getShowXray()
-                ? `${result.kind === "density" && result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
-                : `Cluster ${ping.cluster}`
-          const distanceLine = classified && isDensityAlgorithm() && getShowXray() ? `<br>Distance threshold: ${getChartData().distanceThreshold}` : ""
-          return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}${distanceLine}`
-        }
-        return ""
-      },
-    },
+    tooltip: { show: false },
     series: [
       {
         id: "streets",

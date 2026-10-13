@@ -390,6 +390,9 @@
               id: "individual-results",
               type: "scatter",
               data: scatterData,
+              // Redraw all points in one frame; above the default progressive threshold
+              // ECharts restyles them in batches, so dimming visibly sweeps across the chart
+              progressive: 0,
               symbolSize: 7,
               cursor: "pointer",
               itemStyle: {

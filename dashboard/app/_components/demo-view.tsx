@@ -164,7 +164,7 @@ export function DemoView({
             {scene && (
               <Button variant="outline" size="sm" onClick={() => openMetricsFromDemo(scene.user_id)} className="w-full text-xs">
                 <BarChart3 className="h-4 w-4" />
-                Metrics for parameter sweep
+                Aggregated Metrics (Agent)
               </Button>
             )}
           </div>

@@ -470,7 +470,7 @@ function NomadDashboard() {
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
           metricsTrajectory={metricsTrajectory}
-          selectedUserId={metricsAgentId ?? undefined}
+          initialSelectedUserId={metricsAgentId ?? undefined}
           leftParameterNote={leftParameterNote}
           rightParameterNote={rightParameterNote}
           metricsError={metricsError}

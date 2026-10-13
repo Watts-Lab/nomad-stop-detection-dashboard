@@ -196,7 +196,7 @@ export function MetricsView({
   metricsLeftParameter,
   metricsRightParameter,
   metricsTrajectory,
-  selectedUserId,
+  initialSelectedUserId,
   leftParameterNote,
   rightParameterNote,
   metricsError,
@@ -216,7 +216,7 @@ export function MetricsView({
   metricsLeftParameter: string
   metricsRightParameter: string
   metricsTrajectory: string
-  selectedUserId?: string
+  initialSelectedUserId?: string
   leftParameterNote: MetricsParameterNote | undefined
   rightParameterNote: MetricsParameterNote | undefined
   metricsError: string | null
@@ -232,12 +232,36 @@ export function MetricsView({
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
   const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
   const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
+  const selectedUserIdsRef = useRef({
+    left: initialSelectedUserId ?? null,
+    right: initialSelectedUserId ?? null,
+  })
 
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  const initialSelectedUserParameter = initialSelectedUserId ? `&user=${encodeURIComponent(initialSelectedUserId)}` : ""
+  // Pin changes are stored in refs so they do not reload the iframe that reported them.
+  // A later chart reload includes that frame's latest pin, or no user after unpinning.
+  const [leftMetricsPrototypeSrc, setLeftMetricsPrototypeSrc] = useState(
+    () => `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${initialSelectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`,
+  )
+  const [rightMetricsPrototypeSrc, setRightMetricsPrototypeSrc] = useState(
+    () => `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${initialSelectedUserParameter}`,
+  )
+
+  useEffect(() => {
+    const selectedUserParameter = selectedUserIdsRef.current.left
+      ? `&user=${encodeURIComponent(selectedUserIdsRef.current.left)}`
+      : ""
+    setLeftMetricsPrototypeSrc(`${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`)
+  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory])
+
+  useEffect(() => {
+    const selectedUserParameter = selectedUserIdsRef.current.right
+      ? `&user=${encodeURIComponent(selectedUserIdsRef.current.right)}`
+      : ""
+    setRightMetricsPrototypeSrc(`${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`)
+  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, rightFixedParameters])
 
   useEffect(() => {
 
@@ -247,12 +271,13 @@ export function MetricsView({
       if (event.origin !== window.location.origin) return
       if (event.data?.type !== "nomad-metrics-pin-change") return
       const { frame, algoId, userId, param, value, recall, fixed } = event.data
+      const pinned = typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
+        ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
+        : null
       const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
-      setPinned(
-        typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
-          ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
-          : null,
-      )
+      if (frame === "right") selectedUserIdsRef.current.right = pinned?.userId ?? null
+      else selectedUserIdsRef.current.left = pinned?.userId ?? null
+      setPinned(pinned)
     }
     window.addEventListener("message", handlePinChange)
     return () => window.removeEventListener("message", handlePinChange)

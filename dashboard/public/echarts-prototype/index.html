@@ -370,7 +370,8 @@
               // ECharts restyles them in batches, so dimming visibly sweeps across the chart
               progressive: 0,
               symbolSize: 7,
-              cursor: "pointer",
+              // Context only: individual points ignore hover and clicks
+              silent: true,
               itemStyle: {
                 color: "rgba(31, 119, 180, 0.055)",
                 borderColor: "rgba(31, 119, 180, 0.14)",
@@ -587,10 +588,6 @@
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
-        // Points that open a single run in Demo: any individual result, or one on the pinned
-        // agent's curve, which covers that agent's own individual points while it is pinned
-        const isRunSelectSeries = (name) => name === "Individual" || name === "Pinned user hit area";
-
         // Get the selected agent's minute-recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
@@ -675,7 +672,8 @@
             postPinChange();
             return;
           }
-        if (!isRunSelectSeries(event.seriesName)) return;
+          // A point on the pinned agent's curve opens that run in Demo
+          if (event.seriesName !== "Pinned user hit area") return;
           const [pointX, , userId] = event.value;
           window.parent.postMessage({
             type: "nomad-metrics-point-select",

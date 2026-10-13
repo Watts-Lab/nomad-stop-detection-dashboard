@@ -27,8 +27,8 @@ const CLUSTER_HUE_START = CURRENT_PING_HUE + CURRENT_PING_HUE_GUARD
 const CLUSTER_HUE_SPAN = 360 - 2 * CURRENT_PING_HUE_GUARD
 const CLUSTER_HUE_PHASE = (49 - CLUSTER_HUE_START) / CLUSTER_HUE_SPAN
 const CLUSTER_HUE_PEAK = 55
-const GROUND_TRUTH_COLOR = "#0f766e"
-const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
+const GROUND_TRUTH_COLOR = "#7629db"
+const FUTURE_GROUND_TRUTH_COLOR = "#9a6bd6"
 const MAP_FOCUS_FADE_OPACITY = 0.2
 type PlaybackState = "playing" | "paused" | "complete"
 
@@ -1700,10 +1700,10 @@ const isDensityAlgorithm = chartData.result.kind === "density"
               shape: { points: building.coords.map((coord) => api.coord(coord)) },
               style: {
                 fill: "transparent",
-                stroke: `rgba(15, 118, 110, ${0.62 + currentPulse * 0.35})`,
+                stroke: `rgba(118, 41, 219, ${0.62 + currentPulse * 0.35})`,
                 lineWidth: 2.4 + currentPulse * 1.2,
                 shadowBlur: 6 + currentPulse * 10,
-                shadowColor: `rgba(15, 118, 110, ${0.2 + currentPulse * 0.32})`,
+                shadowColor: `rgba(118, 41, 219, ${0.2 + currentPulse * 0.32})`,
               },
             }
           },
@@ -1775,7 +1775,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           silent: true,
           z: 4,
           data: [],
-          lineStyle: { color: GROUND_TRUTH_COLOR, width: 4, opacity: 0.95, shadowBlur: 10, shadowColor: "rgba(15, 118, 110, 0.26)" },
+          lineStyle: { color: GROUND_TRUTH_COLOR, width: 4, opacity: 0.95, shadowBlur: 10, shadowColor: "rgba(118, 41, 219, 0.26)" },
         },
         {
           id: "active-fallback-path",
@@ -1809,7 +1809,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
                 stroke: "#ffffff",
                 lineWidth: 1,
                 shadowBlur: 10,
-                shadowColor: `rgba(15, 118, 110, ${opacity * 0.43})`,
+                shadowColor: `rgba(118, 41, 219, ${opacity * 0.43})`,
                 opacity,
               },
             }
@@ -2131,7 +2131,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
               { x: start[0], y: end[1], width: Math.max(2, end[0] - start[0]), height: start[1] - end[1] },
               { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height },
             )
-            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2 + pulse, shadowBlur: 4 + pulse * 8, shadowColor: "rgba(15, 118, 110, 0.48)" } } : null
+            return shape ? { type: "rect", shape, style: { fill: "transparent", stroke: GROUND_TRUTH_COLOR, lineWidth: 2 + pulse, shadowBlur: 4 + pulse * 8, shadowColor: "rgba(118, 41, 219, 0.48)" } } : null
           },
         },
         {

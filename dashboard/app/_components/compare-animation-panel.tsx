@@ -19,7 +19,7 @@ import {
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
   groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
-import { lachesisIntersectionAreas, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
+import { containmentAreasAt, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
 import { pingInfoLines, selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
@@ -259,7 +259,7 @@ export function DemoSceneRenderer({
     let previewing = false
     let hoverPingIndex: number | null = null
     let hoverPingIndexes: Set<number> | null = null
-    let activeLachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }> = []
+    let activeContainmentAreas: Array<{ cluster: number; points: number[][]; shaded: boolean }> = []
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
@@ -290,6 +290,7 @@ export function DemoSceneRenderer({
     }
 
     const isDensityAlgorithm = chartData.result.kind === "density"
+    const isSequentialAlgorithm = panel.algo === "lachesis" || panel.algo.startsWith("sequential_")
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const pingCircle = (api: EChartsApi, scale = 1) => {
@@ -419,8 +420,8 @@ export function DemoSceneRenderer({
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
-      activeLachesisIntersectionAreas = panel.algo === "lachesis" && layerStateRef.current.showXray
-        ? lachesisIntersectionAreas(timestampSeconds, chartData)
+      activeContainmentAreas = isSequentialAlgorithm && layerStateRef.current.showXray
+        ? containmentAreasAt(timestampSeconds, chartData, panel.algo, latestPingIndex)
         : []
       hoverPingIndexes = resolveHoverPingIndexes({
         timestampSeconds,
@@ -437,7 +438,7 @@ export function DemoSceneRenderer({
           anchorEdges,
           promotionEdges,
           hoverPingIndexes,
-          lachesisIntersectionAreas: activeLachesisIntersectionAreas,
+          containmentAreas: activeContainmentAreas,
           hoverBuildingId,
           selectedPingIndexes: selectedPingIndexesRef.current,
           showGroundTruth: layerStateRef.current.showGroundTruth,
@@ -491,7 +492,7 @@ export function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
-          { id: "lachesis-intersections", data: [] },
+          { id: "containment-areas", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],
@@ -1045,7 +1046,7 @@ export function DemoSceneRenderer({
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
         getHoverPingIndex: () => hoverPingIndex,
-        getLachesisIntersectionAreas: () => activeLachesisIntersectionAreas,
+        getContainmentAreas: () => activeContainmentAreas,
         pingTooltipPosition,
         algorithm: panel.algo,
         getShowXray: () => layerStateRef.current.showXray,

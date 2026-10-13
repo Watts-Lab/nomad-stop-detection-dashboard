@@ -30,7 +30,7 @@ type MapChartOptionsArgs = {
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
   getHoverPingIndex: () => number | null
-  getLachesisIntersectionAreas: () => Array<{ cluster: number; points: number[][] }>
+  getContainmentAreas: () => Array<{ cluster: number; points: number[][]; shaded: boolean }>
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
   algorithm: string
   getShowXray: () => boolean
@@ -47,7 +47,7 @@ export function createDemoMapChartOptions({
   getHoverBuildingId,
   getHoverPingIndexes,
   getHoverPingIndex,
-  getLachesisIntersectionAreas,
+  getContainmentAreas,
   pingTooltipPosition,
   algorithm,
   getShowXray,
@@ -633,26 +633,30 @@ export function createDemoMapChartOptions({
         }
       },
       {
-        id: "lachesis-intersections",
-        name: "Lachesis feasible area",
+        id: "containment-areas",
+        name: "Containment area",
         type: "custom",
         coordinateSystem: "cartesian2d",
         silent: true,
         z: 3,
         data: [],
         renderItem(params: EChartsParams, api: EChartsApi) {
-          const area = getLachesisIntersectionAreas()[params.dataIndex]
+          const area = getContainmentAreas()[params.dataIndex]
           if (!area) return null
           const scale = mapZoomScale(api)
+          // Noise candidates get a neutral outline
+          const color = area.cluster < 0 ? "#8b8b8b" : clusterColor(area.cluster)
           return {
             type: "polygon",
             shape: { points: area.points.map((point) => api.coord(point)) },
-            style: {
-              fill: "transparent",
-              stroke: clusterColor(Number(api.value(0))),
-              lineWidth: 1.4 * scale,
-              lineDash: [5 * scale, 4 * scale],
-            },
+            style: area.shaded
+              ? { fill: color, opacity: 0.2 }
+              : {
+                fill: "transparent",
+                stroke: color,
+                lineWidth: 1.4 * scale,
+                lineDash: [5 * scale, 4 * scale],
+              },
           }
         },
       },

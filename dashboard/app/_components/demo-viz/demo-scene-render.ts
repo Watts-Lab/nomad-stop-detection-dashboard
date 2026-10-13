@@ -83,7 +83,7 @@ type BuildDemoMapSeriesArgs = {
     anchorEdges: DemoResultData["densityPromotionEdges"]
     promotionEdges: DemoResultData["densityPromotionEdges"]
     hoverPingIndexes: Set<number> | null
-    lachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }>
+    containmentAreas: Array<{ cluster: number; points: number[][]; shaded: boolean }>
     hoverBuildingId: string
     selectedPingIndexes: number[]
     showGroundTruth: boolean
@@ -106,7 +106,7 @@ export function buildDemoMapSeries({
     anchorEdges,
     promotionEdges,
     hoverPingIndexes,
-    lachesisIntersectionAreas,
+    containmentAreas,
     hoverBuildingId,
     selectedPingIndexes,
     showGroundTruth,
@@ -268,14 +268,13 @@ export function buildDemoMapSeries({
             ),
         },
         {
-            id: "lachesis-intersections",
-            data: lachesisIntersectionAreas.map((area) => [area.cluster])
+            id: "containment-areas",
+            data: containmentAreas.map((area) => [area.cluster])
         },
         {
             id: "distance-circles",
             data: xrayDistanceCircleData(
                 chartData,
-                anchorFrames,
                 showXray,
                 isDensityAlgorithm,
                 algorithm === "lachesis",

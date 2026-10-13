@@ -1443,7 +1443,7 @@ function PanelStat({ icon: Icon, label, help, value }: { icon: LucideIcon; label
               <HelpCircle className="h-3 w-3" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-56">{help}</TooltipContent>
+          <TooltipContent side="top" className="max-w-56">{help}</TooltipContent>
         </Tooltip>
       )}
       <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-[#3b1370]">
@@ -1489,7 +1489,7 @@ export function CompareAnimationPanel({
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
-      <CardHeader className="flex shrink-0 flex-row flex-wrap items-center gap-x-4 gap-y-2 px-3 pt-2 pb-2">
+      <CardHeader className="shrink-0 px-3 pt-2 pb-1">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
@@ -1505,7 +1505,40 @@ export function CompareAnimationPanel({
             </Button>
           )}
         </CardTitle>
-        {panel?.metrics && pings && (
+      </CardHeader>
+      {/* In compare mode the map and timeline get the height a 4:5 panel leaves below the
+          2.75rem title row, so the stats strip below lengthens the card instead of shrinking the map */}
+      <CardContent className={`flex min-h-0 flex-col px-2 pb-2 pt-0 ${mode === "compare" ? "h-[calc(125cqw-2.75rem)] flex-none" : "flex-1"}`}>
+        {panel ? (
+          <div className="min-h-0 w-full flex-1">
+            <DemoSceneRenderer
+              key={`${panel.algo}:${panel.scene.source}:${panel.scene.user_id}`}
+              panel={panel}
+              mode={mode}
+              currentTime={currentTime}
+              onTimeChange={onTimeChange}
+              syncMaster={syncMaster}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              showXray={showXray}
+              previewRunId={previewRunId}
+              onReplayStart={onReplayStart}
+              sharedPlaybackState={sharedPlaybackState}
+              onPlaybackStateChange={onPlaybackStateChange}
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc]">
+            <Skeleton className="flex-1 rounded-none bg-[#e6e3eb]" />
+            <div className="h-24 border-t border-[#d7dbd2] bg-[#f8f9fc] p-4">
+              <Skeleton className="h-4 w-full bg-[#e6e3eb]" />
+              <Skeleton className="mt-4 h-4 w-2/3 bg-[#e6e3eb]" />
+            </div>
+          </div>
+        )}
+      </CardContent>
+      {panel?.metrics && pings && (
+        <div className="shrink-0 px-2 pb-2">
           <TooltipProvider delayDuration={200}>
             {/* Compare panels are too narrow for one row: the four accuracy stats
                 fill the first row and the three trajectory stats the second */}
@@ -1542,39 +1575,8 @@ export function CompareAnimationPanel({
               />
             </div>
           </TooltipProvider>
-        )}
-      </CardHeader>
-      {/* In compare mode the map and timeline get the height a 4:5 panel leaves below a
-          2.75rem title row, so the stats strip lengthens the card instead of shrinking the map */}
-      <CardContent className={`flex min-h-0 flex-col px-2 pb-2 pt-0 ${mode === "compare" ? "h-[calc(125cqw-2.75rem)] flex-none" : "flex-1"}`}>
-        {panel ? (
-          <div className="min-h-0 w-full flex-1">
-            <DemoSceneRenderer
-              key={`${panel.algo}:${panel.scene.source}:${panel.scene.user_id}`}
-              panel={panel}
-              mode={mode}
-              currentTime={currentTime}
-              onTimeChange={onTimeChange}
-              syncMaster={syncMaster}
-              showGroundTruth={showGroundTruth}
-              showStops={showStops}
-              showXray={showXray}
-              previewRunId={previewRunId}
-              onReplayStart={onReplayStart}
-              sharedPlaybackState={sharedPlaybackState}
-              onPlaybackStateChange={onPlaybackStateChange}
-            />
-          </div>
-        ) : (
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc]">
-            <Skeleton className="flex-1 rounded-none bg-[#e6e3eb]" />
-            <div className="h-24 border-t border-[#d7dbd2] bg-[#f8f9fc] p-4">
-              <Skeleton className="h-4 w-full bg-[#e6e3eb]" />
-              <Skeleton className="mt-4 h-4 w-2/3 bg-[#e6e3eb]" />
-            </div>
-          </div>
-        )}
-      </CardContent>
+        </div>
+      )}
     </Card>
   )
 }

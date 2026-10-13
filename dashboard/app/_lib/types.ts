@@ -1,3 +1,8 @@
+/*
+DEFINES SHARED DATA STRUCTURES USED THROUGH DASHBOARD
+(STOP DETECTION RESULTS, SCENE DATA, VIEW TYPES)
+*/
+
 export type AlignedStopResult =
   | { kind: "labels"; cluster: number[] }
   | { kind: "anchor"; cluster: number[]; aux_time: Array<number | null> }
@@ -28,6 +33,10 @@ export type CompareScene = {
     id: string
     type: string
     rings: number[][][]
+  }>
+  destinationDiary: Array<{
+    location: string
+    duration: number
   }>
   pings: Array<{
     x: number

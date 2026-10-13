@@ -1,3 +1,5 @@
+/* RENDER LEARN PAGE EXPLAINING STOP DETECTION ALGOS & CONCEPTS */
+
 import Image from "next/image"
 import { Maximize2, Minimize2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,14 +15,12 @@ export function LearnView({
   syncUrl,
   openLearnAlgorithm,
   openLearnDemo,
-  openLearnDocumentation,
 }: {
   expandedAlgorithm: string | null
   setExpandedAlgorithm: (algorithmId: string | null) => void
   syncUrl: (view: DashboardView, algoId?: string | null, demoMode?: DemoMode) => void
   openLearnAlgorithm: (algorithmId: string) => void
   openLearnDemo: (algorithmId: string) => void
-  openLearnDocumentation: (algorithmId: string) => void
 }) {
   const expandedLearnAlgorithm = expandedAlgorithm ? algorithms.find((a) => a.id === expandedAlgorithm) : null
   const expandedLearnFamilyTitle = expandedLearnAlgorithm ? LEARN_FAMILIES.find((family) => family.id === expandedLearnAlgorithm.family)?.title ?? "Algorithm Family" : ""
@@ -193,12 +193,14 @@ export function LearnView({
                     </Button>
                   )}
                   <Button
+                    asChild
                     variant="outline"
                     size="lg"
-                    onClick={() => openLearnDocumentation(expandedLearnAlgorithm.id)}
                     className="h-11 min-w-36 border-[#e6dffc] bg-[#e8d8fc] text-base font-semibold text-[#3b1370] hover:bg-white hover:text-[#3b1370]"
                   >
-                    Documentation
+                    <a href={expandedLearnAlgorithm.documentationUrl} target="_blank" rel="noreferrer">
+                      Documentation
+                    </a>
                   </Button>
                 </div>
               </div>

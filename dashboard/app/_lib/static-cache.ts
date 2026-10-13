@@ -1,3 +1,8 @@
+/*
+LOADS & CACHES PRECOMPUTED TRAJECTORY, GROUND-TRUTH, AND ALGO RESULTS FROM JSON/PARQUET FILES
+ASSEMBLE INTO DATA USED BY DEMO/COMPARE
+*/
+
 import {
   asyncBufferFromUrl,
   cachedAsyncBuffer,
@@ -56,7 +61,7 @@ type ConfigRow = {
   config_id: number
 }
 
-type SceneCache = Pick<CompareScene, "crs" | "source" | "bounds" | "buildings">
+type SceneCache = Pick<CompareScene, "crs" | "source" | "bounds" | "buildings" | "destinationDiary">
 
 type SeedScene = {
   response: CompareScene
@@ -307,6 +312,7 @@ async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: s
       user_id: userId,
       bounds: scene.bounds,
       buildings: scene.buildings,
+      destinationDiary: scene.destinationDiary,
       pings,
       truth: diary,
       routes,
@@ -321,7 +327,20 @@ async function buildPanel(
   params: Record<string, number> | undefined,
   scene: SeedScene,
 ) {
-  const algorithmId = algorithm ?? "dbstop"
+  if (!algorithm) {
+    return {
+      algo: "",
+      title: "Select an Algorithm to Begin",
+      scene: scene.response,
+      params: {},
+      result: {
+        kind: "labels",
+        cluster: scene.response.pings.map(() => -1),
+      },
+    } satisfies ComparePanelResponse
+  }
+
+  const algorithmId = algorithm
   const cachedResult = await resultForUser(
     cacheRoot,
     algorithmId,

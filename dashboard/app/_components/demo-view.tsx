@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CompareAnimationPanel, DemoSceneRenderer } from "./compare-animation-panel"
 import { DemoParameterControls } from "./demo-parameter-controls"
 import { TrajectoryOptions } from "./trajectory-options"
@@ -132,6 +133,7 @@ export function DemoView({
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+  const algorithmLayersDisabled = !leftAlgo && (!compareMode || !rightAlgo)
   const dataPanel = (
     <Card className="self-start overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-data">
       <CardContent className="flex flex-col gap-3 px-4">
@@ -183,14 +185,30 @@ export function DemoView({
             <Checkbox checked={showGroundTruth} onCheckedChange={(checked) => setShowGroundTruth(checked === true)} />
             Ground Truth
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
-            Detected Stops
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox checked={showXray} onCheckedChange={(checked) => setShowXray(checked === true)} />
-            X-ray
-          </label>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip open={algorithmLayersDisabled ? undefined : false}>
+              <TooltipTrigger asChild>
+                <span>
+                  <label className={`flex items-center gap-2 text-sm font-medium ${algorithmLayersDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                    <Checkbox disabled={algorithmLayersDisabled} checked={showStops} onCheckedChange={(checked) => setShowStops(checked === true)} />
+                    Detected Stops
+                  </label>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Select algorithms first</TooltipContent>
+            </Tooltip>
+            <Tooltip open={algorithmLayersDisabled ? undefined : false}>
+              <TooltipTrigger asChild>
+                <span>
+                  <label className={`flex items-center gap-2 text-sm font-medium ${algorithmLayersDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                    <Checkbox disabled={algorithmLayersDisabled} checked={showXray} onCheckedChange={(checked) => setShowXray(checked === true)} />
+                    X-ray
+                  </label>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Select algorithms first</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -223,9 +241,10 @@ export function DemoView({
                 <h4 className="text-sm font-medium text-[#3b1370]">Algorithm</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                 <SelectTrigger className="h-10 border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                  <SelectValue />
+                  <SelectValue placeholder="Select algorithm" />
                 </SelectTrigger>
                 <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                  <SelectItem value="none">None</SelectItem>
                   {demoAlgorithms.map((a) => (
                     <SelectItem
                       key={a.id}
@@ -307,9 +326,10 @@ export function DemoView({
                 <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
                   <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                    <SelectValue />
+                    <SelectValue placeholder="Select algorithm" />
                   </SelectTrigger>
                   <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                    <SelectItem value="none">None</SelectItem>
                     {demoAlgorithms.map((a) => (
                       <SelectItem
                         key={a.id}
@@ -335,9 +355,10 @@ export function DemoView({
                 <h4 className="text-sm font-medium text-[#3b1370]">Right</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
                   <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                    <SelectValue />
+                    <SelectValue placeholder="Select algorithm" />
                   </SelectTrigger>
                   <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                    <SelectItem value="none">None</SelectItem>
                     {demoAlgorithms.map((a) => (
                       <SelectItem
                         key={a.id}

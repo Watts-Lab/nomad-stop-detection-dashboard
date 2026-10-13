@@ -4,7 +4,6 @@
 
 import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { publicPath } from "../_lib/public-path"
 import type { DashboardView } from "../_lib/types"
 
@@ -13,7 +12,7 @@ function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) 
     <button
       type="button"
       onClick={() => navigateTo("demo")}
-      className="group relative h-[360px] w-full overflow-hidden rounded-md border border-border bg-white text-left outline-none ring-offset-2 ring-offset-background transition hover:border-[#7629db] focus-visible:ring-2 focus-visible:ring-ring"
+      className="group relative aspect-video w-full overflow-hidden rounded-md border border-border bg-white text-left outline-none ring-offset-2 ring-offset-background transition hover:border-[#7629db] focus-visible:ring-2 focus-visible:ring-ring"
       aria-label="Open stop detection demo"
     >
       <video
@@ -24,7 +23,7 @@ function HomeStopRunPreview({ navigateTo }: { navigateTo: (view: DashboardView) 
         poster={publicPath("/issue-images/home-stop-run-placeholder.png")}
         preload="auto"
         src={publicPath("/videos/home-stop-preview.mp4")}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-contain"
         aria-hidden="true"
       />
       <span className="pointer-events-none absolute inset-0 z-10 bg-[#7629db]/0 transition group-hover:bg-[#7629db]/10" />
@@ -39,7 +38,7 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
   return (
     <div className="flex-1 overflow-y-auto">
       <section className="nomad-hero min-h-[calc(100vh-74px)] border-b border-border py-6">
-        <div className="nomad-page-frame grid min-h-[calc(100vh-122px)] items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="nomad-page-frame grid min-h-[calc(100vh-122px)] content-start items-start gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <h1 className="home-copy-reveal text-5xl font-bold tracking-normal text-[#3b1370] sm:text-6xl lg:col-span-2">
             Stop Detection Lab
           </h1>
@@ -51,13 +50,40 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
               <div className="home-copy-reveal home-copy-reveal-3">
                 <h2 className="text-lg font-semibold text-[#3b1370]">What is stop detection?</h2>
                 <p className="mt-2 text-base leading-relaxed text-foreground">
-                  It is the spatio-temporal clustering problem of identifying stationary segments in a mobile object&apos;s trajectory, particularly in the presence of noise and irregularity in the signals. When analyzing human mobility, stop detection adds trips/visits semantics to the trajectory that are key to identifying dwells at places of interest (POIs), trips between locations, and interactions between individuals. Typically, detected stops are represented as tuples of the form (user_id, x, y, t_start, t_end), identifying the individual, median stop coordinates, and the first and last timestamps of the pings that make up the stop.
+                  It is the spatio-temporal{" "}
+                  <span className="font-semibold text-[#3b1370]">clustering</span>{" "}
+                  problem of identifying{" "}
+                  <span className="font-semibold text-[#3b1370]">stationary segments</span>{" "}
+                  in a mobile object&apos;s trajectory, particularly in the presence of noise and
+                  signal irregularity. In human mobility analysis, stop detection adds semantics
+                  that allow inferring{" "}
+                  <span className="font-semibold text-[#3b1370]">visits</span>{" "}
+                  to places of interest (POIs),{" "}
+                  <span className="font-semibold text-[#3b1370]">trips</span>{" "}
+                  between them, and{" "}
+                  <span className="font-semibold text-[#3b1370]">interactions between individuals</span>.{" "}
+                  It can also{" "}
+                  <span className="font-semibold text-[#3b1370]">reduce uncertainty</span>{" "}
+                  about{" "}
+                  <span className="font-semibold text-[#3b1370]">which location</span>{" "}
+                  was visited and the{" "}
+                  <span className="font-semibold text-[#3b1370]">time spent</span>{" "}
+                  there. A stop can be represented by the tuple{" "}
+                  <span className="font-mono">(user_id, x, y, t_start, t_end)</span>.
                 </p>
               </div>
               <div className="home-copy-reveal home-copy-reveal-4">
-                <h2 className="text-lg font-semibold text-[#3b1370]">What does this dashboard do?</h2>
+                <h2 className="text-lg font-semibold text-[#3b1370]">What does this tool do?</h2>
                 <p className="mt-2 text-base leading-relaxed text-foreground">
-                  Learn algorithm assumptions, tune parameters, compare behavior side by side, and inspect trajectory outputs and aggregate metrics without rerunning notebook experiments.
+                  It explains the{" "}
+                  <span className="font-semibold text-[#3b1370]">logic and parameters</span>{" "}
+                  of different stop detection algorithms, points to{" "}
+                  <span className="font-semibold text-[#3b1370]">open-source implementations</span>,
+                  and lets users evaluate detected stops side-by-side against{" "}
+                  <span className="font-semibold text-[#3b1370]">synthetic ground-truth</span>,
+                  across a wide range of parameters. It also provides{" "}
+                  <span className="font-semibold text-[#3b1370]">aggregated performance metrics</span>{" "}
+                  over hundreds of sampled trajectories.
                 </p>
               </div>
             </div>
@@ -72,18 +98,7 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
             </div>
           </div>
 
-          <Card className="nomad-card overflow-hidden rounded-lg bg-white py-0">
-            <CardContent className="bg-white p-0">
-              <div className="border-b border-border bg-[#f8f9fc] px-5 py-4">
-                <h3 className="text-lg font-semibold text-[#3b1370]">
-                  Trajectory Preview
-                </h3>
-              </div>
-              <div className="bg-white p-5">
-                <HomeStopRunPreview navigateTo={navigateTo} />
-              </div>
-            </CardContent>
-          </Card>
+          <HomeStopRunPreview navigateTo={navigateTo} />
         </div>
       </section>
     </div>

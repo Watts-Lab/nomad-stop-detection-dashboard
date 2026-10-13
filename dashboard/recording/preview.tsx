@@ -61,9 +61,6 @@ export function HomePreviewRecording() {
           onTimeChange={handleTimeChange}
         />
       )}
-      <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-[#d7dbd2] bg-white/90 px-2.5 py-1 text-xs font-semibold text-[#202124] shadow-sm">
-        DBSTOP · dist_thresh 10
-      </span>
     </main>
   )
 }

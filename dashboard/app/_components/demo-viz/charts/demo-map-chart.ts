@@ -630,7 +630,7 @@ export function createDemoMapChartOptions({
             },
             style: {
               fill: CURRENT_PING_COLOR,
-              stroke: Number(api.value(3)) === getHoverPingIndex() ? "#ffffff" : "#202124",
+              stroke: "#202124",
               lineWidth: 1.2 * scale,
               strokeNoScale: true,
               opacity: Number(api.value(5))

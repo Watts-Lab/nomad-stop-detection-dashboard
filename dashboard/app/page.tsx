@@ -62,6 +62,7 @@ function NomadDashboard() {
   const [metricsLeftParameter, setMetricsLeftParameter] = useState("delta_roam")
   const [metricsRightParameter, setMetricsRightParameter] = useState("delta_roam")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
+  const [metricsAgentId, setMetricsAgentId] = useState<string | null>(null)
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
   // Update browser URL to reflect the selected view
@@ -196,7 +197,8 @@ function NomadDashboard() {
   // For each available mapping, select its initial sweep parameter.
   // Enable Metrics comparison when Demo comparison is active and the right
   // algorithm has a Metrics mapping, then update the active view and URL.
-  const openMetricsFromDemo = useCallback(() => {
+  // Highlight the given agent's curve, if any, on the Metrics charts.
+  const openMetricsFromDemo = useCallback((agentId?: string) => {
     const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
     const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
 
@@ -210,6 +212,7 @@ function NomadDashboard() {
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
+    setMetricsAgentId(agentId ?? null)
     setActiveView("metrics")
     syncUrl("metrics")
   }, [compareMode, demoTrajectory, leftAlgorithm, rightAlgorithm, syncUrl])
@@ -345,6 +348,12 @@ function NomadDashboard() {
     setCompareMode(nextRoute.compareMode)
   }, [searchParamString])
 
+  // Drop the highlighted Metrics agent once Metrics is left,
+  // so other ways back into Metrics open it without a highlight
+  useEffect(() => {
+    if (activeView !== "metrics") setMetricsAgentId(null)
+  }, [activeView])
+
   useEffect(() => {
 
     // While demo is active, replace unsupported algorithms with defaults
@@ -396,9 +405,9 @@ function NomadDashboard() {
   }, [rightSweepParameters, metricsRightParameter])
 
   return (
-    <div className="nomad-shell flex min-h-dvh flex-col">
+    <div className={`nomad-shell flex min-h-dvh flex-col ${activeView === "demo" && !compareMode ? "lg:h-dvh lg:overflow-hidden" : ""}`}>
       <NomadNav currentView={activeView} />
-      <div className="nomad-viewport">
+      <div className="nomad-viewport min-h-0">
         <div className="nomad-dashboard bg-background">
 
       {activeView === "home" && (
@@ -461,7 +470,7 @@ function NomadDashboard() {
           metricsLeftParameter={metricsLeftParameter}
           metricsRightParameter={metricsRightParameter}
           metricsTrajectory={metricsTrajectory}
-          selectedUserId={compareApiData?.left.scene?.user_id}
+          initialSelectedUserId={metricsAgentId ?? undefined}
           leftParameterNote={leftParameterNote}
           rightParameterNote={rightParameterNote}
           metricsError={metricsError}

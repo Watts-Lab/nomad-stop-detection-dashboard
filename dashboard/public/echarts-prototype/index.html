@@ -61,17 +61,6 @@
 
     // Format the parameter name as plain text for tooltips
     const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
-    const tooltipSeries = new Set(["User max", "User max hit area", "Hovered user spread", "Pinned user spread", "Pinned user hit area"]);
-
-    // Build agent, by-minute recall, and parameter details for maximum points and highlighted curves
-    const pointTooltip = (event) => {
-      if (!tooltipSeries.has(event.seriesName)) return "";
-      const [pointX, recall, userId] = event.value;
-      const parameterRows = [[xField, pointX], ...Object.entries(fixedParameters)]
-        .map(([name, value]) => `<div style="display:flex;justify-content:space-between;gap:18px"><span style="color:#9ca3af">${tooltipParameterLabel(name)}</span><span style="font-family:monospace">${value}</span></div>`)
-        .join("");
-      return `<div style="min-width:180px"><div style="font-weight:600;margin-bottom:6px">Agent ${userId}</div><div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:6px"><span style="color:#9ca3af">By-minute recall</span><span style="font-family:monospace">${Number(recall).toFixed(3)}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:3px">PARAMETERS</div>${parameterRows}</div>`;
-    };
     let pendingTourFocus = null;
 
     window.addEventListener("message", (event) => {
@@ -326,6 +315,12 @@
 
         chart.setOption({
           animationDurationUpdate: 0,
+          // Draw highlights in place: with this many points ECharts would otherwise move
+          // them to a separate hover layer, which drops the emphasis scale
+          hoverLayerThreshold: Infinity,
+          // Switch hover emphasis and dimming instantly; the default 300ms fades overlap
+          // into a rolling wave as the cursor crosses densely packed points
+          stateAnimation: { duration: 0 },
           legend: showLegend ? {
             bottom: 4,
             left: "center",
@@ -343,19 +338,6 @@
             top: 46,
             bottom: reserveLegendSpace ? 60 : 36,
             containLabel: true,
-          },
-          tooltip: {
-            trigger: "item",
-            confine: true,
-            backgroundColor: "rgba(17, 24, 39, 0.96)",
-            borderColor: "#4b5563",
-            borderWidth: 1,
-            padding: 10,
-            textStyle: {
-              color: "#f3f4f6",
-              fontSize: 12,
-            },
-            formatter: pointTooltip,
           },
           xAxis: {
             type: "value",
@@ -413,8 +395,12 @@
               id: "individual-results",
               type: "scatter",
               data: scatterData,
+              // Redraw all points in one frame; above the default progressive threshold
+              // ECharts restyles them in batches, so dimming visibly sweeps across the chart
+              progressive: 0,
               symbolSize: 7,
-              cursor: "pointer",
+              // Context only: individual points ignore hover and clicks
+              silent: true,
               itemStyle: {
                 color: "rgba(31, 119, 180, 0.055)",
                 borderColor: "rgba(31, 119, 180, 0.14)",
@@ -424,9 +410,6 @@
                 itemStyle: {
                   opacity: 0.025,
                 },
-              },
-              tooltip: {
-                show: false,
               },
               z: 3,
             },
@@ -443,8 +426,19 @@
                 borderColor: "rgba(185, 28, 28, 0.46)",
                 borderWidth: 1,
               },
+              // Hovering a maximum point magnifies it and blurs (dims) everything else
               emphasis: {
-                scale: 1.6,
+                focus: "self",
+                scale: 1.75,
+                itemStyle: {
+                  color: "#b91c1c",
+                  borderColor: "#ffffff",
+                  // Scaled with the symbol, so this renders about 1.75px wide
+                  borderWidth: 1,
+                  shadowBlur: 10,
+                  shadowColor: "rgba(0, 0, 0, 0.6)",
+                  opacity: 1,
+                },
               },
               z: 6,
             },
@@ -452,6 +446,12 @@
               name: "Mean",
               id: "mean-line",
               type: "line",
+              // Reference line only: no pointer cursor or hover response, and not dimmed
+              // when a maximum point is hovered
+              silent: true,
+              emphasis: {
+                disabled: true,
+              },
               data: meanLine,
               symbol: "none",
               lineStyle: {
@@ -468,6 +468,7 @@
               name: highestAverageLabel,
               id: "highest-average-retention",
               type: "line",
+              silent: true,
               data: highestAverageLine,
               symbol: "none",
               lineStyle: {
@@ -487,6 +488,7 @@
               name: averageUserMaxLabel,
               id: "average-user-max",
               type: "line",
+              silent: true,
               data: averageUserMaxLine,
               symbol: "none",
               lineStyle: {
@@ -501,33 +503,6 @@
                 disabled: true,
               },
               z: 7,
-            },
-            {
-              name: "Hovered user spread",
-              id: "highlighted-user-line",
-              type: "line",
-              data: emptyHighlight,
-              animation: false,
-              symbol: "circle",
-              symbolSize: 6,
-              lineStyle: {
-                color: "rgba(44, 160, 33, 0.6)",
-                width: 2,
-                type: "dashed",
-              },
-              itemStyle: {
-                color: "rgba(44, 160, 44, 0.6)",
-              },
-              emphasis: {
-                scale: 1.8,
-                itemStyle: {
-                  borderColor: "#ffffff",
-                  borderWidth: 2,
-                  shadowBlur: 8,
-                  shadowColor: "rgba(0, 0, 0, 0.55)",
-                },
-              },
-              z: 9,
             },
             {
               name: "Pinned user spread",
@@ -593,44 +568,6 @@
             },
             z: 12,
           },
-          {
-            // Enlarges whichever point on the pinned curve the cursor is over, the way
-            // "Hovered per-user max" does for the maximum points
-            name: "Hovered pinned point",
-            id: "hovered-pinned-point",
-            type: "scatter",
-            data: emptyHighlight,
-            animation: false,
-            symbol: "circle",
-            symbolSize: 12,
-            silent: true,
-            showInLegend: false,
-            itemStyle: {
-              color: "#2ca02c",
-              borderColor: "#ffffff",
-              borderWidth: 2,
-            },
-            z: 12,
-            },
-            {
-              name: "Hovered per-user max",
-              id: "hovered-per-user-max",
-              type: "scatter",
-              data: emptyHighlight,
-              animation: false,
-              symbol: "circle",
-              symbolSize: 14,
-              silent: true,
-              showInLegend: false,
-              itemStyle: {
-                color: "#b91c1c",
-                borderColor: "#ffffff",
-                borderWidth: 2.5,
-                shadowBlur: 10,
-                shadowColor: "rgba(0, 0, 0, 0.6)",
-              },
-              z: 12,
-            },
             {
               name: "Pinned per-user max",
               id: "pinned-per-user-max",
@@ -652,35 +589,24 @@
         });
         applyTourFocus(pendingTourFocus);
 
-        // A hovered point only previews a user's spread; a clicked point pins it so the
-        // green line survives mouse movement until it is unpinned or replaced.
-        let hoveredPoint = null;
-        let hoveredPinnedPoint = null;
+        // Hovering a point only enlarges it to invite a click; clicking a maximum point pins
+        // that agent, drawing its curve and filling the side card until it is unpinned or replaced.
         let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
 
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
 
-        // Points that open a single run in Demo: any individual result, or one on the pinned
-        // agent's curve, which covers that agent's own individual points while it is pinned
-        const isRunSelectSeries = (name) => name === "Individual" || name === "Pinned user hit area";
-
         // Get the selected agent's by-minute recall values across the parameter sweep
         const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
 
-        // Draw hovered and pinned agent curves and emphasize their maximum points
-        // Restore tour styling when neither is active
+        // Draw the pinned agent's curve and dim the other points;
+        // restore tour styling when no agent is pinned
         const renderHighlight = () => {
-          // A pinned user stays drawn while hovering another one, so both spreads show at once.
-          const hovered = hoveredPoint;
-          if (!hovered && !pinnedPoint) {
+          if (!pinnedPoint) {
             chart.setOption({
               series: [
-                { id: "highlighted-user-line", data: emptyHighlight },
-                { id: "hovered-per-user-max", data: emptyHighlight },
                 { id: "pinned-user-line", data: emptyHighlight },
                 { id: "pinned-user-hit-area", data: emptyHighlight },
-                { id: "hovered-pinned-point", data: emptyHighlight },
                 { id: "pinned-per-user-max", data: emptyHighlight },
               ],
             });
@@ -691,11 +617,8 @@
             series: [
               { id: "individual-results", itemStyle: { opacity: 0.08 } },
               { id: "per-user-max", itemStyle: { opacity: 0.08 } },
-              { id: "highlighted-user-line", data: hovered ? userLineFor(hovered) : emptyHighlight },
-              { id: "hovered-per-user-max", data: hovered ? [hovered] : emptyHighlight },
               { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
               { id: "pinned-user-hit-area", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
-              { id: "hovered-pinned-point", data: hoveredPinnedPoint ? [hoveredPinnedPoint] : emptyHighlight },
               { id: "pinned-per-user-max", data: pinnedPoint ? [pinnedPoint] : emptyHighlight },
             ],
           });
@@ -720,30 +643,17 @@
           postPinChange();
         }
 
+        // Hover only magnifies the point under the cursor. The invisible hit areas receive the
+        // events, so highlight the matching visible point; highlight states skip setOption,
+        // which re-runs the whole chart pipeline and made every hover lag.
+        const hoverTargets = { "User max hit area": "per-user-max", "Pinned user hit area": "pinned-user-line" };
         chart.on("mouseover", (event) => {
-        if (event.seriesName === "Pinned user hit area") {
-          hoveredPinnedPoint = event.value;
-          renderHighlight();
-          return;
-        }
-          if (!isPerUserMaxSeries(event.seriesName)) return;
-          hoveredPoint = event.value;
-          renderHighlight();
+          const seriesId = hoverTargets[event.seriesName];
+          if (seriesId) chart.dispatchAction({ type: "highlight", seriesId, dataIndex: event.dataIndex });
         });
         chart.on("mouseout", (event) => {
-        if (event.seriesName === "Pinned user hit area") {
-          hoveredPinnedPoint = null;
-          renderHighlight();
-          return;
-        }
-          if (!isPerUserMaxSeries(event.seriesName)) return;
-          hoveredPoint = null;
-          renderHighlight();
-        });
-        chart.on("globalout", () => {
-          hoveredPoint = null;
-        hoveredPinnedPoint = null;
-          renderHighlight();
+          const seriesId = hoverTargets[event.seriesName];
+          if (seriesId) chart.dispatchAction({ type: "downplay", seriesId, dataIndex: event.dataIndex });
         });
         chart.on("click", (event) => {
           if (isPerUserMaxSeries(event.seriesName)) {
@@ -753,7 +663,8 @@
             postPinChange();
             return;
           }
-        if (!isRunSelectSeries(event.seriesName)) return;
+          // A point on the pinned agent's curve opens that run in Demo
+          if (event.seriesName !== "Pinned user hit area") return;
           const [pointX, , userId] = event.value;
           window.parent.postMessage({
             type: "nomad-metrics-point-select",

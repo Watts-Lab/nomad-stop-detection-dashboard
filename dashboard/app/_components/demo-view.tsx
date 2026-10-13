@@ -126,13 +126,15 @@ export function DemoView({
   handleLeftAlgorithmChange: (algorithmId: string) => void
   handleRightAlgorithmChange: (algorithmId: string) => void
   handleNewTrajectory: () => void
-  openMetricsFromDemo: () => void
+  openMetricsFromDemo: (agentId?: string) => void
   startTour: () => void
 }) {
 
   // Track replay requests and playback state shared between comparison panels.
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
+  const [showInformation, setShowInformation] = useState(false)
+  const scene = compareApiData?.left.scene
   const algorithmLayersDisabled = !leftAlgo && (!compareMode || !rightAlgo)
   const dataPanel = (
     <Card className="self-start overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-data">
@@ -148,11 +150,11 @@ export function DemoView({
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-[#3b1370]">Selected agent</h4>
           <div className="space-y-2 rounded-md border border-border/70 bg-background/30 px-3 py-2">
-            {compareApiData?.left && (
+            {scene && (
               <div className="flex items-center gap-3 text-xs">
                 <span className="font-semibold text-foreground">agent</span>
                 <span className="min-w-0 flex-1 truncate text-right font-mono text-foreground">
-                  {compareApiData.left.scene.user_id}
+                  {scene.user_id}
                 </span>
               </div>
             )}
@@ -160,6 +162,12 @@ export function DemoView({
               <RefreshCw className="h-4 w-4" />
               New Agent
             </Button>
+            {scene && (
+              <Button variant="outline" size="sm" onClick={() => openMetricsFromDemo(scene.user_id)} className="w-full text-xs">
+                <BarChart3 className="h-4 w-4" />
+                Aggregated Metrics (Agent)
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
@@ -168,14 +176,14 @@ export function DemoView({
 
   // Apply reveal classes to the header and active panel layout.
   return (
-    <div className="nomad-page-frame flex min-w-0 flex-1 flex-col gap-3 pt-4">
+    <div className={`nomad-page-frame flex min-h-0 min-w-0 flex-1 flex-col gap-3 pt-4 ${compareMode ? "" : "lg:overflow-hidden"}`}>
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-3xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
           {!compareMode && (
 
             /* Start the Demo guided tour. */
-            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+            <Button variant="control" size="icon-sm" onClick={startTour} title="Take Tour" aria-label="Take Tour">
               <HelpCircle className="h-4 w-4" />
             </Button>
           )}
@@ -225,6 +233,8 @@ export function DemoView({
                 showGroundTruth={showGroundTruth}
                 showStops={showStops}
                 showXray={showXray}
+                showInformation={showInformation}
+                onShowInformationChange={setShowInformation}
               />
             </div>
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
@@ -270,7 +280,7 @@ export function DemoView({
                 />
               </div>
               <div className="space-y-2 pt-2">
-                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action w-full" data-tour="tour-metrics">
+                <Button onClick={() => openMetricsFromDemo()} size="lg" className="nomad-action w-full" data-tour="tour-metrics">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
                 </Button>
@@ -283,7 +293,9 @@ export function DemoView({
           <div className="order-1 min-w-0 md:col-span-2 xl:col-span-1">
             {dataPanel}
           </div>
-          <div className="order-3 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-0 md:ml-20 xl:order-2 xl:col-span-1 xl:mx-0">
+          {/* Each panel is a size container: its map and timeline keep a 4:5 panel's height
+              and the run stats strip adds to it (see CompareAnimationPanel) */}
+          <div className="@container order-3 mx-[10%] min-w-0 self-start sm:mx-20 md:col-span-3 md:mr-0 md:ml-20 xl:order-2 xl:col-span-1 xl:mx-0">
             <CompareAnimationPanel
               panel={compareApiData?.left}
               mode="compare"
@@ -295,9 +307,11 @@ export function DemoView({
               showXray={showXray}
               previewRunId={comparePreviewRunId}
               sharedPlaybackState={comparePlaybackState}
+              showInformation={showInformation}
+              onShowInformationChange={setShowInformation}
             />
           </div>
-          <div className="order-4 mx-[10%] aspect-[4/5] min-w-0 sm:mx-20 md:col-span-3 md:mr-20 md:ml-0 xl:order-3 xl:col-span-1 xl:mx-0">
+          <div className="@container order-4 mx-[10%] min-w-0 self-start sm:mx-20 md:col-span-3 md:mr-20 md:ml-0 xl:order-3 xl:col-span-1 xl:mx-0">
             <CompareAnimationPanel
               panel={compareApiData?.right}
               mode="compare"
@@ -308,16 +322,18 @@ export function DemoView({
               showXray={showXray}
               onReplayStart={() => setComparePreviewRunId((runId) => runId + 1)}
               onPlaybackStateChange={setComparePlaybackState}
+              showInformation={showInformation}
+              onShowInformationChange={setShowInformation}
             />
           </div>
           <Card className="order-2 min-h-0 overflow-hidden bg-[#f8f9fc] py-4 md:col-span-4 xl:order-4 xl:col-span-1">
-            <CardContent className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
+            <CardContent className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
               <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-center md:justify-between xl:col-span-1 xl:flex-col xl:items-stretch">
                 <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
                   <Square className="h-4 w-4" />
                   Single
                 </Button>
-                <Button onClick={openMetricsFromDemo} size="lg" className="nomad-action">
+                <Button onClick={() => openMetricsFromDemo()} size="lg" className="nomad-action">
                   <BarChart3 className="h-4 w-4" />
                   Aggregated Metrics
                 </Button>

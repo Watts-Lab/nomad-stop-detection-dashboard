@@ -4,13 +4,12 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { HelpCircle, Pause, Play, RotateCcw } from "lucide-react"
+import { HelpCircle, Info, Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { parameterDisplayName } from "../_lib/dashboard-utils"
 import type { ComparePanelResponse, EChartsApi } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
@@ -25,7 +24,7 @@ import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
-  scrubPlaybackTimestamp
+  scrubPlaybackTimestamp, wheelDeltaPixels, wheelScrubSeconds, adjacentPingTimestamp
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
@@ -95,6 +94,7 @@ export function DemoSceneRenderer({
   const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => { })
   const replayRef = useRef<() => void>(() => { })
+  const stepToPingRef = useRef<(direction: number) => void>(() => { })
   const previewRef = useRef<() => void>(() => { })
   const clearSelectionRef = useRef<() => void>(() => { })
   const onReplayStartRef = useRef(onReplayStart)
@@ -461,7 +461,7 @@ export function DemoSceneRenderer({
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
           { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] },
           { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
-          { id: "cursor", data: [[timestampSeconds * 1000, 0.08], [timestampSeconds * 1000, 0.92]] }
+          { id: "cursor", data: [[timestampSeconds * 1000]] }
         ]
       }, { lazyUpdate: true })
     }
@@ -469,7 +469,7 @@ export function DemoSceneRenderer({
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount).map((point) => [...point, 1])
+      const previewPings = chartData.pingData.slice(0, pingCount)
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -784,12 +784,30 @@ export function DemoSceneRenderer({
       if (params.seriesId === "core-point-ticks") selectPing(Number(value[2]))
     }
 
-    // Use Space for playback/replay and arrow keys to move the second selected ping
-    // Ignore keyboard input on interactive controls
+    // Pause and seek to the previous or next ping, staying put at either end
+    const stepToPing = (direction: number) => {
+      const pingTimestamp = adjacentPingTimestamp(activeTimestamp(), scene.pings, direction)
+      if (pingTimestamp === undefined) return
+      window.clearTimeout(timer)
+      paused = true
+      seekTo(pingTimestamp)
+      setPlaybackState("paused")
+      onPlaybackStateChangeRef.current?.("paused")
+    }
+
+    // Use Space for playback/replay, Escape to clear selected pings, and arrow keys
+    // to step between pings, or to move the second selected ping when two are selected
+    // Ignore keys that interactive controls handle themselves: Space on buttons and links,
+    // and any key on form fields and sliders
     const onKeyDown: (event: KeyboardEvent) => void = (event) => {
-      if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, [role='slider']")) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest("input, select, textarea, [role='slider']")) return
+      if (event.key === "Escape") {
+        if (selectedPingIndexesRef.current.length) clearSelectedPings()
+        return
+      }
       if (event.key === " ") {
-        if (!syncMaster || variant !== "full" || event.repeat) return
+        if (target?.closest("button, a") || !syncMaster || variant !== "full" || event.repeat) return
         event.preventDefault()
         if (paused && isPlaybackComplete(sequenceIndex, chartData.timeSequence.length)
         ) {
@@ -800,8 +818,13 @@ export function DemoSceneRenderer({
       }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
       const selected = selectedPingIndexesRef.current
-      if (selected.length !== 2) return
       const direction = event.key === "ArrowRight" ? 1 : -1
+      if (selected.length !== 2) {
+        if (!syncMaster || variant !== "full") return
+        event.preventDefault()
+        stepToPing(direction)
+        return
+      }
       let nextPingIndex = selected[1] + direction
       if (nextPingIndex === selected[0]) nextPingIndex += direction
       if (nextPingIndex < 0 || nextPingIndex >= chartData.pings.length) return
@@ -834,37 +857,44 @@ export function DemoSceneRenderer({
     let dragging = false
 
     // Seek continuously as the pointer drags across the timeline
-    const onPointerMove = (event: MouseEvent) => {
+    const onPointerMove = (event: PointerEvent) => {
       if (!dragging || !timelineRef.current) return
       const rect = timelineRef.current.getBoundingClientRect()
       seekTo(timestampFromOffset(event.clientX - rect.left, event.clientY - rect.top))
     }
 
-    // End timeline dragging and remove its temporary mouse listeners
+    // End timeline dragging and remove its temporary pointer listeners
     const onPointerUp = () => {
       dragging = false
-      window.removeEventListener("mousemove", onPointerMove)
-      window.removeEventListener("mouseup", onPointerUp)
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerUp)
     }
 
     // Pause playback, seek to the pressed timeline position, and attach drag listeners
-    const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent }) => {
+    // Grabbing the cursor itself keeps the current time until the pointer moves
+    const onTimelinePointerDown = (event: { offsetX: number; offsetY: number; event?: MouseEvent; target?: { name?: string } }) => {
       event.event?.preventDefault()
       window.clearTimeout(timer)
       paused = true
       dragging = true
-      seekTo(timestampFromOffset(event.offsetX, event.offsetY))
+      if (event.target?.name !== "cursor-grab") seekTo(timestampFromOffset(event.offsetX, event.offsetY))
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
-      window.addEventListener("mousemove", onPointerMove)
-      window.addEventListener("mouseup", onPointerUp)
+      window.addEventListener("pointermove", onPointerMove)
+      window.addEventListener("pointerup", onPointerUp)
+      window.addEventListener("pointercancel", onPointerUp)
     }
-    let wheelStepSeconds = 60
+    // Show a drag cursor over the time cursor, which echarts would render with a pointer cursor
+    const onTimelineHover = (event: { target?: { name?: string } }) => {
+      if (event.target?.name === "cursor-grab") timelineChart.getZr().setCursorStyle("ew-resize")
+    }
+    let wheelGesturePixels = 0
     let wheelDirection = 0
     let lastWheelTime = 0
 
     // Pause and scrub time by scrolling
-    // First scroll from the initial end view returns to the start, repeated scrolling accelerates
+    // First scroll from the initial end view returns to the start, continued scrolling accelerates
     const onTimelineWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.shiftKey) return
       event.preventDefault()
@@ -876,21 +906,20 @@ export function DemoSceneRenderer({
       const initializedAtEnd = wheelStartsAtEndRef.current && activeTime === maxTime
       wheelStartsAtEndRef.current = false
       if (initializedAtEnd) {
-        wheelStepSeconds = 60
+        wheelGesturePixels = 0
         wheelDirection = 0
         lastWheelTime = 0
         seekTo(minTime)
       } else {
-        const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
-        const direction = Math.sign(delta)
+        const deltaPixels = wheelDeltaPixels(event)
+        const direction = Math.sign(deltaPixels)
         const wheelTime = event.timeStamp
-        wheelStepSeconds = direction !== wheelDirection || wheelTime - lastWheelTime > 200
-          ? 60
-          : Math.min(wheelStepSeconds * 1.2, Math.max(60, (maxTime - minTime) / 15))
+        if (direction !== wheelDirection || wheelTime - lastWheelTime > 200) wheelGesturePixels = 0
+        const deltaSeconds = wheelScrubSeconds(deltaPixels, wheelGesturePixels, chartData.timeSequence)
+        wheelGesturePixels += Math.abs(deltaPixels)
         wheelDirection = direction
         lastWheelTime = wheelTime
-        const nextTimestamp = scrubPlaybackTimestamp(activeTime, direction * wheelStepSeconds, chartData.timeSequence)
-        seekTo(nextTimestamp)
+        seekTo(scrubPlaybackTimestamp(activeTime, deltaSeconds, chartData.timeSequence))
       }
       setPlaybackState("paused")
       onPlaybackStateChangeRef.current?.("paused")
@@ -952,6 +981,25 @@ export function DemoSceneRenderer({
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
 
+    const syncMapLineStyles = () => {
+      const ping = chartData.pings[0]
+      const origin = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
+      const edge = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x + 1, ping.y]) as number[]
+      const scale = Math.abs(edge[0] - origin[0]) / baseMapPixelsPerUnit
+      mapChart.setOption({ series: [
+        { id: "completed-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "completed-fallback-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "next-path", lineStyle: { width: 3 * scale } },
+        { id: "active-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "active-fallback-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "promotion-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "promotion-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "anchor-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "anchor-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "selected-ping-line", lineStyle: { width: 3 * scale } },
+      ] }, { lazyUpdate: true })
+    }
+
     // Preserve the map camera while matching its bounds to the resized plot.
     const resize = () => {
       const dataZoom = mapChart.getOption().dataZoom
@@ -980,6 +1028,10 @@ export function DemoSceneRenderer({
       } else {
         applyMapBounds()
       }
+      const defaultBounds = mapBounds()
+      baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 16) /
+        (defaultBounds.view.maxX - defaultBounds.view.minX)
+      syncMapLineStyles()
       timelineChart.resize()
       refreshTooltipLayout()
     }
@@ -1031,6 +1083,8 @@ export function DemoSceneRenderer({
     }
 
     const bounds = mapBounds()
+    let baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 16) /
+      (bounds.view.maxX - bounds.view.minX)
 
     mapChart.setOption(
       createDemoMapChartOptions({
@@ -1043,6 +1097,7 @@ export function DemoSceneRenderer({
         getShowXray: () => layerStateRef.current.showXray,
         getShowStops: () => layerStateRef.current.showStops,
         getActiveTimestamp: activeTimestamp,
+        getBaseMapPixelsPerUnit: () => baseMapPixelsPerUnit,
         destinationPreview,
         clusterColor
       })
@@ -1064,6 +1119,7 @@ export function DemoSceneRenderer({
 
     toggleRef.current = toggle
     replayRef.current = replay
+    stepToPingRef.current = stepToPing
     previewRef.current = playLocalPreview
     clearSelectionRef.current = clearSelectedPings
     renderSceneRef.current = (timestampSeconds) => {
@@ -1086,9 +1142,13 @@ export function DemoSceneRenderer({
     paused = true
     syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(mapEl)
+    resizeObserver.observe(timelineEl)
     window.addEventListener("resize", resize)
     if (destinationPreview) {
       return () => {
+        resizeObserver.disconnect()
         window.removeEventListener("resize", resize)
         updateResultRef.current = () => { }
         renderSceneRef.current = null
@@ -1106,12 +1166,17 @@ export function DemoSceneRenderer({
     mapChart.on("mouseout", onMapMouseOut)
     mapChart.on("globalout", onMapMouseOut)
     mapChart.on("click", onMapClick)
-    mapChart.on("dataZoom", refreshTooltipLayout)
+    const onMapZoom = () => {
+      syncMapLineStyles()
+      refreshTooltipLayout()
+    }
+    mapChart.on("dataZoom", onMapZoom)
     mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.on("click", onTimelineClick)
     timelineChart.getZr().on("mousedown", onTimelinePointerDown)
+    timelineChart.getZr().on("mousemove", onTimelineHover)
     mapEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
     timelineEl.addEventListener("wheel", onTimelineWheel, { passive: false, capture: true })
     if (variant === "preview") timer = window.setTimeout(replay, initialDelay)
@@ -1180,16 +1245,19 @@ export function DemoSceneRenderer({
       if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
+      resizeObserver.disconnect()
       window.removeEventListener("resize", resize)
       window.removeEventListener("nomad-tour-action", onTourAction)
       window.removeEventListener("keydown", onKeyDown)
       window.removeEventListener("pointerup", onMapSelectionPointerUp)
       window.removeEventListener("pointercancel", onMapSelectionPointerCancel)
       mapEl.removeEventListener("pointerdown", onMapSelectionPointerDown)
-      window.removeEventListener("mousemove", onPointerMove)
-      window.removeEventListener("mouseup", onPointerUp)
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerUp)
       toggleRef.current = () => { }
       replayRef.current = () => { }
+      stepToPingRef.current = () => { }
       previewRef.current = () => { }
       clearSelectionRef.current = () => { }
       updateResultRef.current = () => { }
@@ -1197,12 +1265,13 @@ export function DemoSceneRenderer({
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
       mapChart.off("click", onMapClick)
-      mapChart.off("dataZoom", refreshTooltipLayout)
+      mapChart.off("dataZoom", onMapZoom)
       mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.off("click", onTimelineClick)
       timelineChart.getZr().off("mousedown", onTimelinePointerDown)
+      timelineChart.getZr().off("mousemove", onTimelineHover)
       mapEl.removeEventListener("wheel", onTimelineWheel, true)
       timelineEl.removeEventListener("wheel", onTimelineWheel, true)
       renderSceneRef.current = null
@@ -1268,6 +1337,8 @@ export function DemoSceneRenderer({
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
   const selectedPingElapsed = selectedPings ? Math.abs(selectedPings[1].t - selectedPings[0].t) : 0
+  // Derived from the shared time so the end state holds however it was reached
+  const atLastPing = currentTime !== null && adjacentPingTimestamp(currentTime, scene.pings, 1) === undefined
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
@@ -1286,31 +1357,61 @@ export function DemoSceneRenderer({
         <div className="pointer-events-none absolute right-3 top-3 z-10 flex gap-2">
           <TooltipProvider delayDuration={300}>
             <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
-              {playbackState !== "complete" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => toggleRef.current()}
-                      aria-label={playbackState === "playing" ? "Pause" : "Play"}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
-                    >
-                      {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
-                </Tooltip>
-              )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
+                    type="button"
+                    onClick={() => stepToPingRef.current(-1)}
+                    aria-label="Previous ping"
+                    variant="control"
+                    size="icon-sm"
+                  >
+                    <StepBack className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Previous ping</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={() => toggleRef.current()}
+                    disabled={atLastPing && playbackState !== "playing"}
+                    aria-label={playbackState === "playing" ? "Pause" : "Play"}
+                    variant="control"
+                    size="icon-sm"
+                  >
+                    {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={() => stepToPingRef.current(1)}
+                    disabled={atLastPing}
+                    aria-label="Next ping"
+                    variant="control"
+                    size="icon-sm"
+                  >
+                    <StepForward className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Next ping</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
                     type="button"
                     onClick={() => replayRef.current()}
                     aria-label="Replay"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                    variant="control"
+                    size="icon-sm"
                   >
                     <RotateCcw className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Replay</TooltipContent>
               </Tooltip>
@@ -1336,7 +1437,7 @@ export function DemoSceneRenderer({
 }
 
 // Wrap the scene renderer with the algorithm title, 
-// Learn link, agent details, and loading placeholders
+// Learn link, run statistics, and loading placeholders
 export function CompareAnimationPanel({
   panel,
   mode = "compare",
@@ -1350,6 +1451,8 @@ export function CompareAnimationPanel({
   onReplayStart,
   sharedPlaybackState,
   onPlaybackStateChange,
+  showInformation,
+  onShowInformationChange,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1363,8 +1466,17 @@ export function CompareAnimationPanel({
   onReplayStart?: () => void
   sharedPlaybackState?: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
+  showInformation: boolean
+  onShowInformationChange: (visible: boolean) => void
 }) {
   const learnAlgorithmId = panel?.algo
+  const pings = panel?.scene.pings
+  const percent = (value: number) => `${Math.round(value * 100)}%`
+  const pingFrequency = pings
+    ? (pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)
+    : ""
+  const trueStopCount = panel?.scene.truth.filter((stop) => stop.location !== null).length ?? 0
+  const detectedStopCount = panel ? new Set(panel.result.cluster.filter((label) => label >= 0)).size : 0
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
@@ -1372,15 +1484,34 @@ export function CompareAnimationPanel({
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
-            <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
+            <Button asChild variant="control" size="icon-sm" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`}>
               <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>
                 <HelpCircle className="h-4 w-4" />
               </Link>
             </Button>
           )}
+          {panel && !learnAlgorithmId && (
+            <Button type="button" variant="control" size="icon-sm" disabled aria-label="Select an algorithm to learn more">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="control"
+            size="icon-sm"
+            disabled={!panel?.metrics}
+            aria-label={showInformation ? "Hide run information" : "Show run information"}
+            aria-pressed={showInformation}
+            title={showInformation ? "Hide run information" : "Show run information"}
+            onClick={() => onShowInformationChange(!showInformation)}
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-0">
+      {/* In compare mode the map and timeline get the height a 4:5 panel leaves below the
+          2.75rem title row, so the stats strip below lengthens the card instead of shrinking the map */}
+      <CardContent className={`flex min-h-0 flex-col px-2 pb-2 pt-0 ${mode === "compare" ? "h-[calc(125cqw-2.75rem)] flex-none" : "flex-1"}`}>
         {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer
@@ -1409,6 +1540,37 @@ export function CompareAnimationPanel({
           </div>
         )}
       </CardContent>
+      {showInformation && panel?.metrics && pings && (
+        <div className="shrink-0 px-2 pb-2">
+          <div className="grid w-full grid-cols-3 divide-x divide-[#d1d5db] overflow-hidden rounded-md border border-[#d1d5db] bg-white">
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{pingFrequency}</span>
+                <span className="text-xs font-normal text-[#3a465d]">pings/hour</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{pings.length} pings, {trueStopCount} true stops</p>
+            </div>
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{detectedStopCount}</span>
+                <span className="text-xs font-normal text-[#3a465d]">stops detected</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{percent(panel.metrics.missed_fraction)} missed; {percent(panel.metrics.split_fraction)} split; {percent(panel.metrics.merged_fraction)} merged</p>
+            </div>
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{percent(panel.metrics.recall)}</span>
+                <span className="text-xs font-normal text-[#3a465d]">min-by-min recall</span>
+              </div>
+              {panel.metrics.best && (
+                <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">
+                  Best: {percent(panel.metrics.best.recall)} at <span className="font-mono">{panel.metrics.best.parameter}={panel.metrics.best.value}</span>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

@@ -392,14 +392,47 @@ export function createDemoTimelineChartOptions({
 
       {
         id: "cursor",
-        type: "line",
+        type: "custom",
         coordinateSystem: "cartesian2d",
-        showSymbol: false,
-        z: 6,
+        silent: false,
+        z: 8,
         data: [],
-        lineStyle: {
-          color: "#d83832",
-          width: 2
+        renderItem(_params: EChartsParams, api: EChartsApi) {
+          const top = api.coord([api.value(0), 0.92])
+          const bottom = api.coord([api.value(0), 0.08])
+
+          const shape = {
+            x1: top[0],
+            y1: top[1],
+            x2: bottom[0],
+            y2: bottom[1]
+          }
+
+          // Drawn above the ping ticks with a wide transparent grab area
+          // so the cursor stays draggable when it sits on a ping
+          return {
+            type: "group",
+            children: [
+              {
+                type: "line",
+                name: "cursor-grab",
+                shape,
+                style: {
+                  stroke: "rgba(0, 0, 0, 0)",
+                  lineWidth: 12
+                }
+              },
+              {
+                type: "line",
+                name: "cursor-grab",
+                shape,
+                style: {
+                  stroke: "#d83832",
+                  lineWidth: 2
+                }
+              }
+            ]
+          }
         }
       }
     ]

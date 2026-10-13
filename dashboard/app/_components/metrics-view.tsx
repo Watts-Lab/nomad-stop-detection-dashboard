@@ -204,7 +204,7 @@ export function MetricsView({
   metricsTopParameter,
   metricsBottomParameter,
   metricsTrajectory,
-  selectedUserId,
+  initialSelectedUserId,
   topParameterNote,
   bottomParameterNote,
   metricsError,
@@ -224,7 +224,7 @@ export function MetricsView({
   metricsTopParameter: string
   metricsBottomParameter: string
   metricsTrajectory: string
-  selectedUserId?: string
+  initialSelectedUserId?: string
   topParameterNote: MetricsParameterNote | undefined
   bottomParameterNote: MetricsParameterNote | undefined
   metricsError: string | null
@@ -239,8 +239,8 @@ export function MetricsView({
 }) {
   const [pinnedTopAgent, setPinnedTopAgent] = useState<PinnedAgent | null>(null)
   const [pinnedBottomAgent, setPinnedBottomAgent] = useState<PinnedAgent | null>(null)
-  const [selectedTopUserId, setSelectedTopUserId] = useState<string | null>(selectedUserId ?? null)
-  const [selectedBottomUserId, setSelectedBottomUserId] = useState<string | null>(selectedUserId ?? null)
+  const [selectedTopUserId, setSelectedTopUserId] = useState<string | null>(initialSelectedUserId ?? null)
+  const [selectedBottomUserId, setSelectedBottomUserId] = useState<string | null>(initialSelectedUserId ?? null)
   const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
 
   const topFixedParameters = topParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
@@ -283,17 +283,16 @@ export function MetricsView({
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+            <h2 className="text-3xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
             <Button
-              variant="outline"
-              size="icon"
+              variant="control"
+              size="icon-sm"
               onClick={() => {
                 setMetricsChartView("recall")
                 startTour()
               }}
               title="Take Tour"
               aria-label="Take Tour"
-              className="h-8 w-8"
             >
               <HelpCircle className="h-4 w-4" />
             </Button>

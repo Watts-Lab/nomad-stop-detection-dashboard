@@ -1,8 +1,8 @@
 /* BUILD DYNAMIC MAP & TIMELINE SERIES DATA FOR CURRENT PLAYBACK TIMESTAMP */
 
 import type { DemoResultData } from "../../_lib/demo-result-data"
-import { 
-    connectedPingIndexes, relatedPingIndexesAt, anchorOpacity, associatedWithHover, 
+import {
+    connectedPingIndexes, relatedPingIndexesAt, anchorOpacity,
     associationOpacity, edgeOpacity, selectedPingLineData
 } from "./demo-interactions"
 import { hoveredAssignedBuildingData, pingClassifiedAt, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
@@ -149,12 +149,7 @@ export function buildDemoMapSeries({
     isDensityAlgorithm,
     clusterColor
 }: BuildDemoMapSeriesArgs) {
-    const styledScatterPoint = (point: number[]) => [
-        ...point,
-        associationOpacity(point[3], hoverPingIndexes),
-      ]
-
-      const styledXrayPoint = (point: number[]) => [
+    const styledXrayPoint = (point: number[]) => [
         ...point,
         anchorOpacity(point[3], hoverPingIndexes),
       ]
@@ -220,15 +215,12 @@ export function buildDemoMapSeries({
         ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
         {
             id: "ghost-pings",
-            data: chartData.pingData.map((point) => [
-              ...point,
-              associatedWithHover(point[3], hoverPingIndexes) ? 1 : 0.18,
-            ]),
+            data: chartData.pingData,
         },
         {
             id: "noise-pings",
             data: showStops
-                ? visibleNoisePingsAt(timestampSeconds, chartData).map(styledScatterPoint)
+                ? visibleNoisePingsAt(timestampSeconds, chartData)
                 : []
         },
         {

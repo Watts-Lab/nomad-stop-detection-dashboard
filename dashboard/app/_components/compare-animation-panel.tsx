@@ -1544,7 +1544,9 @@ export function CompareAnimationPanel({
           </TooltipProvider>
         )}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-0">
+      {/* In compare mode the map and timeline get the height a 4:5 panel leaves below a
+          2.75rem title row, so the stats strip lengthens the card instead of shrinking the map */}
+      <CardContent className={`flex min-h-0 flex-col px-2 pb-2 pt-0 ${mode === "compare" ? "h-[calc(125cqw-2.75rem)] flex-none" : "flex-1"}`}>
         {panel ? (
           <div className="min-h-0 w-full flex-1">
             <DemoSceneRenderer

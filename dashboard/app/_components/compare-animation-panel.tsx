@@ -1542,21 +1542,21 @@ export function CompareAnimationPanel({
           <div className="grid w-full grid-cols-3 divide-x divide-[#d1d5db] overflow-hidden rounded-md border border-[#d1d5db] bg-white">
             <div className="min-w-0 px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-x-1">
-                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{pingFrequency}</span>
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{pingFrequency}</span>
                 <span className="text-xs font-normal text-[#3a465d]">pings/hour</span>
               </div>
               <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{pings.length} pings, {trueStopCount} true stops</p>
             </div>
             <div className="min-w-0 px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-x-1">
-                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{detectedStopCount}</span>
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{detectedStopCount}</span>
                 <span className="text-xs font-normal text-[#3a465d]">stops detected</span>
               </div>
               <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{percent(panel.metrics.missed_fraction)} missed; {percent(panel.metrics.split_fraction)} split; {percent(panel.metrics.merged_fraction)} merged</p>
             </div>
             <div className="min-w-0 px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-x-1">
-                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{percent(panel.metrics.recall)}</span>
+                <span className="text-sm font-semibold tabular-nums text-[#3b1370]">{percent(panel.metrics.recall)}</span>
                 <span className="text-xs font-normal text-[#3a465d]">min-by-min recall</span>
               </div>
               {panel.metrics.best && (

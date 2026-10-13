@@ -21,7 +21,7 @@ import {
 } from "./demo-viz/overlays/demo-ground-truth"
 import { lachesisIntersectionAreas, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
-import { activePingClusterAt, selectedPingLineData } from "./demo-viz/demo-interactions"
+import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
@@ -258,9 +258,7 @@ export function DemoSceneRenderer({
     let pingFloatOffset = 0
     let previewing = false
     let hoverPingIndex: number | null = null
-    let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
-    let focusedLachesisCluster: number | null = null
     let activeLachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }> = []
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
@@ -421,18 +419,13 @@ export function DemoSceneRenderer({
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
-      const showLachesisXray = panel.algo === "lachesis" && layerStateRef.current.showXray
-      const hoveredCluster = hoverPingIndex === null ? -1 : activePingClusterAt(hoverPingIndex, timestampSeconds, chartData)
-      focusedLachesisCluster = showLachesisXray && hoveredCluster >= 0 ? hoveredCluster : null
-      activeLachesisIntersectionAreas = showLachesisXray ? lachesisIntersectionAreas(timestampSeconds, chartData) : []
+      activeLachesisIntersectionAreas = panel.algo === "lachesis" && layerStateRef.current.showXray
+        ? lachesisIntersectionAreas(timestampSeconds, chartData)
+        : []
       hoverPingIndexes = resolveHoverPingIndexes({
         timestampSeconds,
         chartData,
-        selectedPingIndexes: selectedPingIndexesRef.current,
-        hoverPingIndex,
-        hoverEdgeEndpoints,
-        focusedLachesisCluster,
-        anchorEdges
+        selectedPingIndexes: selectedPingIndexesRef.current
       })
       mapChart.setOption({
         series: buildDemoMapSeries({
@@ -444,8 +437,6 @@ export function DemoSceneRenderer({
           anchorEdges,
           promotionEdges,
           hoverPingIndexes,
-          hoverPingIndex,
-          focusedLachesisCluster,
           lachesisIntersectionAreas: activeLachesisIntersectionAreas,
           hoverBuildingId,
           selectedPingIndexes: selectedPingIndexesRef.current,
@@ -538,38 +529,20 @@ export function DemoSceneRenderer({
     }
     const activeTimestamp = () => activePlaybackTimestamp(selectedTimestampRef.current, sequenceIndex, chartData.timeSequence)
 
-    // Update the hovered ping and its ground-truth building, 
-    // Redraw highlights and reposition tooltips
+    // Update the hovered ping (a magnify accent only) and clear building hover,
+    // Redraw and reposition tooltips
     const setHoveredPing = (pingIndex: number | null) => {
-      const ping = pingIndex === null ? null : chartData.pings[pingIndex]
-      const buildingId = ping ? groundTruthAt(ping.t, chartData).current?.location ?? "" : ""
-      if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId && hoverEdgeEndpoints === null) return
+      if (hoverPingIndex === pingIndex && hoverBuildingId === "") return
       hoverPingIndex = pingIndex
-      hoverEdgeEndpoints = null
-      hoverBuildingId = buildingId
-      renderScene(activeTimestamp())
-      refreshTooltipLayout()
-    }
-
-    // Update the hovered edge, clear ping/building hover
-    // Redraw the connected-ping highligh
-    const setHoveredEdge = (endpoints: [number, number] | null) => {
-      const same = hoverEdgeEndpoints !== null && endpoints !== null &&
-        hoverEdgeEndpoints[0] === endpoints[0] && hoverEdgeEndpoints[1] === endpoints[1]
-      const alreadyClear = hoverEdgeEndpoints === null && endpoints === null
-      if ((same || alreadyClear) && hoverPingIndex === null && hoverBuildingId === "") return
-      hoverEdgeEndpoints = endpoints
-      hoverPingIndex = null
       hoverBuildingId = ""
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
 
-    // Highlight a building while clearing ping and edge hover
+    // Highlight a building while clearing ping hover
     const setHoveredBuilding = (buildingId: string) => {
-      if (hoverPingIndex === null && hoverEdgeEndpoints === null && hoverBuildingId === buildingId) return
+      if (hoverPingIndex === null && hoverBuildingId === buildingId) return
       hoverPingIndex = null
-      hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
       refreshTooltipLayout()
@@ -677,13 +650,8 @@ export function DemoSceneRenderer({
       if (action === "ground-truth") setHoveredBuilding(chartData.truthStops[0]?.location ?? "")
     }
 
-    // Route map hover events to the matching ping, anchor, or connection-edge highlight
+    // Route map hover events to the matching ping or anchor accent
     const onMapMouseOver = (params: echarts.ECElementEvent) => {
-      if (params.seriesId === "anchor-edges-hit-area" || params.seriesId === "promotion-edges-hit-area") {
-        const value = paramsValue(params)
-        setHoveredEdge([Number(value[1]), Number(value[2])])
-        return
-      }
       if (
         params.seriesId === "ghost-pings" ||
         params.seriesId === "cluster-pings" ||
@@ -737,7 +705,7 @@ export function DemoSceneRenderer({
     // Clear map hover when leaving an item or the chart, unless a tour highlight is active
     const onMapMouseOut = () => {
       mapMousePosition = null
-      if (!tourActionActive) setHoveredEdge(null)
+      if (!tourActionActive) setHoveredPing(null)
       else positionComparisonTooltip()
     }
 
@@ -1075,7 +1043,6 @@ export function DemoSceneRenderer({
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
         getHoverPingIndex: () => hoverPingIndex,
-        getFocusedLachesisCluster: () => focusedLachesisCluster,
         getLachesisIntersectionAreas: () => activeLachesisIntersectionAreas,
         pingTooltipPosition,
         algorithm: panel.algo,
@@ -1201,7 +1168,6 @@ export function DemoSceneRenderer({
               latestPingIndexAt(timestampSeconds, scene.pings),
               layerStateRef.current.showStops,
               hoverPingIndexes,
-              focusedLachesisCluster,
               pingFloatOffset,
             ),
           },

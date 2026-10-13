@@ -30,7 +30,6 @@ type MapChartOptionsArgs = {
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
   getHoverPingIndex: () => number | null
-  getFocusedLachesisCluster: () => number | null
   getLachesisIntersectionAreas: () => Array<{ cluster: number; points: number[][] }>
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
   algorithm: string
@@ -48,7 +47,6 @@ export function createDemoMapChartOptions({
   getHoverBuildingId,
   getHoverPingIndexes,
   getHoverPingIndex,
-  getFocusedLachesisCluster,
   getLachesisIntersectionAreas,
   pingTooltipPosition,
   algorithm,
@@ -84,7 +82,7 @@ export function createDemoMapChartOptions({
     const pingIndex = Number(api.value(3))
     const circle = pingCircle(
       api,
-      0.28 * pingScale(pingIndex, getHoverPingIndexes())
+      0.28 * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
     )
 
     return {
@@ -107,7 +105,7 @@ export function createDemoMapChartOptions({
     const pingIndex = Number(api.value(3))
     const circle = pingCircle(
       api,
-      1.3 * pingScale(pingIndex, getHoverPingIndexes())
+      1.3 * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
     )
 
     return {
@@ -459,7 +457,7 @@ export function createDemoMapChartOptions({
       
           const circle = pingCircle(
             api,
-            markScale * pingScale(pingIndex, getHoverPingIndexes())
+            markScale * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           )
       
           return {
@@ -494,7 +492,7 @@ export function createDemoMapChartOptions({
         renderItem(_params: EChartsParams, api: EChartsApi) {
           const pingIndex = Number(api.value(3))
           const circle = pingCircle(api)
-          const scale = pingScale(pingIndex, getHoverPingIndexes())
+          const scale = pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           const strokeScale = mapZoomScale(api)
 
           return {
@@ -650,7 +648,6 @@ export function createDemoMapChartOptions({
           const area = getLachesisIntersectionAreas()[params.dataIndex]
           if (!area) return null
           const scale = mapZoomScale(api)
-          const focusedCluster = getFocusedLachesisCluster()
           return {
             type: "polygon",
             shape: { points: area.points.map((point) => api.coord(point)) },
@@ -659,7 +656,6 @@ export function createDemoMapChartOptions({
               stroke: clusterColor(Number(api.value(0))),
               lineWidth: 1.4 * scale,
               lineDash: [5 * scale, 4 * scale],
-              opacity: focusedCluster === null || area.cluster === focusedCluster ? 1 : 0.1,
             },
           }
         },
@@ -676,19 +672,17 @@ export function createDemoMapChartOptions({
           const center = api.coord([api.value(0), api.value(1)])
           const edge = api.coord([api.value(0) + getChartData().distanceThreshold, api.value(1)])
           const radius = Math.abs(edge[0] - center[0])
-          const cluster = Number(api.value(2))
+          const color = clusterColor(Number(api.value(2)))
           const scale = mapZoomScale(api)
-          const focusedCluster = getFocusedLachesisCluster()
-          const hoveredLachesisCircle = algorithm === "lachesis" && getHoverPingIndex() === Number(api.value(3))
           return {
             type: "circle",
             shape: { cx: center[0], cy: center[1], r: radius },
             style: {
               fill: "transparent",
-              stroke: clusterColor(cluster),
+              stroke: color,
               lineWidth: 1.6 * scale,
-              lineDash: hoveredLachesisCircle ? undefined : [5 * scale, 4 * scale],
-              opacity: focusedCluster === null || cluster === focusedCluster ? 0.9 : 0.1,
+              lineDash: [5 * scale, 4 * scale],
+              opacity: 0.9,
             },
           }
         },

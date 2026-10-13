@@ -58,34 +58,6 @@ export function relatedPingIndexesAt(
     ) ?? [pingIndex]
   }
 
-// Return all pings in the connected component containing the currently hovered edge.
-export function connectedPingIndexes(
-    hoverEdgeEndpoints: [number, number],
-    anchorEdges: DemoResultData["anchorFrames"][number]["edges"]
-  ) {
-    const connectedPings = new Set<number>(hoverEdgeEndpoints)
-    const pending: number[] = [...hoverEdgeEndpoints]
-  
-    while (pending.length) {
-      const current = pending.pop()!
-      anchorEdges.forEach((edge) => {
-        const neighbor = edge.value[1] === current
-          ? edge.value[2]
-          : edge.value[2] === current
-            ? edge.value[1]
-            : null
-        if (
-          neighbor !== null &&
-          !connectedPings.has(neighbor)
-        ) {
-          connectedPings.add(neighbor)
-          pending.push(neighbor)
-        }
-      })
-    }
-    return connectedPings
-  }
-
 // Determine whether a ping belongs to the currently highlighted interaction set.
 export function associatedWithHover(
     pingIndex: number,
@@ -98,30 +70,27 @@ export function associatedWithHover(
   }
 
 // Determine the opacity of a ping based on whether it belongs
-// to the currently highlighted interaction set, fading further
-// while a Lachesis stop is focused.
+// to the currently highlighted interaction set.
 export function associationOpacity(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null,
-    focusedLachesisCluster: number | null
+    hoverPingIndexes: Set<number> | null
   ) {
     return associatedWithHover(
       pingIndex,
       hoverPingIndexes
-    ) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
+    ) ? 1 : 0.2
   }
   
   // Determine the opacity of an X-ray anchor point based on
   // whether it belongs to the currently highlighted interaction set.
   export function anchorOpacity(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null,
-    focusedLachesisCluster: number | null
+    hoverPingIndexes: Set<number> | null
   ) {
     return associatedWithHover(
       pingIndex,
       hoverPingIndexes
-    ) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
+    ) ? 1 : 0.2
   }
   
   // Determine the opacity of an edge based on whether both of its
@@ -140,13 +109,16 @@ export function associationOpacity(
     ) ? 0.7 : 0.1
   }
   
-  // Slightly enlarge a ping when it belongs to the active
-  // hover or selection set.
+  // Magnify the hovered ping as an accent, and slightly enlarge
+  // pings that belong to the selection set.
   export function pingScale(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null
+    hoverPingIndexes: Set<number> | null,
+    hoverPingIndex: number | null
   ) {
-    return hoverPingIndexes?.has(pingIndex)
-      ? 1.1
-      : 1
+    return pingIndex === hoverPingIndex
+      ? 1.25
+      : hoverPingIndexes?.has(pingIndex)
+        ? 1.1
+        : 1
   }

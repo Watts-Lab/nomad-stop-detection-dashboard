@@ -1,7 +1,7 @@
 /* X-RAY VISUALIZATION LOGIC FOR DEMO MODE */
 
 import type { DemoResultData } from "../../../_lib/demo-result-data"
-import { visibleClusterPingsAt } from "./demo-detected-stops"
+import { pingClassifiedAt, visibleClusterPingsAt } from "./demo-detected-stops"
 
 // Return the most recent X-ray anchor frame for each stop/cluster
 // that has been reached by the current playback time.
@@ -29,31 +29,23 @@ export function xrayDistanceCircleData(
     anchorFrames: DemoResultData["anchorFrames"],
     showXray: boolean,
     isDensityAlgorithm: boolean,
-    hoverPingIndex: number | null,
-    hoverPingIsClassified: boolean,
     isLachesis: boolean,
     selectedPingIndexes: number[],
     timestampSeconds: number,
   ) {
     if (!showXray) return []
   
-    // Lachesis only draws circles for the pings the user is inspecting.
-    if (isLachesis) {
-      return visibleClusterPingsAt(timestampSeconds, chartData)
-        .filter((point) => point[3] === hoverPingIndex || selectedPingIndexes.includes(point[3]))
-        .map((point) => point.slice(0, 4))
-    }
-  
-    if (!isDensityAlgorithm) {
+    if (!isDensityAlgorithm && !isLachesis) {
       return anchorFrames.map((frame) => frame.point)
     }
   
-    if (hoverPingIndex === null) return []
-    if (!hoverPingIsClassified) return []
-  
-    const point = chartData.pingData[hoverPingIndex]
-  
-    return [[point[0], point[1], point[2]]]
+    // Density and Lachesis circles follow the pings the user has selected.
+    return selectedPingIndexes
+      .filter((pingIndex) =>
+        pingClassifiedAt(pingIndex, timestampSeconds, chartData) &&
+        (!isLachesis || chartData.pingData[pingIndex][2] >= 0)
+      )
+      .map((pingIndex) => chartData.pingData[pingIndex].slice(0, 4))
   }
 
 // Outline the region within the distance threshold of every classified ping

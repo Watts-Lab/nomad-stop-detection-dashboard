@@ -1741,7 +1741,7 @@ const isDensityAlgorithm = chartData.result.kind === "density"
           silent: true,
           z: 2,
           data: [],
-          lineStyle: { color: "#1f6d6a", width: 2.4, opacity: 0.78 },
+          lineStyle: { color: GROUND_TRUTH_COLOR, width: 2.4, opacity: 0.78 },
         },
         {
           id: "completed-fallback-paths",

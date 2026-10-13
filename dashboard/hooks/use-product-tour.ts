@@ -21,7 +21,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Inspect GPS Pings",
-      description: "Each dot is one GPS ping from the current agent. Hover a ping to enlarge it, show its time and status, and highlight the same ping on the timeline. Pings in the same detected stop remain emphasized while unrelated pings fade. Density algorithms also show the active distance threshold. That hover is being demonstrated now.",
+      description: "Each dot is one GPS location from the current agent. Click a point to explain its stop assignment and mark its exact time on the timeline. Points in the same detected stop share a color. Density algorithms also show the active distance threshold.",
     },
   },
   {
@@ -37,7 +37,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Detected Stops and Algorithm Structure",
-      description: "Colored pings show revealed detected-stop assignments; pings shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. Hover a ping to focus its detected stop or hover an edge to isolate its connected component. An anchor is highlighted now.",
+      description: "Colored points show revealed detected-stop assignments; points shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. Hover an edge to isolate its connected component. An anchor is highlighted now.",
     },
   },
   {
@@ -54,8 +54,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Hover Timeline Pings",
-      description: "Vertical bars are GPS pings. Hover one to raise and outline it, fade unrelated bars, and highlight that ping and its detected stop on the map. Timeline pings can also be clicked for the same two-ping comparison available on the map. The tour is demonstrating the hover now.",
+      title: "Inspect Exact Times",
+      description: "Vertical bars are GPS locations. Click one on the map or timeline to add a labeled marker at its exact time. You can select two points to compare their distance and elapsed time.",
     },
   },
   {

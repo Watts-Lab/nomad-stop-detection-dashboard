@@ -391,6 +391,62 @@ export function createDemoTimelineChartOptions({
       },
 
       {
+        id: "selected-ping-times",
+        type: "custom",
+        coordinateSystem: "cartesian2d",
+        silent: true,
+        z: 12,
+        data: [],
+        renderItem(params: EChartsParams, api: EChartsApi) {
+          const timestamp = Number(api.value(0))
+          const cluster = Number(api.value(1))
+          const selectionIndex = Number(api.value(2))
+          const markerX = api.coord([timestamp, 0.5])[0]
+          const labelHalfWidth = 29
+          const labelX = Math.max(
+            params.coordSys.x + labelHalfWidth,
+            Math.min(markerX, params.coordSys.x + params.coordSys.width - labelHalfWidth)
+          )
+          const labelY = params.coordSys.y + 10 + selectionIndex * 19
+          const color = cluster >= 0 ? clusterColor(cluster) : "#626760"
+          const time = new Date(timestamp).toISOString().slice(11, 19)
+
+          return {
+            type: "group",
+            children: [
+              {
+                type: "line",
+                shape: {
+                  x1: markerX,
+                  y1: params.coordSys.y + 20 + selectionIndex * 19,
+                  x2: markerX,
+                  y2: params.coordSys.y + params.coordSys.height - 2
+                },
+                style: { stroke: color, lineWidth: 2, opacity: 0.95 }
+              },
+              {
+                type: "text",
+                x: labelX,
+                y: labelY,
+                style: {
+                  text: time,
+                  align: "center",
+                  verticalAlign: "middle",
+                  fill: "#ffffff",
+                  backgroundColor: color,
+                  borderColor: "#ffffff",
+                  borderWidth: 1,
+                  borderRadius: 2,
+                  padding: [2, 4],
+                  font: "600 10px monospace"
+                }
+              }
+            ]
+          }
+        }
+      },
+
+      {
         id: "cursor",
         type: "line",
         coordinateSystem: "cartesian2d",

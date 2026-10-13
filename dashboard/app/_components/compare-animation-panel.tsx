@@ -483,6 +483,7 @@ export function DemoSceneRenderer({
           { id: "ghost-pings", data: previewPings },
           { id: "noise-pings", data: [] },
           { id: "cluster-pings", data: [] },
+          { id: "grid-cells", data: [] },
           { id: "promotion-edges", data: [] },
           { id: "promotion-edges-hit-area", data: [] },
           { id: "core-points", data: [] },

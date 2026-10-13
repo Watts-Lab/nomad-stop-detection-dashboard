@@ -22,6 +22,21 @@ export function xrayAnchorFramesAt(
   return Array.from(framesByStop.values())
 }
 
+export function xrayGridCellsAt(timestampSeconds: number, chartData: DemoResultData) {
+  const visible = new Map<number, [number, number, number]>()
+  let currentCell = -1
+
+  for (const [cellIndex, time, cluster] of chartData.gridCellFrames) {
+    if (time > timestampSeconds) break
+    visible.set(cellIndex, [cellIndex, cluster, 0])
+    currentCell = cellIndex
+  }
+
+  const current = visible.get(currentCell)
+  if (current) current[2] = 1
+  return Array.from(visible.values())
+}
+
 // Determine which points should display an X-ray distance-radius circle.
 export function xrayDistanceCircleData(
     chartData: DemoResultData,

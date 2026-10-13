@@ -117,7 +117,7 @@ function loadManifest(cacheRoot: string) {
   if (cached) return cached
 
   const manifest = fetchJson<Manifest>(cacheRoot, "manifest.json").then((value) => {
-    if (value.format !== "stop-detection-dashboard-parquet-cache-v4") {
+    if (value.format !== "stop-detection-dashboard-parquet-cache-v5") {
       throw new Error("Unsupported stop-detection cache format: " + value.format)
     }
     return value
@@ -211,6 +211,7 @@ function loadResults(
 
   const rowStart = userIndex * configCount
   const columns = ["user_id", "config_id", "cluster"]
+  if (resultKind === "grid") columns.push("h3_cell")
   if (resultKind === "density") columns.push("core", "aux_time")
   if (resultKind === "anchor") columns.push("aux_time")
   const results = readParquet(cacheRoot, resultsPath, {
@@ -342,6 +343,12 @@ async function resultForUser(
       (value) => value == null ? null : Number(value),
     )
     result = { kind: "anchor", cluster, aux_time }
+  } else if (entry.result_kind === "grid") {
+    const h3_cell = listValues(row.h3_cell, "h3_cell", trajectoryLength).map(
+      (value) => value == null ? "" : String(value),
+    )
+    if (h3_cell.some((cell) => !cell)) throw new Error("Cached Grid-Based cells contain missing values")
+    result = { kind: "grid", cluster, h3_cell }
   } else if (entry.result_kind === "labels") {
     result = { kind: "labels", cluster }
   } else {

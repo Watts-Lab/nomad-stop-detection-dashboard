@@ -30,6 +30,7 @@ type MapChartOptionsArgs = {
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
   getHoverPingIndex: () => number | null
+  getSelectedPingIndexes: () => number[]
   getContainmentAreas: () => Array<{ cluster: number; points: number[][]; shaded: boolean }>
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
   algorithm: string
@@ -47,6 +48,7 @@ export function createDemoMapChartOptions({
   getHoverBuildingId,
   getHoverPingIndexes,
   getHoverPingIndex,
+  getSelectedPingIndexes,
   getContainmentAreas,
   pingTooltipPosition,
   algorithm,
@@ -198,6 +200,8 @@ export function createDemoMapChartOptions({
           return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
         }
         if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
+          // Selected pings already show this in the selection box; empty content hides the tooltip.
+          if (getSelectedPingIndexes().includes(value[3])) return ""
           return pingInfoLines(value[3], getActiveTimestamp(), getChartData(), getShowXray()).join("<br>")
         }
         return ""

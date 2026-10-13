@@ -557,7 +557,7 @@ export function DemoSceneRenderer({
     })
 
     const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
-      if (!element || element.style.visibility === "hidden") return false
+      if (!element || element.style.visibility === "hidden" || element.style.display === "none") return false
       return !(
         left + width + gap <= element.offsetLeft ||
         left >= element.offsetLeft + element.offsetWidth + gap ||
@@ -1026,11 +1026,9 @@ export function DemoSceneRenderer({
         !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
         !overlapsComparison(candidate)
       )
-      // Selected pings already show their information in the selection box.
-      const hoveringSelectedPing = hoverPingIndex !== null && selectedPingIndexesRef.current.includes(hoverPingIndex)
       if (element instanceof HTMLDivElement) {
         pingTooltipElement = element
-        element.style.visibility = position && !hoveringSelectedPing ? "visible" : "hidden"
+        element.style.visibility = position ? "visible" : "hidden"
       }
       return position ?? positions[0]
     }
@@ -1046,6 +1044,7 @@ export function DemoSceneRenderer({
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
         getHoverPingIndex: () => hoverPingIndex,
+        getSelectedPingIndexes: () => selectedPingIndexesRef.current,
         getContainmentAreas: () => activeContainmentAreas,
         pingTooltipPosition,
         algorithm: panel.algo,

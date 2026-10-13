@@ -1025,8 +1025,8 @@ export function DemoSceneRenderer({
         !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
         !overlapsComparison(candidate)
       )
-      // A single selected ping already shows this information in the selection box.
-      const hoveringSelectedPing = selectedPingIndexesRef.current.length === 1 && selectedPingIndexesRef.current[0] === hoverPingIndex
+      // Selected pings already show their information in the selection box.
+      const hoveringSelectedPing = hoverPingIndex !== null && selectedPingIndexesRef.current.includes(hoverPingIndex)
       if (element instanceof HTMLDivElement) {
         pingTooltipElement = element
         element.style.visibility = position && !hoveringSelectedPing ? "visible" : "hidden"

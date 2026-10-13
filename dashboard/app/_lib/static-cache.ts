@@ -349,7 +349,21 @@ async function buildPanel(
   params: Record<string, number> | undefined,
   scene: SeedScene,
 ) {
-  const algorithmId = algorithm ?? "dbstop"
+  if (!algorithm) {
+    return {
+      algo: "",
+      title: "Select an Algorithm to Begin",
+      scene: scene.response,
+      params: {},
+      result: {
+        kind: "labels",
+        cluster: scene.response.pings.map(() => -1),
+      },
+      metrics: null,
+    } satisfies ComparePanelResponse
+  }
+
+  const algorithmId = algorithm
   const cachedResult = await resultForUser(
     cacheRoot,
     algorithmId,

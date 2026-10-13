@@ -471,7 +471,7 @@ export function DemoSceneRenderer({
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount).map((point) => [...point, 1])
+      const previewPings = chartData.pingData.slice(0, pingCount)
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -983,6 +983,25 @@ export function DemoSceneRenderer({
       if (!paused && syncMaster) timer = window.setTimeout(advance, toggleDelay)
     }
 
+    const syncMapLineStyles = () => {
+      const ping = chartData.pings[0]
+      const origin = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x, ping.y]) as number[]
+      const edge = mapChart.convertToPixel({ gridIndex: 0 }, [ping.x + 1, ping.y]) as number[]
+      const scale = Math.abs(edge[0] - origin[0]) / baseMapPixelsPerUnit
+      mapChart.setOption({ series: [
+        { id: "completed-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "completed-fallback-paths", lineStyle: { width: 2.4 * scale } },
+        { id: "next-path", lineStyle: { width: 3 * scale } },
+        { id: "active-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "active-fallback-path", lineStyle: { width: 4 * scale, shadowBlur: 10 * scale } },
+        { id: "promotion-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "promotion-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "anchor-edges", lineStyle: { width: 1.8 * scale } },
+        { id: "anchor-edges-hit-area", lineStyle: { width: 16 * scale } },
+        { id: "selected-ping-line", lineStyle: { width: 3 * scale } },
+      ] }, { lazyUpdate: true })
+    }
+
     // Preserve the map camera while matching its bounds to the resized plot.
     const resize = () => {
       const dataZoom = mapChart.getOption().dataZoom
@@ -1011,6 +1030,10 @@ export function DemoSceneRenderer({
       } else {
         applyMapBounds()
       }
+      const defaultBounds = mapBounds()
+      baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 16) /
+        (defaultBounds.view.maxX - defaultBounds.view.minX)
+      syncMapLineStyles()
       timelineChart.resize()
       refreshTooltipLayout()
     }
@@ -1062,6 +1085,8 @@ export function DemoSceneRenderer({
     }
 
     const bounds = mapBounds()
+    let baseMapPixelsPerUnit = Math.max(1, mapEl.clientWidth - 16) /
+      (bounds.view.maxX - bounds.view.minX)
 
     mapChart.setOption(
       createDemoMapChartOptions({
@@ -1074,6 +1099,7 @@ export function DemoSceneRenderer({
         getShowXray: () => layerStateRef.current.showXray,
         getShowStops: () => layerStateRef.current.showStops,
         getActiveTimestamp: activeTimestamp,
+        getBaseMapPixelsPerUnit: () => baseMapPixelsPerUnit,
         destinationPreview,
         clusterColor
       })
@@ -1138,7 +1164,11 @@ export function DemoSceneRenderer({
     mapChart.on("mouseout", onMapMouseOut)
     mapChart.on("globalout", onMapMouseOut)
     mapChart.on("click", onMapClick)
-    mapChart.on("dataZoom", refreshTooltipLayout)
+    const onMapZoom = () => {
+      syncMapLineStyles()
+      refreshTooltipLayout()
+    }
+    mapChart.on("dataZoom", onMapZoom)
     mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
@@ -1232,7 +1262,7 @@ export function DemoSceneRenderer({
       mapChart.off("mouseout", onMapMouseOut)
       mapChart.off("globalout", onMapMouseOut)
       mapChart.off("click", onMapClick)
-      mapChart.off("dataZoom", refreshTooltipLayout)
+      mapChart.off("dataZoom", onMapZoom)
       mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)
@@ -1469,8 +1499,13 @@ export function CompareAnimationPanel({
               </Link>
             </Button>
           )}
+          {panel && !learnAlgorithmId && (
+            <Button type="button" variant="outline" size="icon" disabled aria-label="Select an algorithm to learn more" className="h-8 w-8">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
         </CardTitle>
-        {panel && pings && (
+        {panel?.metrics && pings && (
           <TooltipProvider delayDuration={200}>
             {/* Compare panels are too narrow for one row: the four accuracy stats
                 fill the first row and the three trajectory stats the second */}

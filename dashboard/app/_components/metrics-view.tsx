@@ -245,7 +245,7 @@ export function MetricsView({
 
   const topFixedParameters = topParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const bottomFixedParameters = bottomParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const topMetricsPrototypeSrc = `${prototypeChartSrc(metricsTopAlgorithm, metricsTopParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsTopAlgorithm])}&view=${metricsChartView}&frame=top&${topFixedParameters}${metricsCompareMode ? "&legend=space" : ""}`
+  const topMetricsPrototypeSrc = `${prototypeChartSrc(metricsTopAlgorithm, metricsTopParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsTopAlgorithm])}&view=${metricsChartView}&frame=top&${topFixedParameters}`
   const bottomMetricsPrototypeSrc = `${prototypeChartSrc(metricsBottomAlgorithm, metricsBottomParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsBottomAlgorithm])}&view=${metricsChartView}&frame=bottom&${bottomFixedParameters}`
 
   useEffect(() => {

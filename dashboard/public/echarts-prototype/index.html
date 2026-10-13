@@ -295,6 +295,9 @@
           // Draw highlights in place: with this many points ECharts would otherwise move
           // them to a separate hover layer, which drops the emphasis scale
           hoverLayerThreshold: Infinity,
+          // Switch hover emphasis and dimming instantly; the default 300ms fades overlap
+          // into a rolling wave as the cursor crosses densely packed points
+          stateAnimation: { duration: 0 },
           legend: showLegend ? {
             bottom: 4,
             left: "center",

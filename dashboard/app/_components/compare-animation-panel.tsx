@@ -18,17 +18,21 @@ import type {
 } from "../_lib/types"
 
 const CURRENT_PING_COLOR = "#d83832"
-// Hue of CURRENT_PING_COLOR, and the half-width of the arc around it kept free of cluster colors
-const CURRENT_PING_HUE = 2
-const CURRENT_PING_HUE_GUARD = 30
-// Cluster hues occupy the rest of the wheel, phased so the first stop lands on the yellow
-// the hand-picked palette used to start with
-const CLUSTER_HUE_START = CURRENT_PING_HUE + CURRENT_PING_HUE_GUARD
-const CLUSTER_HUE_SPAN = 360 - 2 * CURRENT_PING_HUE_GUARD
-const CLUSTER_HUE_PHASE = (49 - CLUSTER_HUE_START) / CLUSTER_HUE_SPAN
-const CLUSTER_HUE_PEAK = 55
 const GROUND_TRUTH_COLOR = "#7629db"
 const FUTURE_GROUND_TRUTH_COLOR = "#9a6bd6"
+// OKLCH hues of CURRENT_PING_COLOR and GROUND_TRUTH_COLOR, and the half-width of the arc around
+// each kept free of cluster colors
+const CURRENT_PING_HUE = 27
+const GROUND_TRUTH_HUE = 296
+const RESERVED_HUE_GUARD = 30
+// Cluster hues occupy the rest of the wheel, phased so the first stop lands on yellow
+const CLUSTER_HUE_START = CURRENT_PING_HUE + RESERVED_HUE_GUARD
+const CLUSTER_HUE_SPAN = 360 - 4 * RESERVED_HUE_GUARD
+const CLUSTER_HUE_PHASE = (100 - CLUSTER_HUE_START) / CLUSTER_HUE_SPAN
+// Clusters alternate between two OKLCH lightness levels, both lighter than GROUND_TRUTH_COLOR,
+// so neighbouring hues stay apart and lightness still separates them under color blindness
+const CLUSTER_LIGHTNESS = [0.82, 0.66]
+const CLUSTER_CHROMA = 0.17
 const MAP_FOCUS_FADE_OPACITY = 0.2
 type PlaybackState = "playing" | "paused" | "complete"
 
@@ -37,6 +41,25 @@ const elapsedTimeLabel = (seconds: number) => {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
   return minutes ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`
+}
+
+// Convert an OKLCH color to hex, clamping channels that fall outside sRGB.
+// ECharts cannot parse oklch() strings, so cluster colors are converted here.
+const oklchToHex = (lightness: number, chroma: number, hue: number) => {
+  const a = chroma * Math.cos(hue * Math.PI / 180)
+  const b = chroma * Math.sin(hue * Math.PI / 180)
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3
+  return "#" + [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ].map((linear) => {
+    const channel = Math.min(1, Math.max(0, linear))
+    const encoded = channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055
+    return Math.round(encoded * 255).toString(16).padStart(2, "0")
+  }).join("")
 }
 
 // Render and control the interactive map and timeline, 
@@ -508,14 +531,14 @@ export function DemoSceneRenderer({
       onPlaybackStateChangeRef.current?.(nextState)
     }
 
-   // Spread cluster colors across a hue range that avoids the current ping's red.
+   // Spread cluster colors across hue ranges that avoid the current ping's red and the ground truth purple.
 const clusterColor = (cluster: number) => {
   if (cluster < 0) return "#1f2326"
   const hue =
     CLUSTER_HUE_START +
     ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
-  const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
-  return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+  const unreservedHue = hue > GROUND_TRUTH_HUE - RESERVED_HUE_GUARD ? hue + 2 * RESERVED_HUE_GUARD : hue
+  return oklchToHex(CLUSTER_LIGHTNESS[cluster % CLUSTER_LIGHTNESS.length], CLUSTER_CHROMA, unreservedHue)
 }
 
 const isDensityAlgorithm = chartData.result.kind === "density"

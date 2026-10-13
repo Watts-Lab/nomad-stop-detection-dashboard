@@ -40,23 +40,23 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
     <div className="flex-1 overflow-y-auto">
       <section className="nomad-hero min-h-[calc(100vh-74px)] border-b border-border py-6">
         <div className="nomad-page-frame grid min-h-[calc(100vh-122px)] items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <h1 className="home-copy-reveal text-5xl font-bold tracking-normal text-[#3b1370] sm:text-6xl lg:col-span-2">
+            Stop Detection Lab
+          </h1>
           <div className="max-w-2xl">
-          <h1 className="home-copy-reveal text-5xl font-bold tracking-normal text-[#3b1370] sm:text-6xl">
-              Stop Detection Dashboard
-            </h1>
-            <p className="home-copy-reveal home-copy-reveal-2 mt-7 text-2xl font-semibold tracking-normal text-foreground">
+            <p className="home-copy-reveal home-copy-reveal-2 text-2xl font-semibold tracking-normal text-foreground">
               Explore and compare algorithms that turn noisy GPS traces into meaningful stops.
             </p>
             <div className="mt-7 grid gap-5 text-left">
               <div className="home-copy-reveal home-copy-reveal-3">
-              <h2 className="text-lg font-semibold text-[#3b1370]">What Stop Detection Is</h2>
-              <p className="mt-2 text-base leading-relaxed text-foreground">
-                  A critical step in making sense of human mobility trajectories is stop detection. Stop detection enriches raw trajectory data with semantic information about visits to places of interest (POIs), trips between locations, and recurring mobility routines. This process applies a stop-detection algorithm to identify stationary segments in the trajectory of a moving object through spatio-temporal clustering of location records. Typically, detected stops are represented as tuples of the form (user_id, x, y, t_start, t_end), identifying the individual, median stop coordinates, and the first and last timestamps of the pings that make up the stop.
+                <h2 className="text-lg font-semibold text-[#3b1370]">What is stop detection?</h2>
+                <p className="mt-2 text-base leading-relaxed text-foreground">
+                  It is the spatio-temporal clustering problem of identifying stationary segments in a mobile object&apos;s trajectory, particularly in the presence of noise and irregularity in the signals. When analyzing human mobility, stop detection adds trips/visits semantics to the trajectory that are key to identifying dwells at places of interest (POIs), trips between locations, and interactions between individuals. Typically, detected stops are represented as tuples of the form (user_id, x, y, t_start, t_end), identifying the individual, median stop coordinates, and the first and last timestamps of the pings that make up the stop.
                 </p>
               </div>
               <div className="home-copy-reveal home-copy-reveal-4">
-              <h2 className="text-lg font-semibold text-[#3b1370]">What This Dashboard Does</h2>
-              <p className="mt-2 text-base leading-relaxed text-foreground">
+                <h2 className="text-lg font-semibold text-[#3b1370]">What does this dashboard do?</h2>
+                <p className="mt-2 text-base leading-relaxed text-foreground">
                   Learn algorithm assumptions, tune parameters, compare behavior side by side, and inspect trajectory outputs and aggregate metrics without rerunning notebook experiments.
                 </p>
               </div>

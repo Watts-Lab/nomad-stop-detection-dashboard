@@ -19,9 +19,9 @@ import {
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
   groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
-import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
+import { lachesisIntersectionAreas, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
-import { selectedPingLineData } from "./demo-viz/demo-interactions"
+import { activePingClusterAt, selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
@@ -260,6 +260,8 @@ export function DemoSceneRenderer({
     let hoverPingIndex: number | null = null
     let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
+    let focusedLachesisCluster: number | null = null
+    let activeLachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }> = []
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
@@ -419,12 +421,17 @@ export function DemoSceneRenderer({
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
+      const showLachesisXray = panel.algo === "lachesis" && layerStateRef.current.showXray
+      const hoveredCluster = hoverPingIndex === null ? -1 : activePingClusterAt(hoverPingIndex, timestampSeconds, chartData)
+      focusedLachesisCluster = showLachesisXray && hoveredCluster >= 0 ? hoveredCluster : null
+      activeLachesisIntersectionAreas = showLachesisXray ? lachesisIntersectionAreas(timestampSeconds, chartData) : []
       hoverPingIndexes = resolveHoverPingIndexes({
         timestampSeconds,
         chartData,
         selectedPingIndexes: selectedPingIndexesRef.current,
         hoverPingIndex,
         hoverEdgeEndpoints,
+        focusedLachesisCluster,
         anchorEdges
       })
       mapChart.setOption({
@@ -438,6 +445,8 @@ export function DemoSceneRenderer({
           promotionEdges,
           hoverPingIndexes,
           hoverPingIndex,
+          focusedLachesisCluster,
+          lachesisIntersectionAreas: activeLachesisIntersectionAreas,
           hoverBuildingId,
           selectedPingIndexes: selectedPingIndexesRef.current,
           showGroundTruth: layerStateRef.current.showGroundTruth,
@@ -447,6 +456,7 @@ export function DemoSceneRenderer({
           pulseStrength,
           pingFloatOffset,
           isDensityAlgorithm,
+          algorithm: panel.algo,
           clusterColor
         })
       }, { lazyUpdate: true })
@@ -490,6 +500,7 @@ export function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "lachesis-intersections", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],
@@ -1063,6 +1074,9 @@ export function DemoSceneRenderer({
         bounds,
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
+        getHoverPingIndex: () => hoverPingIndex,
+        getFocusedLachesisCluster: () => focusedLachesisCluster,
+        getLachesisIntersectionAreas: () => activeLachesisIntersectionAreas,
         pingTooltipPosition,
         algorithm: panel.algo,
         getShowXray: () => layerStateRef.current.showXray,
@@ -1187,6 +1201,7 @@ export function DemoSceneRenderer({
               latestPingIndexAt(timestampSeconds, scene.pings),
               layerStateRef.current.showStops,
               hoverPingIndexes,
+              focusedLachesisCluster,
               pingFloatOffset,
             ),
           },

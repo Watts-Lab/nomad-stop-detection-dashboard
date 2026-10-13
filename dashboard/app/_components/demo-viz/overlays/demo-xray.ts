@@ -1,6 +1,7 @@
 /* X-RAY VISUALIZATION LOGIC FOR DEMO MODE */
 
 import type { DemoResultData } from "../../../_lib/demo-result-data"
+import { visibleClusterPingsAt } from "./demo-detected-stops"
 
 // Return the most recent X-ray anchor frame for each stop/cluster
 // that has been reached by the current playback time.
@@ -30,8 +31,18 @@ export function xrayDistanceCircleData(
     isDensityAlgorithm: boolean,
     hoverPingIndex: number | null,
     hoverPingIsClassified: boolean,
+    isLachesis: boolean,
+    selectedPingIndexes: number[],
+    timestampSeconds: number,
   ) {
     if (!showXray) return []
+  
+    // Lachesis only draws circles for the pings the user is inspecting.
+    if (isLachesis) {
+      return visibleClusterPingsAt(timestampSeconds, chartData)
+        .filter((point) => point[3] === hoverPingIndex || selectedPingIndexes.includes(point[3]))
+        .map((point) => point.slice(0, 4))
+    }
   
     if (!isDensityAlgorithm) {
       return anchorFrames.map((frame) => frame.point)
@@ -44,3 +55,54 @@ export function xrayDistanceCircleData(
   
     return [[point[0], point[1], point[2]]]
   }
+
+// Outline the region within the distance threshold of every classified ping
+// in each Lachesis stop, i.e. the intersection of their distance circles.
+export function lachesisIntersectionAreas(
+  timestampSeconds: number,
+  chartData: DemoResultData,
+) {
+  const pointsByCluster = new Map<number, number[][]>()
+  visibleClusterPingsAt(timestampSeconds, chartData).forEach((point) => {
+    const points = pointsByCluster.get(point[2])
+    if (points) points.push([point[0], point[1]])
+    else pointsByCluster.set(point[2], [[point[0], point[1]]])
+  })
+  const radius = chartData.distanceThreshold
+  const radiusSquared = radius ** 2
+
+  return Array.from(pointsByCluster, ([cluster, centers]) => {
+    // Only boundary points belong in the outline; interior centers create notches.
+    const candidates = centers.flatMap(([x, y]) => Array.from({ length: 64 }, (_, index) => {
+      const angle = index / 64 * Math.PI * 2
+      return [x + radius * Math.cos(angle), y + radius * Math.sin(angle)]
+    }))
+    centers.forEach(([firstX, firstY], firstIndex) => {
+      centers.slice(firstIndex + 1).forEach(([secondX, secondY]) => {
+        const distance = Math.hypot(secondX - firstX, secondY - firstY)
+        if (distance === 0 || distance > radius * 2) return
+        const midpointX = (firstX + secondX) / 2
+        const midpointY = (firstY + secondY) / 2
+        const offset = Math.sqrt(radiusSquared - (distance / 2) ** 2)
+        const perpendicularX = -(secondY - firstY) / distance * offset
+        const perpendicularY = (secondX - firstX) / distance * offset
+        candidates.push(
+          [midpointX + perpendicularX, midpointY + perpendicularY],
+          [midpointX - perpendicularX, midpointY - perpendicularY],
+        )
+      })
+    })
+    const points = candidates.filter(([x, y]) => centers.every(([centerX, centerY]) =>
+      (x - centerX) ** 2 + (y - centerY) ** 2 <= radiusSquared + 0.000001
+    ))
+    const centerX = points.reduce((sum, [x]) => sum + x, 0) / points.length
+    const centerY = points.reduce((sum, [, y]) => sum + y, 0) / points.length
+
+    return {
+      cluster,
+      points: points.sort(([firstX, firstY], [secondX, secondY]) =>
+        Math.atan2(firstY - centerY, firstX - centerX) - Math.atan2(secondY - centerY, secondX - centerX)
+      ),
+    }
+  }).filter((area) => area.points.length >= 3)
+}

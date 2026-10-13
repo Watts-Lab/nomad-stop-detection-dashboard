@@ -98,27 +98,30 @@ export function associatedWithHover(
   }
 
 // Determine the opacity of a ping based on whether it belongs
-// to the currently highlighted interaction set.
+// to the currently highlighted interaction set, fading further
+// while a Lachesis stop is focused.
 export function associationOpacity(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null
+    hoverPingIndexes: Set<number> | null,
+    focusedLachesisCluster: number | null
   ) {
     return associatedWithHover(
       pingIndex,
       hoverPingIndexes
-    ) ? 1 : 0.2
+    ) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
   }
   
   // Determine the opacity of an X-ray anchor point based on
   // whether it belongs to the currently highlighted interaction set.
   export function anchorOpacity(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null
+    hoverPingIndexes: Set<number> | null,
+    focusedLachesisCluster: number | null
   ) {
     return associatedWithHover(
       pingIndex,
       hoverPingIndexes
-    ) ? 1 : 0.2
+    ) ? 1 : focusedLachesisCluster === null ? 0.2 : 0.1
   }
   
   // Determine the opacity of an edge based on whether both of its

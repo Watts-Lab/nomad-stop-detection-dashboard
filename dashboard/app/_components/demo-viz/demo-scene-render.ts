@@ -5,7 +5,7 @@ import {
     connectedPingIndexes, relatedPingIndexesAt, anchorOpacity,
     associationOpacity, edgeOpacity, selectedPingLineData
 } from "./demo-interactions"
-import { hoveredAssignedBuildingData, pingClassifiedAt, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
+import { classifiedClusterMembersAt, hoveredAssignedBuildingData, pingClassifiedAt, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
 import { groundTruthBuildingGlowData, groundTruthBuildingsSeriesData } from "./overlays/demo-ground-truth"
 import { xrayDistanceCircleData } from "./overlays/demo-xray"
 
@@ -15,22 +15,34 @@ type ResolveHoverPingIndexesArgs = {
     selectedPingIndexes: number[]
     hoverPingIndex: number | null
     hoverEdgeEndpoints: [number, number] | null
+    focusedLachesisCluster: number | null
     anchorEdges: Array<{
         coords: number[][]
         value: number[]
     }>
 }
 
-// Determine which pings should be highlighted based on the current
-// selection, hovered ping, or hovered connection edge.
+// Determine which pings should be highlighted based on the focused
+// Lachesis stop, current selection, hovered ping, or hovered connection edge.
 export function resolveHoverPingIndexes({
     timestampSeconds,
     chartData,
     selectedPingIndexes,
     hoverPingIndex,
     hoverEdgeEndpoints,
+    focusedLachesisCluster,
     anchorEdges
 }: ResolveHoverPingIndexesArgs): Set<number> | null {
+    if (focusedLachesisCluster !== null) {
+        return new Set(
+            classifiedClusterMembersAt(
+                focusedLachesisCluster,
+                timestampSeconds,
+                chartData
+            )
+        )
+    }
+
     if (selectedPingIndexes.length === 2) {
         const indexes = new Set(selectedPingIndexes)
 
@@ -81,6 +93,7 @@ export function currentPingData(
     latestPingIndex: number,
     showStops: boolean,
     hoverPingIndexes: Set<number> | null,
+    focusedLachesisCluster: number | null,
     pingFloatOffset: number,
   ) {
     const ping = chartData.pingData[latestPingIndex]
@@ -96,7 +109,7 @@ export function currentPingData(
       cluster,
       latestPingIndex,
       ping[4],
-      associationOpacity(latestPingIndex, hoverPingIndexes),
+      associationOpacity(latestPingIndex, hoverPingIndexes, focusedLachesisCluster),
       pingFloatOffset,
     ]]
   }
@@ -116,6 +129,8 @@ type BuildDemoMapSeriesArgs = {
     promotionEdges: DemoResultData["densityPromotionEdges"]
     hoverPingIndexes: Set<number> | null
     hoverPingIndex: number | null
+    focusedLachesisCluster: number | null
+    lachesisIntersectionAreas: Array<{ cluster: number; points: number[][] }>
     hoverBuildingId: string
     selectedPingIndexes: number[]
     showGroundTruth: boolean
@@ -124,6 +139,7 @@ type BuildDemoMapSeriesArgs = {
     nextPathVisible: boolean
     pulseStrength: number
     isDensityAlgorithm: boolean
+    algorithm: string
     clusterColor: (cluster: number) => string
     pingFloatOffset: number
 }
@@ -138,6 +154,8 @@ export function buildDemoMapSeries({
     promotionEdges,
     hoverPingIndexes,
     hoverPingIndex,
+    focusedLachesisCluster,
+    lachesisIntersectionAreas,
     hoverBuildingId,
     selectedPingIndexes,
     showGroundTruth,
@@ -147,11 +165,12 @@ export function buildDemoMapSeries({
     pulseStrength,
     pingFloatOffset,
     isDensityAlgorithm,
+    algorithm,
     clusterColor
 }: BuildDemoMapSeriesArgs) {
     const styledXrayPoint = (point: number[]) => [
         ...point,
-        anchorOpacity(point[3], hoverPingIndexes),
+        anchorOpacity(point[3], hoverPingIndexes, focusedLachesisCluster),
       ]
 
     return [
@@ -228,7 +247,7 @@ export function buildDemoMapSeries({
             data: showStops
                 ? visibleClusterPingsAt(timestampSeconds, chartData).map((point: number[]) => [
                     ...point,
-                    associationOpacity(point[3], hoverPingIndexes)
+                    associationOpacity(point[3], hoverPingIndexes, focusedLachesisCluster)
                 ])
                 : []
         },
@@ -294,8 +313,13 @@ export function buildDemoMapSeries({
               latestPingIndex,
               showStops,
               hoverPingIndexes,
+              focusedLachesisCluster,
               pingFloatOffset,
             ),
+        },
+        {
+            id: "lachesis-intersections",
+            data: lachesisIntersectionAreas.map((area) => [area.cluster])
         },
         {
             id: "distance-circles",
@@ -310,7 +334,10 @@ export function buildDemoMapSeries({
                     hoverPingIndex,
                     timestampSeconds,
                     chartData
-                )
+                ),
+                algorithm === "lachesis",
+                selectedPingIndexes,
+                timestampSeconds
             )
         },
         {

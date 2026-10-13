@@ -29,6 +29,9 @@ type MapChartOptionsArgs = {
   bounds: MapChartBounds
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
+  getHoverPingIndex: () => number | null
+  getFocusedLachesisCluster: () => number | null
+  getLachesisIntersectionAreas: () => Array<{ cluster: number; points: number[][] }>
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
   algorithm: string
   getShowXray: () => boolean
@@ -44,6 +47,9 @@ export function createDemoMapChartOptions({
   bounds,
   getHoverBuildingId,
   getHoverPingIndexes,
+  getHoverPingIndex,
+  getFocusedLachesisCluster,
+  getLachesisIntersectionAreas,
   pingTooltipPosition,
   algorithm,
   getShowXray,
@@ -633,6 +639,32 @@ export function createDemoMapChartOptions({
         }
       },
       {
+        id: "lachesis-intersections",
+        name: "Lachesis feasible area",
+        type: "custom",
+        coordinateSystem: "cartesian2d",
+        silent: true,
+        z: 3,
+        data: [],
+        renderItem(params: EChartsParams, api: EChartsApi) {
+          const area = getLachesisIntersectionAreas()[params.dataIndex]
+          if (!area) return null
+          const scale = mapZoomScale(api)
+          const focusedCluster = getFocusedLachesisCluster()
+          return {
+            type: "polygon",
+            shape: { points: area.points.map((point) => api.coord(point)) },
+            style: {
+              fill: "transparent",
+              stroke: clusterColor(Number(api.value(0))),
+              lineWidth: 1.4 * scale,
+              lineDash: [5 * scale, 4 * scale],
+              opacity: focusedCluster === null || area.cluster === focusedCluster ? 1 : 0.1,
+            },
+          }
+        },
+      },
+      {
         id: "distance-circles",
         name: "Distance threshold radius",
         type: "custom",
@@ -644,17 +676,19 @@ export function createDemoMapChartOptions({
           const center = api.coord([api.value(0), api.value(1)])
           const edge = api.coord([api.value(0) + getChartData().distanceThreshold, api.value(1)])
           const radius = Math.abs(edge[0] - center[0])
-          const color = clusterColor(Number(api.value(2)))
+          const cluster = Number(api.value(2))
           const scale = mapZoomScale(api)
+          const focusedCluster = getFocusedLachesisCluster()
+          const hoveredLachesisCircle = algorithm === "lachesis" && getHoverPingIndex() === Number(api.value(3))
           return {
             type: "circle",
             shape: { cx: center[0], cy: center[1], r: radius },
             style: {
               fill: "transparent",
-              stroke: color,
+              stroke: clusterColor(cluster),
               lineWidth: 1.6 * scale,
-              lineDash: [5 * scale, 4 * scale],
-              opacity: 0.9,
+              lineDash: hoveredLachesisCircle ? undefined : [5 * scale, 4 * scale],
+              opacity: focusedCluster === null || cluster === focusedCluster ? 0.9 : 0.1,
             },
           }
         },

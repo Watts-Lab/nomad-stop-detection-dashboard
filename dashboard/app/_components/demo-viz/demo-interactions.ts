@@ -18,6 +18,34 @@ export function selectedPingLineData(
   }]
 }
 
+// Describe a ping for its hover tooltip and the single-selection box.
+export function pingInfoLines(
+    pingIndex: number,
+    timestampSeconds: number,
+    chartData: DemoResultData,
+    showXray: boolean
+  ) {
+    const ping = chartData.pings[pingIndex]
+    const result = chartData.result
+    const classified = pingClassifiedAt(pingIndex, timestampSeconds, chartData)
+    const cluster = !classified
+      ? "Unclassified"
+      : ping.cluster < 0
+        ? "Noise"
+        : result.kind === "density" && showXray
+          ? `${result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
+          : `Cluster ${ping.cluster}`
+
+    return [
+      `Ping ${ping.i + 1}`,
+      ping.time,
+      cluster,
+      ...(classified && result.kind === "density" && showXray
+        ? [`Distance threshold: ${chartData.distanceThreshold}`]
+        : []),
+    ]
+  }
+
 // Return the detected cluster for an interacted-with ping once that ping has been classified at the current playback time.
 export function activePingClusterAt(
     pingIndex: number,

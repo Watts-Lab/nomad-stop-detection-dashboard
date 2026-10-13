@@ -3,7 +3,7 @@
 import * as echarts from "echarts"
 import type { EChartsApi, EChartsParams } from "../../../_lib/types"
 import type { DemoResultData } from "../../../_lib/demo-result-data"
-import { associatedWithHover, pingScale } from "../demo-interactions"
+import { associatedWithHover, pingInfoLines, pingScale } from "../demo-interactions"
 import { pingClassifiedAt } from "../overlays/demo-detected-stops"
 import { xrayAnchorFramesAt } from "../overlays/demo-xray"
 
@@ -142,8 +142,6 @@ export function createDemoMapChartOptions({
       params.data
     ) as number[]
 
-  const isDensityAlgorithm = () => getChartData().result.kind === "density"
-
   return {
     animation: false,
     animationDurationUpdate: 0,
@@ -185,7 +183,6 @@ export function createDemoMapChartOptions({
       extraCssText: "pointer-events: none;",
       position: pingTooltipPosition,
       formatter(params: EChartsParams) {
-        const result = getChartData().result
         const value = paramsValue(params)
         if (params.seriesId === "core-points") {
           const ping = getChartData().pings[value[3]]
@@ -201,17 +198,7 @@ export function createDemoMapChartOptions({
           return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
         }
         if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
-          const ping = getChartData().pings[value[3]]
-          const classified = pingClassifiedAt(ping.i, getActiveTimestamp(), getChartData())
-          const cluster = !classified
-            ? "Unclassified"
-            : ping.cluster < 0
-              ? "Noise"
-              : isDensityAlgorithm() && getShowXray()
-                ? `${result.kind === "density" && result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
-                : `Cluster ${ping.cluster}`
-          const distanceLine = classified && isDensityAlgorithm() && getShowXray() ? `<br>Distance threshold: ${getChartData().distanceThreshold}` : ""
-          return `Ping ${ping.i + 1}<br>${ping.time}<br>${cluster}${distanceLine}`
+          return pingInfoLines(value[3], getActiveTimestamp(), getChartData(), getShowXray()).join("<br>")
         }
         return ""
       },

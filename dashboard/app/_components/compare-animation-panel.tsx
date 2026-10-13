@@ -21,7 +21,7 @@ import {
 } from "./demo-viz/overlays/demo-ground-truth"
 import { lachesisIntersectionAreas, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
-import { selectedPingLineData } from "./demo-viz/demo-interactions"
+import { pingInfoLines, selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
@@ -1025,9 +1025,11 @@ export function DemoSceneRenderer({
         !boxIntersectsSelection(candidate, tooltipWidth, tooltipHeight, points) &&
         !overlapsComparison(candidate)
       )
+      // A single selected ping already shows this information in the selection box.
+      const hoveringSelectedPing = selectedPingIndexesRef.current.length === 1 && selectedPingIndexesRef.current[0] === hoverPingIndex
       if (element instanceof HTMLDivElement) {
         pingTooltipElement = element
-        element.style.visibility = position ? "visible" : "hidden"
+        element.style.visibility = position && !hoveringSelectedPing ? "visible" : "hidden"
       }
       return position ?? positions[0]
     }
@@ -1290,7 +1292,12 @@ export function DemoSceneRenderer({
             <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
             <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
             <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
-          </> : <div>Ping {selectedPing!.i + 1} selected</div>}
+          </> : pingInfoLines(
+            selectedPing!.i,
+            currentTime ?? resultData!.timeSequence[resultData!.timeSequence.length - 1],
+            resultData!,
+            showXray,
+          ).map((line) => <div key={line}>{line}</div>)}
         </div>
       )}
       {syncMaster && variant === "full" && (

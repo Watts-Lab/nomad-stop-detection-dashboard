@@ -84,6 +84,12 @@ export function createDemoMapChartOptions({
       api,
       0.28 * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
     )
+    // Outline only when this dot is the ping's visible mark, not the center of a cluster ping.
+    const outlined = pingIndex === getHoverPingIndex() && !(
+      getShowStops() &&
+      Number(api.value(2)) >= 0 &&
+      pingClassifiedAt(pingIndex, getActiveTimestamp(), getChartData())
+    )
 
     return {
       type: "circle",
@@ -96,7 +102,9 @@ export function createDemoMapChartOptions({
       style: {
         fill: associatedWithHover(pingIndex, getHoverPingIndexes())
           ? "#000000"
-          : "#9ba0a3"
+          : "#9ba0a3",
+        stroke: outlined ? "#ffffff" : undefined,
+        lineWidth: mapZoomScale(api)
       }
     }
   }
@@ -494,6 +502,7 @@ export function createDemoMapChartOptions({
           const circle = pingCircle(api)
           const scale = pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           const strokeScale = mapZoomScale(api)
+          const hovered = pingIndex === getHoverPingIndex()
 
           return {
             type: "group",
@@ -508,8 +517,8 @@ export function createDemoMapChartOptions({
                 },
                 style: {
                   fill: clusterColor(Number(api.value(2))),
-                  stroke: "#202124",
-                  lineWidth: 1.6 * strokeScale,
+                  stroke: hovered ? "#ffffff" : "#202124",
+                  lineWidth: (hovered ? 1.2 : 1.6) * strokeScale,
                   opacity: Number(api.value(5))
                 }
               },
@@ -628,7 +637,7 @@ export function createDemoMapChartOptions({
             },
             style: {
               fill: CURRENT_PING_COLOR,
-              stroke: "#202124",
+              stroke: Number(api.value(3)) === getHoverPingIndex() ? "#ffffff" : "#202124",
               lineWidth: 1.2 * scale,
               strokeNoScale: true,
               opacity: Number(api.value(5))

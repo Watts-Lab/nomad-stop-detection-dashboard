@@ -1429,12 +1429,13 @@ export function DemoSceneRenderer({
   )
 }
 
-// Display one run statistic as a labeled cell of the panel-header stat strip,
-// with an optional explanation behind a help icon. The cell draws its own left
-// and top divider so the lines stay correct when the strip wraps.
-function PanelStat({ icon: Icon, label, help, value }: { icon: LucideIcon; label: string; help?: string; value: string }) {
+// Display one run statistic as a labeled cell of the panel's stat strip, with an
+// optional explanation behind a help icon, tinted green when it beats the other
+// compare panel. The cell draws its own left and top divider so the lines stay
+// correct when the strip wraps.
+function PanelStat({ icon: Icon, label, help, value, better = false }: { icon: LucideIcon; label: string; help?: string; value: string; better?: boolean }) {
   return (
-    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-4" : "pr-1.5"}`}>
+    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-4" : "pr-1.5"} ${better ? "bg-[#e7f6ec]" : ""}`}>
       <span className="text-[10px] font-semibold uppercase leading-tight tracking-[0.02em] text-[#3b1370]/80">{label}</span>
       {help && (
         <Tooltip>
@@ -1446,9 +1447,10 @@ function PanelStat({ icon: Icon, label, help, value }: { icon: LucideIcon; label
           <TooltipContent side="top" className="max-w-56">{help}</TooltipContent>
         </Tooltip>
       )}
-      <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-[#3b1370]">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-[#7629db]" aria-hidden="true" />
+      <span className={`flex items-center gap-1 text-sm font-bold tabular-nums ${better ? "text-[#15803d]" : "text-[#3b1370]"}`}>
+        <Icon className={`h-3.5 w-3.5 shrink-0 ${better ? "text-[#15803d]" : "text-[#7629db]"}`} aria-hidden="true" />
         {value}
+        {better && <span className="sr-only">(better than the other algorithm)</span>}
       </span>
     </div>
   )
@@ -1469,6 +1471,7 @@ export function CompareAnimationPanel({
   onReplayStart,
   sharedPlaybackState,
   onPlaybackStateChange,
+  otherMetrics,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1482,10 +1485,19 @@ export function CompareAnimationPanel({
   onReplayStart?: () => void
   sharedPlaybackState?: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
+  otherMetrics?: ComparePanelResponse["metrics"]
 }) {
   const learnAlgorithmId = panel?.algo
   const pings = panel?.scene.pings
   const percent = (value: number) => `${Math.round(value * 100)}%`
+  // Whether this panel wins a metric against the other compare panel, judged on the
+  // displayed percentages so equal-looking values are never marked as better
+  const beats = (metric: keyof NonNullable<ComparePanelResponse["metrics"]>, higherIsBetter: boolean) => {
+    if (!panel?.metrics || !otherMetrics) return false
+    const own = Math.round(panel.metrics[metric] * 100)
+    const other = Math.round(otherMetrics[metric] * 100)
+    return higherIsBetter ? own > other : own < other
+  }
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
@@ -1543,24 +1555,27 @@ export function CompareAnimationPanel({
             {/* Compare panels are too narrow for one row: the four accuracy stats
                 fill the first row and the three trajectory stats the second */}
             <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-12 [&>*:nth-child(-n+4)]:col-span-3 [&>*:nth-child(n+5)]:col-span-4" : "grid-cols-[repeat(7,minmax(min-content,1fr))]"}`}>
-              <PanelStat icon={Target} label="min-by-min recall" value={percent(panel.metrics.recall)} />
+              <PanelStat icon={Target} label="min-by-min recall" value={percent(panel.metrics.recall)} better={beats("recall", true)} />
               <PanelStat
                 icon={Split}
                 label="stops split"
                 help="Share of true stops detected as more than one stop at the correct location."
                 value={percent(panel.metrics.split_fraction)}
+                better={beats("split_fraction", false)}
               />
               <PanelStat
                 icon={MapPinOff}
                 label="stops missing"
                 help="Share of true stops not overlapped by any detected stop."
                 value={percent(panel.metrics.missed_fraction)}
+                better={beats("missed_fraction", false)}
               />
               <PanelStat
                 icon={Merge}
                 label="stops merged"
                 help="Share of detected true stops that also overlap a detected stop at a different location."
                 value={percent(panel.metrics.merged_fraction)}
+                better={beats("merged_fraction", false)}
               />
               <PanelStat icon={Radio} label="number of pings" value={String(pings.length)} />
               <PanelStat

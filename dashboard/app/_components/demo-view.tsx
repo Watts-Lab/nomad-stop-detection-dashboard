@@ -296,6 +296,7 @@ export function DemoView({
             <CompareAnimationPanel
               panel={compareApiData?.left}
               mode="compare"
+              otherMetrics={compareApiData?.right?.metrics}
               currentTime={demoTime}
               onTimeChange={setDemoTime}
               syncMaster={false}
@@ -310,6 +311,7 @@ export function DemoView({
             <CompareAnimationPanel
               panel={compareApiData?.right}
               mode="compare"
+              otherMetrics={compareApiData?.left.metrics}
               currentTime={demoTime}
               onTimeChange={setDemoTime}
               showGroundTruth={showGroundTruth}

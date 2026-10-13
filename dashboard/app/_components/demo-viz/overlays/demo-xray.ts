@@ -32,6 +32,7 @@ export function xrayDistanceCircleData(
     hoverPingIsClassified: boolean,
   ) {
     if (!showXray) return []
+    if (chartData.result.kind === "anchor") return []
   
     if (!isDensityAlgorithm) {
       return anchorFrames.map((frame) => frame.point)

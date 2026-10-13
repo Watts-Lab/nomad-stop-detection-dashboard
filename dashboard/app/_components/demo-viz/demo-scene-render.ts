@@ -124,6 +124,7 @@ type BuildDemoMapSeriesArgs = {
     nextPathVisible: boolean
     pulseStrength: number
     isDensityAlgorithm: boolean
+    showLachesisContainment: boolean
     clusterColor: (cluster: number) => string
     pingFloatOffset: number
 }
@@ -147,6 +148,7 @@ export function buildDemoMapSeries({
     pulseStrength,
     pingFloatOffset,
     isDensityAlgorithm,
+    showLachesisContainment,
     clusterColor
 }: BuildDemoMapSeriesArgs) {
     const styledXrayPoint = (point: number[]) => [
@@ -296,6 +298,18 @@ export function buildDemoMapSeries({
               hoverPingIndexes,
               pingFloatOffset,
             ),
+        },
+        {
+            id: "lachesis-containment",
+            data: showLachesisContainment
+                ? Array.from(chartData.clusterMembers).flatMap(([cluster, members]) => {
+                    const visibleMembers = members.filter((index) => chartData.pings[index].t <= timestampSeconds)
+                    return visibleMembers.length ? [{
+                        id: `${cluster}-${visibleMembers.length}`,
+                        value: [chartData.pings[visibleMembers[0]].x, chartData.pings[visibleMembers[0]].y, cluster]
+                    }] : []
+                })
+                : []
         },
         {
             id: "distance-circles",

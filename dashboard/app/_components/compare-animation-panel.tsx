@@ -447,6 +447,7 @@ export function DemoSceneRenderer({
           pulseStrength,
           pingFloatOffset,
           isDensityAlgorithm,
+          showLachesisContainment: panel.algo === "lachesis" && layerStateRef.current.showXray,
           clusterColor
         })
       }, { lazyUpdate: true })
@@ -490,6 +491,7 @@ export function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "lachesis-containment", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],

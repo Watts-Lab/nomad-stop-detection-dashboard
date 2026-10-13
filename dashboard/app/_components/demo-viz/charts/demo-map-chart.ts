@@ -633,6 +633,45 @@ export function createDemoMapChartOptions({
         }
       },
       {
+        id: "lachesis-containment",
+        name: "Lachesis containment area",
+        type: "custom",
+        coordinateSystem: "cartesian2d",
+        silent: true,
+        z: 8,
+        data: [],
+        renderItem(_params: EChartsParams, api: EChartsApi) {
+          const chartData = getChartData()
+          const circles = (chartData.clusterMembers.get(Number(api.value(2))) ?? [])
+            .map((index) => chartData.pings[index])
+            .filter((ping) => ping.t <= getActiveTimestamp())
+            .map((ping) => {
+              const center = api.coord([ping.x, ping.y])
+              const edge = api.coord([ping.x + chartData.distanceThreshold, ping.y])
+              return { cx: center[0], cy: center[1], r: Math.abs(edge[0] - center[0]) }
+            })
+          if (!circles.length) return null
+
+          const color = clusterColor(Number(api.value(2)))
+          let area: echarts.CustomSeriesRenderItemReturn = {
+            type: "group",
+            children: [
+              { type: "circle", shape: circles[0], style: { fill: color, opacity: 0.2 } },
+              ...circles.map((circle) => ({
+                type: "circle" as const,
+                shape: circle,
+                style: { fill: "transparent", stroke: color, lineWidth: 1.6, opacity: 0.9 }
+              }))
+            ]
+          }
+          // Each nested clip keeps only locations within every cluster ping's radius.
+          circles.forEach((circle) => {
+            area = { type: "group", clipPath: { type: "circle", shape: circle }, children: [area!] }
+          })
+          return area
+        },
+      },
+      {
         id: "distance-circles",
         name: "Distance threshold radius",
         type: "custom",

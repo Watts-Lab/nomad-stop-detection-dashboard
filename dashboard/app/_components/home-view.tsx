@@ -100,7 +100,7 @@ export function HomeView({ navigateTo }: { navigateTo: (view: DashboardView) => 
                   of different stop detection algorithms, points to{" "}
                   <span className="font-semibold text-[#3b1370]">open-source implementations</span>,
                   and lets users evaluate detected stops side-by-side against{" "}
-                  <span className="font-semibold text-[#3b1370]">synthetic ground-truth</span>,
+                  <span className="font-semibold text-[#3b1370]">synthetic ground truth</span>,
                   across a wide range of parameters. It also provides{" "}
                   <span className="font-semibold text-[#3b1370]">aggregated performance metrics</span>{" "}
                   over hundreds of sampled trajectories.

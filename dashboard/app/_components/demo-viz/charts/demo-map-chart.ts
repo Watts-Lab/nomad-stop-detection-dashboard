@@ -82,15 +82,16 @@ export function createDemoMapChartOptions({
 
   const renderGpsPing = (_params: EChartsParams, api: EChartsApi) => {
     const pingIndex = Number(api.value(3))
-    const circle = pingCircle(
-      api,
-      0.28 * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
-    )
-    // Outline only when this dot is the ping's visible mark, not the center of a cluster ping.
+    // Accent only when this dot is the ping's visible mark, not the center of a cluster ping.
+    // The dot is small, so it doubles in size rather than using the regular hover scale.
     const outlined = pingIndex === getHoverPingIndex() && !(
       getShowStops() &&
       Number(api.value(2)) >= 0 &&
       pingClassifiedAt(pingIndex, getActiveTimestamp(), getChartData())
+    )
+    const circle = pingCircle(
+      api,
+      0.28 * (outlined ? 2 : pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex()))
     )
 
     return {
@@ -459,12 +460,13 @@ export function createDemoMapChartOptions({
             markScale * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           )
       
+          // Pad the target beyond the drawn mark so small pings are easy to hover.
           return {
             type: "circle",
             shape: {
               cx: circle.center[0],
               cy: circle.center[1],
-              r: circle.radius
+              r: circle.radius + 5
             },
             style: {
               fill: "rgba(0, 0, 0, 0.001)"

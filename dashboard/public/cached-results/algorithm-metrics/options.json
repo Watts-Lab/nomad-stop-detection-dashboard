@@ -101,8 +101,8 @@
   },
   "defaults": {
     "mode": "compare",
-    "left_algorithm": "Lachesis",
-    "right_algorithm": "Sequential (Centroid)",
+    "top_algorithm": "Lachesis",
+    "bottom_algorithm": "Sequential (Centroid)",
     "iterations": 100,
     "sweep_min": 5,
     "sweep_max": 50,

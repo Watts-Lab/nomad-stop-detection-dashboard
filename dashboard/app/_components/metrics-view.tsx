@@ -294,15 +294,14 @@ export function MetricsView({
           <div className="flex items-center gap-2">
             <h2 className="text-3xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
             <Button
-              variant="outline"
-              size="icon"
+              variant="control"
+              size="icon-sm"
               onClick={() => {
                 setMetricsChartView("recall")
                 startTour()
               }}
               title="Take Tour"
               aria-label="Take Tour"
-              className="h-8 w-8"
             >
               <HelpCircle className="h-4 w-4" />
             </Button>

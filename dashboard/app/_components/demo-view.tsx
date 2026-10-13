@@ -183,7 +183,7 @@ export function DemoView({
           {!compareMode && (
 
             /* Start the Demo guided tour. */
-            <Button variant="outline" size="icon" onClick={startTour} title="Take Tour" aria-label="Take Tour" className="h-8 w-8">
+            <Button variant="control" size="icon-sm" onClick={startTour} title="Take Tour" aria-label="Take Tour">
               <HelpCircle className="h-4 w-4" />
             </Button>
           )}

@@ -1359,55 +1359,59 @@ export function DemoSceneRenderer({
             <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[#d7dbd2] bg-[#f8f9fc] px-1 py-1 shadow-sm">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => stepToPingRef.current(-1)}
                     aria-label="Previous ping"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                    variant="control"
+                    size="icon-sm"
                   >
                     <StepBack className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Previous ping</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => toggleRef.current()}
                     disabled={atLastPing && playbackState !== "playing"}
                     aria-label={playbackState === "playing" ? "Pause" : "Play"}
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db] disabled:pointer-events-none disabled:opacity-40"
+                    variant="control"
+                    size="icon-sm"
                   >
                     {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">{playbackState === "playing" ? "Pause" : "Play"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => stepToPingRef.current(1)}
                     disabled={atLastPing}
                     aria-label="Next ping"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db] disabled:pointer-events-none disabled:opacity-40"
+                    variant="control"
+                    size="icon-sm"
                   >
                     <StepForward className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Next ping</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => replayRef.current()}
                     aria-label="Replay"
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-[#bfc6bb] bg-[#f8f9fc] text-[#3b1370] hover:bg-white hover:border-[#7629db]"
+                    variant="control"
+                    size="icon-sm"
                   >
                     <RotateCcw className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Replay</TooltipContent>
               </Tooltip>
@@ -1480,27 +1484,26 @@ export function CompareAnimationPanel({
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#3b1370]">
           {panel?.title ?? <><Spinner className="text-[#8acac8]" /> Loading visualization</>}
           {learnAlgorithmId && (
-            <Button asChild variant="outline" size="icon" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`} className="h-8 w-8">
+            <Button asChild variant="control" size="icon-sm" title="Learn about this algorithm" aria-label={`Learn about ${panel?.title}`}>
               <Link href={`/?view=learn&algo=${learnAlgorithmId}`} prefetch={false}>
                 <HelpCircle className="h-4 w-4" />
               </Link>
             </Button>
           )}
           {panel && !learnAlgorithmId && (
-            <Button type="button" variant="outline" size="icon" disabled aria-label="Select an algorithm to learn more" className="h-8 w-8">
+            <Button type="button" variant="control" size="icon-sm" disabled aria-label="Select an algorithm to learn more">
               <HelpCircle className="h-4 w-4" />
             </Button>
           )}
           <Button
             type="button"
-            variant="outline"
-            size="icon"
+            variant="control"
+            size="icon-sm"
             disabled={!panel?.metrics}
             aria-label={showInformation ? "Hide run information" : "Show run information"}
             aria-pressed={showInformation}
             title={showInformation ? "Hide run information" : "Show run information"}
             onClick={() => onShowInformationChange(!showInformation)}
-            className="h-8 w-8"
           >
             <Info className="h-4 w-4" />
           </Button>

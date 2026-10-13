@@ -321,7 +321,7 @@ def algorithm_specs():
         "gridbased": {
             "display_name": "Grid-Based",
             "labeler": SEQUENTIAL.grid_based_labels,
-            "result_kind": "labels",
+            "result_kind": "grid",
             "external_params": {
                 "h3_resolution": H3_RESOLUTION_VALUES,
             },
@@ -403,7 +403,7 @@ def run_user_job(user_id):
                     res=resolution,
                     data_crs="EPSG:3857",
                     traj_cols=TRAJ_COLS,
-                )
+                ).to_numpy()
                 h3_inputs[resolution] = grid_input
             detection_input = h3_inputs[resolution]
 
@@ -420,6 +420,8 @@ def run_user_job(user_id):
             "config_id": config_id,
             "cluster": result["cluster"].to_numpy(dtype=np.int16),
         }
+        if family == "gridbased":
+            result_row["h3_cell"] = detection_input["tessellation"].tolist()
         if "core" in result:
             result_row["core"] = result["core"].to_numpy(dtype=np.int16)
         if "aux_time" in result:
@@ -519,7 +521,7 @@ def write_algorithm(algorithm, spec, configurations, frames, output_dir):
 def write_manifest(output_dir, config_key, files, users):
     manifest = {
         "config_key": config_key,
-        "format": "stop-detection-dashboard-parquet-cache-v4",
+        "format": "stop-detection-dashboard-parquet-cache-v5",
         "algorithm_keys": list(files.keys()),
         "algorithms": files,
         "users": users.astype(str).tolist(),

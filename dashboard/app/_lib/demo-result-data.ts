@@ -1,6 +1,7 @@
 /* COMBINE SCENE WITH ALGO'S OUTPUT & PREPARE VIZ DATA */
 
 import { stopsFromLabels } from "@/lib/stop-detection"
+import { cellToBoundary } from "h3-js"
 import { prepareDemoSceneData } from "./demo-scene-data"
 import type { ComparePanelResponse } from "./types"
 
@@ -30,6 +31,36 @@ export function prepareDemoResultData(
         ping.i,
         ping.t,
     ])
+
+    const gridCells: number[][][] = []
+    const gridCellFrames: Array<[number, number, number]> = []
+    if (result.kind === "grid") {
+        const cellIndexes = new Map<string, number>()
+        const timeThreshold = panel.params.time_thresh * 60
+        const minDuration = panel.params.dur_min * 60
+        let runStart = 0
+
+        result.h3_cell.forEach((cell, index) => {
+            const ping = pings[index]
+            if (index > 0 && (cell !== result.h3_cell[index - 1] || ping.t - pings[index - 1].t > timeThreshold)) {
+                runStart = index
+            }
+
+            let cellIndex = cellIndexes.get(cell)
+            if (cellIndex === undefined) {
+                cellIndex = gridCells.length
+                cellIndexes.set(cell, cellIndex)
+                gridCells.push(cellToBoundary(cell, true).map(([longitude, latitude]) => [
+                    6378137 * longitude * Math.PI / 180,
+                    6378137 * Math.log(Math.tan(Math.PI / 4 + latitude * Math.PI / 360)),
+                ]))
+            }
+
+            const confirmed = index - runStart + 1 >= panel.params.min_cluster_size &&
+                ping.t - pings[runStart].t >= minDuration
+            gridCellFrames.push([cellIndex, ping.t, confirmed ? ping.cluster : -1])
+        })
+    }
 
     const clusterMembers = new Map<number, number[]>()
 
@@ -289,6 +320,8 @@ export function prepareDemoResultData(
         blockSide: sceneData.blockSide,
         pings,
         pingData,
+        gridCells,
+        gridCellFrames,
         result,
         clusterMembers,
         stops,

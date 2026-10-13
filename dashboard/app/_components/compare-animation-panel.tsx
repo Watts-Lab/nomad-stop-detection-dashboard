@@ -4,14 +4,12 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import type { TooltipComponentPositionCallback } from "echarts"
-import { Activity, HelpCircle, MapPin, MapPinOff, Merge, Pause, Play, Radio, RotateCcw, Split, StepBack, StepForward, Target } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
+import { HelpCircle, Info, Pause, Play, RotateCcw, StepBack, StepForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { parameterDisplayName } from "../_lib/dashboard-utils"
 import type { ComparePanelResponse, EChartsApi } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
@@ -1144,9 +1142,13 @@ export function DemoSceneRenderer({
     paused = true
     syncPlaybackState()
     renderSceneRef.current(initialTimestamp)
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(mapEl)
+    resizeObserver.observe(timelineEl)
     window.addEventListener("resize", resize)
     if (destinationPreview) {
       return () => {
+        resizeObserver.disconnect()
         window.removeEventListener("resize", resize)
         updateResultRef.current = () => { }
         renderSceneRef.current = null
@@ -1243,6 +1245,7 @@ export function DemoSceneRenderer({
       if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
       if (routeGlowFrame) window.cancelAnimationFrame(routeGlowFrame)
       if (nextPathFrame) window.cancelAnimationFrame(nextPathFrame)
+      resizeObserver.disconnect()
       window.removeEventListener("resize", resize)
       window.removeEventListener("nomad-tour-action", onTourAction)
       window.removeEventListener("keydown", onKeyDown)
@@ -1429,33 +1432,6 @@ export function DemoSceneRenderer({
   )
 }
 
-// Display one run statistic as a labeled cell of the panel's stat strip, with an
-// optional explanation behind a help icon, tinted green when it beats the other
-// compare panel. The cell draws its own left and top divider so the lines stay
-// correct when the strip wraps.
-function PanelStat({ icon: Icon, label, help, value, better = false }: { icon: LucideIcon; label: string; help?: string; value: string; better?: boolean }) {
-  return (
-    <div className={`relative flex min-w-0 flex-col justify-between gap-0.5 py-1 pl-2 shadow-[-1px_-1px_0_0_#d1d5db] ${help ? "pr-4" : "pr-1.5"} ${better ? "bg-[#e7f6ec]" : ""}`}>
-      <span className="text-[10px] font-semibold uppercase leading-tight tracking-[0.02em] text-[#3b1370]/80">{label}</span>
-      {help && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" aria-label={`About ${label}`} className="absolute right-1 top-1 text-[#3b1370]/60 hover:text-[#3b1370]">
-              <HelpCircle className="h-3 w-3" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-56">{help}</TooltipContent>
-        </Tooltip>
-      )}
-      <span className={`flex items-center gap-1 text-sm font-bold tabular-nums ${better ? "text-[#15803d]" : "text-[#3b1370]"}`}>
-        <Icon className={`h-3.5 w-3.5 shrink-0 ${better ? "text-[#15803d]" : "text-[#7629db]"}`} aria-hidden="true" />
-        {value}
-        {better && <span className="sr-only">(better than the other algorithm)</span>}
-      </span>
-    </div>
-  )
-}
-
 // Wrap the scene renderer with the algorithm title, 
 // Learn link, run statistics, and loading placeholders
 export function CompareAnimationPanel({
@@ -1471,7 +1447,8 @@ export function CompareAnimationPanel({
   onReplayStart,
   sharedPlaybackState,
   onPlaybackStateChange,
-  otherMetrics,
+  showInformation,
+  onShowInformationChange,
 }: {
   panel: ComparePanelResponse | null | undefined
   mode?: "single" | "compare"
@@ -1485,19 +1462,17 @@ export function CompareAnimationPanel({
   onReplayStart?: () => void
   sharedPlaybackState?: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
-  otherMetrics?: ComparePanelResponse["metrics"]
+  showInformation: boolean
+  onShowInformationChange: (visible: boolean) => void
 }) {
   const learnAlgorithmId = panel?.algo
   const pings = panel?.scene.pings
   const percent = (value: number) => `${Math.round(value * 100)}%`
-  // Whether this panel wins a metric against the other compare panel, judged on the
-  // displayed percentages so equal-looking values are never marked as better
-  const beats = (metric: keyof NonNullable<ComparePanelResponse["metrics"]>, higherIsBetter: boolean) => {
-    if (!panel?.metrics || !otherMetrics) return false
-    const own = Math.round(panel.metrics[metric] * 100)
-    const other = Math.round(otherMetrics[metric] * 100)
-    return higherIsBetter ? own > other : own < other
-  }
+  const pingFrequency = pings
+    ? (pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)
+    : ""
+  const trueStopCount = panel?.scene.truth.filter((stop) => stop.location !== null).length ?? 0
+  const detectedStopCount = panel ? new Set(panel.result.cluster.filter((label) => label >= 0)).size : 0
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">
@@ -1516,6 +1491,19 @@ export function CompareAnimationPanel({
               <HelpCircle className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={!panel?.metrics}
+            aria-label={showInformation ? "Hide run information" : "Show run information"}
+            aria-pressed={showInformation}
+            title={showInformation ? "Hide run information" : "Show run information"}
+            onClick={() => onShowInformationChange(!showInformation)}
+            className="h-8 w-8"
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         </CardTitle>
       </CardHeader>
       {/* In compare mode the map and timeline get the height a 4:5 panel leaves below the
@@ -1549,47 +1537,35 @@ export function CompareAnimationPanel({
           </div>
         )}
       </CardContent>
-      {panel?.metrics && pings && (
+      {showInformation && panel?.metrics && pings && (
         <div className="shrink-0 px-2 pb-2">
-          <TooltipProvider delayDuration={200}>
-            {/* Compare panels are too narrow for one row: the four accuracy stats
-                fill the first row and the three trajectory stats the second */}
-            <div className={`grid w-full overflow-hidden rounded-md border border-[#d1d5db] bg-white ${mode === "compare" ? "grid-cols-12 [&>*:nth-child(-n+4)]:col-span-3 [&>*:nth-child(n+5)]:col-span-4" : "grid-cols-[repeat(7,minmax(min-content,1fr))]"}`}>
-              <PanelStat icon={Target} label="min-by-min recall" value={percent(panel.metrics.recall)} better={beats("recall", true)} />
-              <PanelStat
-                icon={Split}
-                label="stops split"
-                help="Share of true stops detected as more than one stop at the correct location."
-                value={percent(panel.metrics.split_fraction)}
-                better={beats("split_fraction", false)}
-              />
-              <PanelStat
-                icon={MapPinOff}
-                label="stops missing"
-                help="Share of true stops not overlapped by any detected stop."
-                value={percent(panel.metrics.missed_fraction)}
-                better={beats("missed_fraction", false)}
-              />
-              <PanelStat
-                icon={Merge}
-                label="stops merged"
-                help="Share of detected true stops that also overlap a detected stop at a different location."
-                value={percent(panel.metrics.merged_fraction)}
-                better={beats("merged_fraction", false)}
-              />
-              <PanelStat icon={Radio} label="number of pings" value={String(pings.length)} />
-              <PanelStat
-                icon={Activity}
-                label="frequency"
-                value={`${(pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)}/hr`}
-              />
-              <PanelStat
-                icon={MapPin}
-                label="stops detected"
-                value={String(new Set(panel.result.cluster.filter((label) => label >= 0)).size)}
-              />
+          <div className="grid w-full grid-cols-3 divide-x divide-[#d1d5db] overflow-hidden rounded-md border border-[#d1d5db] bg-white">
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{pingFrequency}</span>
+                <span className="text-xs font-normal text-[#3a465d]">pings/hour</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{pings.length} pings, {trueStopCount} true stops</p>
             </div>
-          </TooltipProvider>
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{detectedStopCount}</span>
+                <span className="text-xs font-normal text-[#3a465d]">stops detected</span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">{percent(panel.metrics.missed_fraction)} missed; {percent(panel.metrics.split_fraction)} split; {percent(panel.metrics.merged_fraction)} merged</p>
+            </div>
+            <div className="min-w-0 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-1">
+                <span className="text-xl font-semibold tabular-nums text-[#3b1370]">{percent(panel.metrics.recall)}</span>
+                <span className="text-xs font-normal text-[#3a465d]">min-by-min recall</span>
+              </div>
+              {panel.metrics.best && (
+                <p className="mt-0.5 text-[11px] leading-tight text-[#3a465d]">
+                  Best: {percent(panel.metrics.best.recall)} at <span className="font-mono">{panel.metrics.best.parameter}={panel.metrics.best.value}</span>
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </Card>

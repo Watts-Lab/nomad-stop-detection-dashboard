@@ -10,6 +10,7 @@ import {
   type ParquetQueryFilter,
 } from "hyparquet"
 import { compressors } from "hyparquet-compressors"
+import { METRICS_ALGORITHM_BY_DEMO_ID, METRICS_SWEEP_PARAMETERS } from "./dashboard-data"
 import { publicPath } from "./public-path"
 import type {
   AlignedStopResult,
@@ -87,6 +88,7 @@ const routeCache = new Map<string, Promise<NonNullable<CompareScene["routes"]>>>
 let diaryCache: { key: string; value: Promise<CompareScene["truth"]> } | undefined
 let trajectoryCache: { key: string; value: Promise<CompareScene["pings"]> } | undefined
 const resultCache = new Map<string, { key: string; value: Promise<Record<string, unknown>[]> }>()
+const metricsCache = new Map<string, { key: string; value: Promise<Record<string, unknown>[]> }>()
 const parquetFileCache = new Map<string, ReturnType<typeof asyncBufferFromUrl>>()
 
 function cacheRootForTrajectory(trajectory: string | undefined) {
@@ -225,22 +227,24 @@ function loadResults(
   return results
 }
 
-function loadMetrics(cacheRoot: string, metricsPath: string, userId: string, configId: number, rowIndex: number) {
-  return readParquet(cacheRoot, metricsPath, {
+function loadMetrics(cacheRoot: string, algorithm: string, metricsPath: string, userId: string, userIndex: number, configCount: number) {
+  const cacheKey = cacheRoot + "|" + algorithm + "|" + userIndex
+  const cached = metricsCache.get(algorithm)
+  if (cached?.key === cacheKey) return cached.value
+
+  const rowStart = userIndex * configCount
+  const metrics = readParquet(cacheRoot, metricsPath, {
     columns: ["user_id", "config_id", "recall", "missed_fraction", "merged_fraction", "split_fraction"],
-    rowStart: rowIndex,
-    rowEnd: rowIndex + 1,
-  }).then(([row]) => {
-    if (String(row?.user_id) !== userId || Number(row.config_id) !== configId) {
+    rowStart,
+    rowEnd: rowStart + configCount,
+  }).then((rows) => {
+    if (rows.length !== configCount || rows.some((row) => String(row.user_id) !== userId)) {
       throw new Error("Cached metrics do not match selected user " + userId)
     }
-    return {
-      recall: Number(row.recall),
-      missed_fraction: Number(row.missed_fraction),
-      merged_fraction: Number(row.merged_fraction),
-      split_fraction: Number(row.split_fraction),
-    }
+    return rows
   })
+  metricsCache.set(algorithm, { key: cacheKey, value: metrics })
+  return metrics
 }
 
 function resolveConfig(configs: ConfigRow[], params: Record<string, number>) {
@@ -279,7 +283,7 @@ async function resultForUser(
 
   const configs = await loadConfigs(cacheRoot, entry.configs)
   const config = resolveConfig(configs, params)
-  const [rows, metrics] = await Promise.all([
+  const [rows, metricRows] = await Promise.all([
     loadResults(
       cacheRoot,
       algorithm,
@@ -289,10 +293,41 @@ async function resultForUser(
       userIndex,
       configs.length,
     ),
-    loadMetrics(cacheRoot, entry.metrics, userId, config.config_id, userIndex * configs.length + configs.indexOf(config)),
+    loadMetrics(cacheRoot, algorithm, entry.metrics, userId, userIndex, configs.length),
   ])
   const row = rows.find((candidate) => Number(candidate.config_id) === config.config_id)
   if (!row) throw new Error("Cached result is missing config_id " + config.config_id)
+  const metricByConfigId = new Map(metricRows.map((candidate) => [Number(candidate.config_id), candidate]))
+  const metricRow = metricByConfigId.get(config.config_id)
+  if (!metricRow) throw new Error("Cached metrics are missing config_id " + config.config_id)
+
+  const metricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[algorithm]
+  const sweepParameter = METRICS_SWEEP_PARAMETERS[metricsAlgorithm]?.[0]?.value
+  const sweepConfigs = sweepParameter
+    ? configs
+      .filter((candidate) => Object.entries(config.params).every(
+        ([name, value]) => name === sweepParameter || Object.is(candidate.params[name], value),
+      ))
+      .sort((left, right) => Number(left.params[sweepParameter]) - Number(right.params[sweepParameter]))
+    : []
+  let bestConfig: ConfigRow | undefined
+  let bestRecall = -Infinity
+  for (const candidate of sweepConfigs) {
+    const recall = Number(metricByConfigId.get(candidate.config_id)?.recall)
+    if (recall > bestRecall) {
+      bestConfig = candidate
+      bestRecall = recall
+    }
+  }
+  const metrics = {
+    recall: Number(metricRow.recall),
+    missed_fraction: Number(metricRow.missed_fraction),
+    merged_fraction: Number(metricRow.merged_fraction),
+    split_fraction: Number(metricRow.split_fraction),
+    best: bestConfig && sweepParameter
+      ? { recall: bestRecall, parameter: sweepParameter, value: Number(bestConfig.params[sweepParameter]) }
+      : null,
+  }
 
   const cluster = listValues(row.cluster, "cluster", trajectoryLength).map(Number)
   let result: AlignedStopResult

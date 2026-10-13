@@ -405,9 +405,9 @@ function NomadDashboard() {
   }, [rightSweepParameters, metricsRightParameter])
 
   return (
-    <div className="nomad-shell flex min-h-dvh flex-col">
+    <div className={`nomad-shell flex min-h-dvh flex-col ${activeView === "demo" && !compareMode ? "lg:h-dvh lg:overflow-hidden" : ""}`}>
       <NomadNav currentView={activeView} />
-      <div className="nomad-viewport">
+      <div className="nomad-viewport min-h-0">
         <div className="nomad-dashboard bg-background">
 
       {activeView === "home" && (

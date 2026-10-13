@@ -20,6 +20,11 @@ export type ComparePanelResponse = {
     missed_fraction: number
     merged_fraction: number
     split_fraction: number
+    best: {
+      recall: number
+      parameter: string
+      value: number
+    } | null
   } | null
 }
 

@@ -320,7 +320,7 @@ export function DemoView({
             />
           </div>
           <Card className="order-2 min-h-0 overflow-hidden bg-[#f8f9fc] py-4 md:col-span-4 xl:order-4 xl:col-span-1">
-            <CardContent className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
+            <CardContent className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
               <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-center md:justify-between xl:col-span-1 xl:flex-col xl:items-stretch">
                 <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
                   <Square className="h-4 w-4" />

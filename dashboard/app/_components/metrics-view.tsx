@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { DEMO_ID_BY_METRICS_ALGORITHM} from "../_lib/dashboard-data"
+import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import { TrajectoryOptions } from "./trajectory-options"
 import type { MetricsParameterNote } from "../_lib/types"
@@ -48,7 +48,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-foreground">by-minute recall</span>
+            <span className="text-xs font-semibold text-foreground">min-by-min recall</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
@@ -64,7 +64,7 @@ function PinnedAgentCard({
   )
 }
 
-// Display the algorithm's fixed parameters as read-only rows.
+// Display the chart's x-axis and its fixed filters as read-only rows.
 function MetricsParameterRows({
   algorithm,
   note,
@@ -81,7 +81,14 @@ function MetricsParameterRows({
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-[#3b1370]">Parameters</h4>
+      <h4 className="text-sm font-medium text-[#3b1370]">Chart configuration</h4>
+      <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] px-3 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-mono text-muted-foreground">x-axis</span>
+          <span className="text-xs font-mono text-foreground">{parameterDisplayName(note?.sweep_parameter ?? "delta_roam")}</span>
+        </div>
+      </div>
+      <h4 className="text-sm font-medium text-[#3b1370]">Filters held constant</h4>
       {rows.map(([name, value]) => (
         <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
@@ -193,8 +200,6 @@ export function MetricsView({
   metricsAlgorithms,
   metricsLeftAlgorithm,
   metricsRightAlgorithm,
-  metricsLeftParameter,
-  metricsRightParameter,
   metricsTrajectory,
   initialSelectedUserId,
   leftParameterNote,
@@ -203,8 +208,6 @@ export function MetricsView({
   setMetricsCompareMode,
   setMetricsLeftAlgorithm,
   setMetricsRightAlgorithm,
-  setMetricsLeftParameter,
-  setMetricsRightParameter,
   setMetricsTrajectory,
   openPinnedAgent,
   startTour,
@@ -213,8 +216,6 @@ export function MetricsView({
   metricsAlgorithms: string[]
   metricsLeftAlgorithm: string
   metricsRightAlgorithm: string
-  metricsLeftParameter: string
-  metricsRightParameter: string
   metricsTrajectory: string
   initialSelectedUserId?: string
   leftParameterNote: MetricsParameterNote | undefined
@@ -223,8 +224,6 @@ export function MetricsView({
   setMetricsCompareMode: (value: boolean) => void
   setMetricsLeftAlgorithm: (algorithm: string) => void
   setMetricsRightAlgorithm: (algorithm: string) => void
-  setMetricsLeftParameter: (parameter: string) => void
-  setMetricsRightParameter: (parameter: string) => void
   setMetricsTrajectory: (trajectory: string) => void
   openPinnedAgent: (pinned: PinnedAgent) => void
   startTour: () => void
@@ -243,25 +242,25 @@ export function MetricsView({
   // Pin changes are stored in refs so they do not reload the iframe that reported them.
   // A later chart reload includes that frame's latest pin, or no user after unpinning.
   const [leftMetricsPrototypeSrc, setLeftMetricsPrototypeSrc] = useState(
-    () => `${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${initialSelectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`,
+    () => `${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${initialSelectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`,
   )
   const [rightMetricsPrototypeSrc, setRightMetricsPrototypeSrc] = useState(
-    () => `${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${initialSelectedUserParameter}`,
+    () => `${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${initialSelectedUserParameter}`,
   )
 
   useEffect(() => {
     const selectedUserParameter = selectedUserIdsRef.current.left
       ? `&user=${encodeURIComponent(selectedUserIdsRef.current.left)}`
       : ""
-    setLeftMetricsPrototypeSrc(`${prototypeChartSrc(metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`)
-  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, metricsLeftParameter, metricsTrajectory])
+    setLeftMetricsPrototypeSrc(`${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`)
+  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, leftParameterNote?.sweep_parameter, metricsTrajectory])
 
   useEffect(() => {
     const selectedUserParameter = selectedUserIdsRef.current.right
       ? `&user=${encodeURIComponent(selectedUserIdsRef.current.right)}`
       : ""
-    setRightMetricsPrototypeSrc(`${prototypeChartSrc(metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`)
-  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, metricsRightParameter, metricsTrajectory, rightFixedParameters])
+    setRightMetricsPrototypeSrc(`${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`)
+  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, rightParameterNote?.sweep_parameter, metricsTrajectory, rightFixedParameters])
 
   useEffect(() => {
 
@@ -372,10 +371,7 @@ export function MetricsView({
               </label>
               <Select
                 value={metricsLeftAlgorithm}
-                onValueChange={(algorithm) => {
-                  setMetricsLeftAlgorithm(algorithm)
-                  setMetricsLeftParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
-                }}
+                onValueChange={setMetricsLeftAlgorithm}
               >
                 <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -392,10 +388,7 @@ export function MetricsView({
                   <label className="text-sm font-medium text-[#3b1370]">Bottom</label>
                   <Select
                     value={metricsRightAlgorithm}
-                    onValueChange={(algorithm) => {
-                      setMetricsRightAlgorithm(algorithm)
-                      setMetricsRightParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
-                    }}
+                    onValueChange={setMetricsRightAlgorithm}
                   >
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>

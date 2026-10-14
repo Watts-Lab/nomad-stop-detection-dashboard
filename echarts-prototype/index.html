@@ -11,7 +11,7 @@
 
     body {
       margin: 0;
-      padding: 12px;
+      padding: 6px 8px;
       box-sizing: border-box;
       display: flex;
       align-items: center;
@@ -42,23 +42,188 @@
     const params = new URLSearchParams(window.location.search);
     const xLabel = params.get("x") || "delta_roam";
     const xField = params.get("field") || "delta_roam";
-    const showLegend = params.get("legend") !== "false";
+    const chartView = params.get("view") === "failures" ? "failures" : "recall";
+    const legendMode = params.get("legend");
+    const showLegend = legendMode !== "false" && legendMode !== "space";
+    const reserveLegendSpace = legendMode !== "false";
+    const xMinParam = params.get("xmin");
+    const xMaxParam = params.get("xmax");
+    const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
+    const demoAlgoId = params.get("algo") || "";
+    const frameId = params.get("frame") || "left";
+    const initialUserId = params.get("user");
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
+
+    // Format the parameter name for the chart axis, including the delta-roam subscript
     const parameterLabel = (value) => value === "delta_roam" ? "{delta|Δ}{sub|roam}" : value;
+
+    // Format the parameter name as plain text for tooltips
+    const tooltipParameterLabel = (value) => value === "delta_roam" ? "Δroam" : value;
+    let pendingTourFocus = null;
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === "nomad-metrics-tour-focus") {
+        pendingTourFocus = event.data.mode;
+        window.applyMetricsTourFocus?.(pendingTourFocus);
+      }
+    });
 
     (async () => {
       const buffer = await (await fetch(DATA_URL)).arrayBuffer();
       const data = await parquetReadObjects({ file: buffer, compressors });
         const rows = data
+          .filter((d) => Object.entries(fixedParameters).every(([field, value]) => String(d[field]).toLowerCase() === value))
           .map((d) => ({
             user_id: d.user_id,
             x: Number(d[xField]),
             recall: Number(d.recall),
+            missed_fraction: Number(d.missed_fraction),
+            split_fraction: Number(d.split_fraction),
+            merged_fraction: Number(d.merged_fraction),
           }))
           .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.recall))
           .sort((a, b) => a.user_id.localeCompare(b.user_id) || a.x - b.x);
+        const xValues = rows.map((d) => d.x);
+        const minX = Math.min(...xValues);
+        const maxX = Math.max(...xValues);
+        const axisMinX = xMinParam === null ? minX : Number(xMinParam);
+        const axisMaxX = xMaxParam === null ? maxX : Number(xMaxParam);
+
+        if (chartView === "failures") {
+          const failureTypes = [
+            { label: "% missed/split", title: "Missed and split stops", description: "Percentage of true stops not detected or split as multiple correct stops." },
+            { label: "% merged", title: "Merged stops", description: "Percentage of true stops (partially) detected as part of a stop in a different location." },
+          ];
+          const failureRowsByX = new Map();
+          rows.forEach((row) => {
+            failureRowsByX.set(row.x, (failureRowsByX.get(row.x) || []).concat(row));
+          });
+          const failureXValues = Array.from(failureRowsByX.keys()).sort((a, b) => a - b);
+          const failureData = failureXValues.map((x) => {
+            const values = failureRowsByX.get(x);
+            const mean = (field) => values.reduce((sum, row) => sum + row[field], 0) / values.length;
+            return { x, missed: mean("missed_fraction"), split: mean("split_fraction"), merged: mean("merged_fraction") };
+          });
+
+          chart.setOption({
+            animationDurationUpdate: 0,
+            legend: {
+              data: ["% missed", "% split", "% merged"],
+              left: "center",
+              // Center the 24px legend in the 14%-high space above the first grid.
+              top: chart.getHeight() * 0.07 - 12,
+              textStyle: { fontSize: 12 },
+            },
+            grid: failureTypes.map((_, index) => ({
+              left: 28,
+              right: 24,
+              top: `${14 + index * 43}%`,
+              height: "31%",
+              containLabel: true,
+            })),
+            tooltip: {
+              trigger: "axis",
+              confine: true,
+              axisPointer: {
+                type: "line",
+                snap: true,
+                lineStyle: { color: "#9ca3af", type: "dashed" },
+              },
+              backgroundColor: "rgba(17, 24, 39, 0.96)",
+              borderColor: "#4b5563",
+              borderWidth: 1,
+              padding: 10,
+              textStyle: {
+                color: "#f3f4f6",
+                fontSize: 12,
+              },
+              formatter: (events) => {
+                const event = events[0];
+                if (!event) return "";
+                const [x] = event.value;
+                const values = failureData.find((row) => row.x === x);
+                if (!values) return "";
+                const failure = failureTypes[event.axisIndex];
+                const metricRows = event.axisIndex === 0
+                  ? [["% missed", values.missed], ["% split", values.split], ["% missed + split", values.missed + values.split]]
+                  : [["% merged", values.merged]];
+                return `<div style="min-width:180px;max-width:300px;white-space:normal"><div style="font-weight:600;margin-bottom:6px">${failure.title}</div><div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px"><span style="color:#9ca3af">${tooltipParameterLabel(xField)}</span><span style="font-family:monospace">${x}</span></div><div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:4px">TRUE STOPS AFFECTED</div>${metricRows.map(([label, value]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px"><span>${label}</span><span style="font-family:monospace">${(value * 100).toFixed(1)}%</span></div>`).join("")}<div style="color:#d1d5db;line-height:1.4;overflow-wrap:anywhere;margin-top:6px">${failure.description}</div></div>`;
+              },
+            },
+            xAxis: failureTypes.map((_, index) => ({
+              type: "value",
+              gridIndex: index,
+              name: index === failureTypes.length - 1 ? `Parameter: ${parameterLabel(xLabel)}` : "",
+              nameLocation: "center",
+              nameGap: 26,
+              min: axisMinX,
+              max: axisMaxX,
+              splitLine: {
+                lineStyle: {
+                  color: "#ddd",
+                  type: "dotted",
+                },
+              },
+              axisLabel: { fontSize: 13, show: index === failureTypes.length - 1 },
+              axisTick: { show: index === failureTypes.length - 1 },
+              nameTextStyle: {
+                fontSize: 14,
+                rich: {
+                  delta: { fontSize: 18, fontWeight: 500 },
+                  sub: { fontSize: 11, padding: [10, 0, 0, 1] },
+                },
+              },
+            })),
+            yAxis: failureTypes.map((failure, index) => ({
+              name: failure.label,
+              nameLocation: "middle",
+              nameRotate: 90,
+              nameGap: 48,
+              nameTextStyle: { fontSize: 14 },
+              type: "value",
+              gridIndex: index,
+              axisLine: { show: true },
+              min: 0,
+              max: 1,
+              interval: 0.5,
+              axisLabel: {
+                fontSize: 13,
+                formatter: (value) => `${value * 100}%`,
+              },
+              splitLine: { lineStyle: { color: "#ddd", type: "dotted" } },
+            })),
+            series: [
+              { name: "% missed", field: "missed", color: "#715599", index: 0, stack: "missed-split" },
+              { name: "% split", field: "split", color: "#C58B00", index: 0, stack: "missed-split" },
+              { name: "% merged", field: "merged", color: "#008C73", index: 1 },
+            ].map((failure) => ({
+              name: failure.name,
+              type: "line",
+              stack: failure.stack,
+              xAxisIndex: failure.index,
+              yAxisIndex: failure.index,
+              data: failureData.map((row) => [row.x, row[failure.field]]),
+              symbol: "circle",
+              symbolSize: 7,
+              lineStyle: { color: failure.color, width: 2 },
+              itemStyle: { color: failure.color },
+              areaStyle: { color: failure.color, opacity: 0.22 },
+              emphasis: {
+                itemStyle: {
+                  borderColor: failure.color,
+                  borderWidth: 2,
+                },
+              },
+            })),
+          });
+          new ResizeObserver(() => {
+            chart.resize();
+            chart.setOption({ legend: { top: chart.getHeight() * 0.07 - 12 } });
+          }).observe(document.getElementById("chart"));
+          return;
+        }
 
         const scatterData = rows.map((d) => [d.x, d.recall, d.user_id]);
 
@@ -84,6 +249,9 @@
           .map((userRows) => userRows.reduce((best, d) => (d.recall > best.recall ? d : best)))
           .map((d) => [d.x, d.recall, d.user_id]);
 
+        const highestMeanPoint = meanLine.reduce((best, point) => (point[1] > best[1] ? point : best));
+        const averageUserMax = perUserMaxData.reduce((sum, point) => sum + point[1], 0) / perUserMaxData.length;
+
         const xs = Array.from(grouped.keys()).map(Number).sort((a, b) => a - b);
         const meanPerUserMaxLine = xs.map((x) => [
           x,
@@ -91,41 +259,93 @@
             .map((userRows) => Math.max(...userRows.filter((d) => d.x <= x).map((d) => d.recall)))
             .reduce((sum, value) => sum + value, 0) / byUser.size,
         ]);
-        const xValues = rows.map((d) => d.x);
-        const minX = Math.min(...xValues);
-        const maxX = Math.max(...xValues);
-        const xPadding = (maxX - minX) * 0.025;
-        const meanPerUserMaxLabel = "Mean per-user max";
+        const meanPerUserMaxLabel = "Mean user max";
+        const highestAverageLabel = "Best mean";
+        const averageUserMaxLabel = "Avg user max";
+        const highestAverageLine = [[axisMinX, highestMeanPoint[1]], [axisMaxX, highestMeanPoint[1]]];
+        const averageUserMaxLine = [[axisMinX, averageUserMax], [axisMaxX, averageUserMax]];
         const emptyHighlight = [];
+
+        // Return chart styles for the requested tour focus, or the default styles when focus is cleared
+        const tourFocusSeries = (mode) => {
+          if (mode === "points") {
+            return [
+              { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.015)", width: 1 } },
+              { id: "individual-results", symbolSize: 8, itemStyle: { color: "rgba(31, 119, 180, 0.18)", borderColor: "rgba(31, 119, 180, 0.34)", borderWidth: 1, opacity: 1 } },
+              { id: "per-user-max", symbolSize: 10, itemStyle: { opacity: 0.08 } },
+              { id: "mean-line", lineStyle: { color: "rgba(31, 119, 180, 0.12)", width: 2 } },
+              { id: "mean-per-user-max", lineStyle: { color: "rgba(214, 39, 40, 0.10)", width: 2 }, itemStyle: { opacity: 0.1 } },
+            ];
+          }
+          if (mode === "pattern") {
+            return [
+              { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.18)", width: 1.3 } },
+              { id: "individual-results", symbolSize: 7, itemStyle: { color: "rgba(31, 119, 180, 0.018)", borderColor: "rgba(31, 119, 180, 0.04)", borderWidth: 1, opacity: 1 } },
+              { id: "per-user-max", symbolSize: 10, itemStyle: { opacity: 0.06 } },
+              { id: "mean-line", lineStyle: { color: "#1f77b4", width: 4 } },
+              { id: "mean-per-user-max", lineStyle: { color: "rgba(214, 39, 40, 0.10)", width: 2 }, itemStyle: { opacity: 0.1 } },
+            ];
+          }
+          if (mode === "best") {
+            return [
+              { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.012)", width: 1 } },
+              { id: "individual-results", symbolSize: 7, itemStyle: { color: "rgba(31, 119, 180, 0.014)", borderColor: "rgba(31, 119, 180, 0.035)", borderWidth: 1, opacity: 1 } },
+              { id: "per-user-max", symbolSize: 10, itemStyle: { color: "rgba(185, 28, 28, 0.58)", borderColor: "rgba(185, 28, 28, 0.58)", borderWidth: 1.1, opacity: 1 } },
+              { id: "mean-line", lineStyle: { color: "rgba(31, 119, 180, 0.10)", width: 2 } },
+              { id: "mean-per-user-max", lineStyle: { color: "#d62728", width: 4 }, itemStyle: { color: "#d62728", opacity: 1 } },
+            ];
+          }
+          return [
+            { id: "user-trajectories", lineStyle: { color: "rgba(31, 119, 180, 0.08)", width: 1 } },
+            { id: "individual-results", symbolSize: 7, itemStyle: { color: "rgba(31, 119, 180, 0.055)", borderColor: "rgba(31, 119, 180, 0.14)", borderWidth: 1, opacity: 1 } },
+            { id: "per-user-max", symbolSize: 8, itemStyle: { color: "rgba(185, 28, 28, 0.46)", borderColor: "rgba(185, 28, 28, 0.46)", borderWidth: 1, opacity: 1 } },
+            { id: "mean-line", lineStyle: { color: "#1f77b4", width: 3 } },
+            { id: "mean-per-user-max", lineStyle: { color: "#d62728", width: 3 }, itemStyle: { color: "#d62728", opacity: 1 } },
+            { id: "per-user-max-hit-area", itemStyle: { color: "rgba(255, 26, 26, 0)" } },
+          ];
+        };
+        let activeTourFocus = null;
+
+        // Store the active tour focus and apply its chart styles
+        const applyTourFocus = (mode) => {
+          activeTourFocus = mode;
+          chart.setOption({ series: tourFocusSeries(mode) });
+        };
+        window.applyMetricsTourFocus = applyTourFocus;
 
         chart.setOption({
           animationDurationUpdate: 0,
+          // Draw highlights in place: with this many points ECharts would otherwise move
+          // them to a separate hover layer, which drops the emphasis scale
+          hoverLayerThreshold: Infinity,
+          // Switch hover emphasis and dimming instantly; the default 300ms fades overlap
+          // into a rolling wave as the cursor crosses densely packed points
+          stateAnimation: { duration: 0 },
           legend: showLegend ? {
             bottom: 4,
             left: "center",
-            data: ["Individual results", "Mean", "Per-user max", meanPerUserMaxLabel, "Hovered user spread"],
-            itemGap: 24,
+            data: ["Individual", "Mean", "User max", meanPerUserMaxLabel, highestAverageLabel, averageUserMaxLabel],
+            itemGap: 10,
+            itemWidth: 14,
+            itemHeight: 8,
             textStyle: {
-              fontSize: 13,
+              fontSize: 11,
             },
           } : { show: false },
           grid: {
-            left: 56,
-            right: 56,
-            top: 38,
-            bottom: 72,
+            left: 28,
+            right: 24,
+            top: 46,
+            bottom: reserveLegendSpace ? 60 : 36,
             containLabel: true,
-          },
-          tooltip: {
-            show: false,
           },
           xAxis: {
             type: "value",
             name: `Parameter: ${parameterLabel(xLabel)}`,
             nameLocation: "center",
-            nameGap: 30,
-            min: minX - xPadding,
-            max: maxX + xPadding,
+            nameGap: 26,
+            min: axisMinX,
+            max: axisMaxX,
             splitLine: {
               lineStyle: {
                 color: "#ddd",
@@ -151,11 +371,11 @@
           },
           yAxis: {
             type: "value",
-            name: "min-by-min accuracy",
+          name: "min-by-min recall",
             nameLocation: "center",
-            nameGap: 42,
+            nameGap: 32,
             min: 0,
-            max: 1.05,
+            max: 1,
             splitLine: {
               lineStyle: {
                 color: "#ddd",
@@ -171,21 +391,16 @@
           },
           series: [
             {
-              name: "Per-user trajectories",
-              type: "line",
-              data: userTrajectoryData,
-              symbol: "none",
-              lineStyle: {
-                color: "rgba(31, 119, 180, 0.08)",
-                width: 1,
-              },
-              z: 2,
-            },
-            {
-              name: "Individual results",
+              name: "Individual",
+              id: "individual-results",
               type: "scatter",
               data: scatterData,
+              // Redraw all points in one frame; above the default progressive threshold
+              // ECharts restyles them in batches, so dimming visibly sweeps across the chart
+              progressive: 0,
               symbolSize: 7,
+              // Context only: individual points ignore hover and clicks
+              silent: true,
               itemStyle: {
                 color: "rgba(31, 119, 180, 0.055)",
                 borderColor: "rgba(31, 119, 180, 0.14)",
@@ -199,24 +414,44 @@
               z: 3,
             },
             {
-              name: "Per-user max",
+              name: "User max",
+              id: "per-user-max",
               type: "scatter",
               data: perUserMaxData,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
-              symbolSize: 10,
+              symbol: "circle",
+              symbolSize: 8,
+              cursor: "pointer",
               itemStyle: {
-                color: "rgba(255, 26, 26, 0.85)",
-                borderColor: "rgba(255, 26, 26, 0.85)",
+                color: "rgba(185, 28, 28, 0.46)",
+                borderColor: "rgba(185, 28, 28, 0.46)",
                 borderWidth: 1,
               },
+              // Hovering a maximum point magnifies it and blurs (dims) everything else
               emphasis: {
-                scale: 1.8,
+                focus: "self",
+                scale: 1.75,
+                itemStyle: {
+                  color: "#b91c1c",
+                  borderColor: "#ffffff",
+                  // Scaled with the symbol, so this renders about 1.75px wide
+                  borderWidth: 1,
+                  shadowBlur: 10,
+                  shadowColor: "rgba(0, 0, 0, 0.6)",
+                  opacity: 1,
+                },
               },
               z: 6,
             },
             {
               name: "Mean",
+              id: "mean-line",
               type: "line",
+              // Reference line only: no pointer cursor or hover response, and not dimmed
+              // when a maximum point is hovered
+              silent: true,
+              emphasis: {
+                disabled: true,
+              },
               data: meanLine,
               symbol: "none",
               lineStyle: {
@@ -230,46 +465,81 @@
               z: 5,
             },
             {
-              name: meanPerUserMaxLabel,
+              name: highestAverageLabel,
+              id: "highest-average-retention",
               type: "line",
-              data: meanPerUserMaxLine,
+              silent: true,
+              data: highestAverageLine,
               symbol: "none",
               lineStyle: {
-                color: "#d62728",
-                width: 3,
-                type: "solid",
+                color: "#0b2f6b",
+                width: 2.5,
+                type: "dotted",
               },
               itemStyle: {
-                color: "#d62728",
+                color: "#0b2f6b",
               },
               emphasis: {
                 disabled: true,
               },
+              z: 7,
             },
             {
-              name: "Hovered user spread",
-              id: "highlighted-user-line",
+              name: averageUserMaxLabel,
+              id: "average-user-max",
+              type: "line",
+              silent: true,
+              data: averageUserMaxLine,
+              symbol: "none",
+              lineStyle: {
+                color: "#b91c1c",
+                width: 2.5,
+                type: "dotted",
+              },
+              itemStyle: {
+                color: "#b91c1c",
+              },
+              emphasis: {
+                disabled: true,
+              },
+              z: 7,
+            },
+            {
+              name: "Pinned user spread",
+              id: "pinned-user-line",
               type: "line",
               data: emptyHighlight,
               animation: false,
-              symbol: "none",
+              symbol: "circle",
+              symbolSize: 7,
+              showInLegend: false,
               lineStyle: {
-                color: "#2ca02c",
-                width: 2,
+                color: "#2ca021",
+                width: 2.4,
               },
               itemStyle: {
                 color: "#2ca02c",
               },
+              emphasis: {
+              scale: 1.6,
+                itemStyle: {
+                color: "#2ca02c",
+                  borderColor: "#ffffff",
+                borderWidth: 1.5,
+                },
+              },
               z: 10,
             },
             {
-              name: "Per-user max hit area",
+              name: "User max hit area",
+              id: "per-user-max-hit-area",
               type: "scatter",
               data: perUserMaxData,
               animation: false,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
+              symbol: "circle",
               symbolSize: 22,
               showInLegend: false,
+              cursor: "pointer",
               itemStyle: {
                 color: "rgba(255, 26, 26, 0)",
               },
@@ -277,56 +547,145 @@
                 disabled: true,
               },
               z: 11,
+          },
+          {
+            // Sits above the maximum points' hit area so the pinned agent's own curve wins
+            // any click the two targets share, rather than pinning whoever is behind it
+            name: "Pinned user hit area",
+            id: "pinned-user-hit-area",
+            type: "scatter",
+            data: emptyHighlight,
+            animation: false,
+            symbol: "circle",
+            symbolSize: 22,
+            showInLegend: false,
+            cursor: "pointer",
+            itemStyle: {
+              color: "rgba(44, 160, 44, 0)",
             },
+            emphasis: {
+              disabled: true,
+            },
+            z: 12,
+          },
             {
-              name: "Hovered per-user max",
-              id: "hovered-per-user-max",
+              name: "Pinned per-user max",
+              id: "pinned-per-user-max",
               type: "scatter",
               data: emptyHighlight,
               animation: false,
-              symbol: "path://M-5,-7 L0,-2 L5,-7 L7,-5 L2,0 L7,5 L5,7 L0,2 L-5,7 L-7,5 L-2,0 L-7,-5 Z",
-              symbolSize: 18,
+              symbol: "circle",
+              symbolSize: 10,
               silent: true,
               showInLegend: false,
               itemStyle: {
-                color: "rgba(255, 26, 26, 0.95)",
-                borderColor: "rgba(255, 255, 255, 0.95)",
-                borderWidth: 1.5,
+                color: "#b91c1c",
+                borderColor: "#2ca02c",
+                borderWidth: 2,
               },
-              z: 12,
+              z: 13,
             },
           ],
         });
+        applyTourFocus(pendingTourFocus);
 
-        const highlightUser = (point) => {
-          const userId = point[2];
-          const userRows = byUser.get(userId) || [];
-          const userLine = userRows.map((d) => [d.x, d.recall, d.user_id]);
+        // Hovering a point only enlarges it to invite a click; clicking a maximum point pins
+        // that agent, drawing its curve and filling the side card until it is unpinned or replaced.
+        let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
+
+        // Identify maximum-point events, including events on their larger invisible hit areas
+        const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
+
+        // Get the selected agent's by-minute recall values across the parameter sweep
+        const userLineFor = (point) => (byUser.get(point[2]) || []).map((d) => [d.x, d.recall, d.user_id]);
+
+        // Draw the pinned agent's curve and dim the other points;
+        // restore tour styling when no agent is pinned
+        const renderHighlight = () => {
+          if (!pinnedPoint) {
+            chart.setOption({
+              series: [
+                { id: "pinned-user-line", data: emptyHighlight },
+                { id: "pinned-user-hit-area", data: emptyHighlight },
+                { id: "pinned-per-user-max", data: emptyHighlight },
+              ],
+            });
+            applyTourFocus(activeTourFocus);
+            return;
+          }
           chart.setOption({
             series: [
-              { id: "highlighted-user-line", data: userLine },
-              { id: "hovered-per-user-max", data: [point] },
+              { id: "individual-results", itemStyle: { opacity: 0.08 } },
+              { id: "per-user-max", itemStyle: { opacity: 0.08 } },
+              { id: "pinned-user-line", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
+              { id: "pinned-user-hit-area", data: pinnedPoint ? userLineFor(pinnedPoint) : emptyHighlight },
+              { id: "pinned-per-user-max", data: pinnedPoint ? [pinnedPoint] : emptyHighlight },
             ],
           });
         };
 
-        const clearHighlight = () => {
-          chart.setOption({
-            series: [
-              { id: "highlighted-user-line", data: emptyHighlight },
-              { id: "hovered-per-user-max", data: emptyHighlight },
-            ],
-          });
+        // Notify the parent Metrics view of the pinned agent and settings, or send null values when unpinned
+        const postPinChange = () => {
+          window.parent.postMessage({
+            type: "nomad-metrics-pin-change",
+            frame: frameId,
+            algoId: demoAlgoId,
+            param: xField,
+            userId: pinnedPoint ? pinnedPoint[2] : null,
+            value: pinnedPoint ? pinnedPoint[0] : null,
+            recall: pinnedPoint ? pinnedPoint[1] : null,
+            fixed: fixedParameters,
+          }, window.location.origin);
         };
 
+        if (pinnedPoint) {
+          renderHighlight();
+          postPinChange();
+        }
+
+        // Hover only magnifies the point under the cursor. The invisible hit areas receive the
+        // events, so highlight the matching visible point; highlight states skip setOption,
+        // which re-runs the whole chart pipeline and made every hover lag.
+        const hoverTargets = { "User max hit area": "per-user-max", "Pinned user hit area": "pinned-user-line" };
         chart.on("mouseover", (event) => {
-          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") highlightUser(event.value);
+          const seriesId = hoverTargets[event.seriesName];
+          if (seriesId) chart.dispatchAction({ type: "highlight", seriesId, dataIndex: event.dataIndex });
         });
         chart.on("mouseout", (event) => {
-          if (event.seriesName === "Per-user max" || event.seriesName === "Per-user max hit area") clearHighlight();
+          const seriesId = hoverTargets[event.seriesName];
+          if (seriesId) chart.dispatchAction({ type: "downplay", seriesId, dataIndex: event.dataIndex });
         });
-        chart.on("globalout", clearHighlight);
-        window.addEventListener("resize", () => chart.resize());
+        chart.on("click", (event) => {
+          if (isPerUserMaxSeries(event.seriesName)) {
+            const userId = event.value[2];
+            pinnedPoint = pinnedPoint && pinnedPoint[2] === userId ? null : event.value;
+            renderHighlight();
+            postPinChange();
+            return;
+          }
+          // A point on the pinned agent's curve opens that run in Demo
+          if (event.seriesName !== "Pinned user hit area") return;
+          const [pointX, , userId] = event.value;
+          window.parent.postMessage({
+            type: "nomad-metrics-point-select",
+            algoId: demoAlgoId,
+            param: xField,
+            value: pointX,
+            userId,
+            fixed: fixedParameters,
+          }, window.location.origin);
+        });
+      // Clicking blank chart space clears the pinned point.
+      chart.getZr().on("click", (event) => {
+        if (event.target || !pinnedPoint) return;
+        pinnedPoint = null;
+        renderHighlight();
+        postPinChange();
+      });
+
+        new ResizeObserver(() => chart.resize()).observe(
+          document.getElementById("chart")
+      );
     })();
   </script>
 </body>

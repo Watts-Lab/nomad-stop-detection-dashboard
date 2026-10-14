@@ -1,2 +1,3 @@
-:HL["/nomad-stop-detection-dashboard/_next/static/chunks/03ge4lawlpnyi.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"wJzPfgTE3dp2XCRy1gg17"}
+:HL["/nomad-stop-detection-dashboard/_next/static/chunks/17yxfbsptjnf8.css","style"]
+:HL["/nomad-stop-detection-dashboard/_next/static/chunks/0_x0u1q67o-ol.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"6BUHwkLXTxoFPZvNdhxJZ"}

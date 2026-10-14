@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DEMO_ID_BY_METRICS_ALGORITHM } from "../_lib/dashboard-data"
+import { DEMO_ID_BY_METRICS_ALGORITHM} from "../_lib/dashboard-data"
 import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import { TrajectoryOptions } from "./trajectory-options"
@@ -48,7 +48,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-foreground">minute recall</span>
+            <span className="text-xs font-semibold text-foreground">min-by-min recall</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
@@ -201,7 +201,7 @@ export function MetricsView({
   metricsLeftAlgorithm,
   metricsRightAlgorithm,
   metricsTrajectory,
-  selectedUserId,
+  initialSelectedUserId,
   leftParameterNote,
   rightParameterNote,
   metricsError,
@@ -217,7 +217,7 @@ export function MetricsView({
   metricsLeftAlgorithm: string
   metricsRightAlgorithm: string
   metricsTrajectory: string
-  selectedUserId?: string
+  initialSelectedUserId?: string
   leftParameterNote: MetricsParameterNote | undefined
   rightParameterNote: MetricsParameterNote | undefined
   metricsError: string | null
@@ -231,12 +231,36 @@ export function MetricsView({
   const [pinnedLeftAgent, setPinnedLeftAgent] = useState<PinnedAgent | null>(null)
   const [pinnedRightAgent, setPinnedRightAgent] = useState<PinnedAgent | null>(null)
   const [metricsChartView, setMetricsChartView] = useState<MetricsChartView>("recall")
+  const selectedUserIdsRef = useRef({
+    left: initialSelectedUserId ?? null,
+    right: initialSelectedUserId ?? null,
+  })
 
   const leftFixedParameters = leftParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const rightFixedParameters = rightParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const selectedUserParameter = selectedUserId ? `&user=${encodeURIComponent(selectedUserId)}` : ""
-  const leftMetricsPrototypeSrc = `${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`
-  const rightMetricsPrototypeSrc = `${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`
+  const initialSelectedUserParameter = initialSelectedUserId ? `&user=${encodeURIComponent(initialSelectedUserId)}` : ""
+  // Pin changes are stored in refs so they do not reload the iframe that reported them.
+  // A later chart reload includes that frame's latest pin, or no user after unpinning.
+  const [leftMetricsPrototypeSrc, setLeftMetricsPrototypeSrc] = useState(
+    () => `${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${initialSelectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`,
+  )
+  const [rightMetricsPrototypeSrc, setRightMetricsPrototypeSrc] = useState(
+    () => `${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${initialSelectedUserParameter}`,
+  )
+
+  useEffect(() => {
+    const selectedUserParameter = selectedUserIdsRef.current.left
+      ? `&user=${encodeURIComponent(selectedUserIdsRef.current.left)}`
+      : ""
+    setLeftMetricsPrototypeSrc(`${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`)
+  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory])
+
+  useEffect(() => {
+    const selectedUserParameter = selectedUserIdsRef.current.right
+      ? `&user=${encodeURIComponent(selectedUserIdsRef.current.right)}`
+      : ""
+    setRightMetricsPrototypeSrc(`${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`)
+  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, rightFixedParameters])
 
   useEffect(() => {
 
@@ -246,12 +270,13 @@ export function MetricsView({
       if (event.origin !== window.location.origin) return
       if (event.data?.type !== "nomad-metrics-pin-change") return
       const { frame, algoId, userId, param, value, recall, fixed } = event.data
+      const pinned = typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
+        ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
+        : null
       const setPinned = frame === "right" ? setPinnedRightAgent : setPinnedLeftAgent
-      setPinned(
-        typeof userId === "string" && Number.isFinite(value) && Number.isFinite(recall)
-          ? { algoId: String(algoId), userId, param: String(param), value: Number(value), recall: Number(recall), fixed }
-          : null,
-      )
+      if (frame === "right") selectedUserIdsRef.current.right = pinned?.userId ?? null
+      else selectedUserIdsRef.current.left = pinned?.userId ?? null
+      setPinned(pinned)
     }
     window.addEventListener("message", handlePinChange)
     return () => window.removeEventListener("message", handlePinChange)
@@ -266,17 +291,16 @@ export function MetricsView({
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
+            <h2 className="text-3xl font-bold">{metricsCompareMode ? "Compare Metrics" : "Aggregated Metrics"}</h2>
             <Button
-              variant="outline"
-              size="icon"
+              variant="control"
+              size="icon-sm"
               onClick={() => {
                 setMetricsChartView("recall")
                 startTour()
               }}
               title="Take Tour"
               aria-label="Take Tour"
-              className="h-8 w-8"
             >
               <HelpCircle className="h-4 w-4" />
             </Button>

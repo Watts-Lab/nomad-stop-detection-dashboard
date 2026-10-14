@@ -58,9 +58,9 @@ export function TrajectoryOptions({
               </Button>
             </div>
             {showingInfo && (
-              <div id={descriptionId} className="mx-3 mb-3 space-y-1.5">
+              <div id={descriptionId} className="mx-2 mb-2 space-y-1.5">
                 {preview?.(trajectory.id)}
-                <div className="rounded-md border bg-muted/40 p-3 text-[13px] leading-relaxed text-muted-foreground">
+                <div className="rounded-md border bg-muted/40 px-2.5 py-2 text-[13px] leading-snug text-muted-foreground">
                   {trajectory.note}
                 </div>
               </div>

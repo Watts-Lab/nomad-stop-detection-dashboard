@@ -37,8 +37,8 @@ function NomadDashboard() {
   const [activeView, setActiveView] = useState<DashboardView>(initialRoute.activeView)
   const [expandedAlgorithm, setExpandedAlgorithm] = useState<string | null>(initialRoute.expandedAlgorithm)
   const [compareMode, setCompareMode] = useState(initialRoute.compareMode)
-  const [leftAlgorithm, setLeftAlgorithm] = useState("dbstop")
-  const [rightAlgorithm, setRightAlgorithm] = useState("seqscan")
+  const [leftAlgorithm, setLeftAlgorithm] = useState("")
+  const [rightAlgorithm, setRightAlgorithm] = useState("")
   const [leftParams, setLeftParams] = useState<Record<string, string>>({})
   const [rightParams, setRightParams] = useState<Record<string, string>>({})
   const [leftParamErrors, setLeftParamErrors] = useState<Record<string, string>>({})
@@ -50,15 +50,16 @@ function NomadDashboard() {
   const [requestedUserId, setRequestedUserId] = useState<string | null>(null)
   const [demoTrajectory, setDemoTrajectory] = useState("two-stop")
   const [demoTime, setDemoTime] = useState<number | null>(null)
-  const [showGroundTruth, setShowGroundTruth] = useState(true)
-  const [showStops, setShowStops] = useState(true)
-  const [showXray, setShowXray] = useState(true)
+  const [showGroundTruth, setShowGroundTruth] = useState(false)
+  const [showStops, setShowStops] = useState(false)
+  const [showXray, setShowXray] = useState(false)
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
   const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
   const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
+  const [metricsAgentId, setMetricsAgentId] = useState<string | null>(null)
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
   // Update browser URL to reflect the selected view
@@ -94,11 +95,14 @@ function NomadDashboard() {
   const runCompareVisualization = useCallback(async (seed: number) => {
     const leftAlgo = algorithms.find((a) => a.id === leftAlgorithm)
     const rightAlgo = algorithms.find((a) => a.id === rightAlgorithm)
-    if (!leftAlgo || !rightAlgo) return
     const requestId = ++compareRequestIdRef.current
 
-    const leftValidation = validateAlgorithmParams(leftAlgorithm, leftAlgo, leftParams)
-    const rightValidation = validateAlgorithmParams(rightAlgorithm, rightAlgo, rightParams)
+    const leftValidation = leftAlgo
+      ? validateAlgorithmParams(leftAlgorithm, leftAlgo, leftParams)
+      : { normalized: {}, errors: {} }
+    const rightValidation = rightAlgo
+      ? validateAlgorithmParams(rightAlgorithm, rightAlgo, rightParams)
+      : { normalized: {}, errors: {} }
     setLeftParamErrors(leftValidation.errors)
     setRightParamErrors(compareMode ? rightValidation.errors : {})
     if (Object.keys(leftValidation.errors).length > 0 || (compareMode && Object.keys(rightValidation.errors).length > 0)) {
@@ -115,13 +119,15 @@ function NomadDashboard() {
         trajectory: demoTrajectory,
         mode: compareMode ? "compare" : "single",
         left: {
-          algo: leftAlgorithm,
+          algo: leftAlgorithm || undefined,
           params: leftValidation.normalized,
         },
-        right: {
-          algo: rightAlgorithm,
-          params: rightValidation.normalized,
-        },
+        ...(compareMode && {
+          right: {
+            algo: rightAlgorithm || undefined,
+            params: rightValidation.normalized,
+          },
+        }),
       })
       if (requestId !== compareRequestIdRef.current) return
       setCompareApiData(data)
@@ -166,25 +172,30 @@ function NomadDashboard() {
   // and validation errors so the new algorithm stats with its defaults
   // The demo-loading effect responds to the updated state
   const handleLeftAlgorithmChange = useCallback((algorithmId: string) => {
-    setLeftAlgorithm(algorithmId)
+    const nextAlgorithm = algorithmId === "none" ? "" : algorithmId
+    setLeftAlgorithm(nextAlgorithm)
+    setShowStops(Boolean(nextAlgorithm || (compareMode && rightAlgorithm)))
     setLeftParams({})
     setLeftParamErrors({})
-  }, [])
+  }, [compareMode, rightAlgorithm])
 
   // Change the right Demo algorithm and clear its parameter overrides
   // and validation errors so the new algorithm starts with its defaults.
   // The Demo-loading effect responds to the updated state.
   const handleRightAlgorithmChange = useCallback((algorithmId: string) => {
-    setRightAlgorithm(algorithmId)
+    const nextAlgorithm = algorithmId === "none" ? "" : algorithmId
+    setRightAlgorithm(nextAlgorithm)
+    setShowStops(Boolean(leftAlgorithm || nextAlgorithm))
     setRightParams({})
     setRightParamErrors({})
-  }, [])
+  }, [leftAlgorithm])
 
   // Open Aggregated Metrics using the Metrics equivalents of the Demo algorithms.
   // For each available mapping, select its initial sweep parameter.
   // Enable Metrics comparison when Demo comparison is active and the right
   // algorithm has a Metrics mapping, then update the active view and URL.
-  const openMetricsFromDemo = useCallback(() => {
+  // Highlight the given agent's curve, if any, on the Metrics charts.
+  const openMetricsFromDemo = useCallback((agentId?: string) => {
     const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
     const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
 
@@ -196,6 +207,7 @@ function NomadDashboard() {
     }
     setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
+    setMetricsAgentId(agentId ?? null)
     setActiveView("metrics")
     syncUrl("metrics")
   }, [compareMode, demoTrajectory, leftAlgorithm, rightAlgorithm, syncUrl])
@@ -251,9 +263,14 @@ function NomadDashboard() {
   // the Demo-loading effect reloads data for the selected mode.
   const handleCompareModeToggle = useCallback(() => {
     const nextMode: DemoMode = compareMode ? "single" : "compare"
+    if (nextMode === "compare") {
+      setRightAlgorithm(leftAlgorithm)
+      setRightParams({ ...leftParams })
+      setRightParamErrors({ ...leftParamErrors })
+    }
     setCompareMode(nextMode === "compare")
     syncUrl("demo", null, nextMode)
-  }, [compareMode, syncUrl])
+  }, [compareMode, leftAlgorithm, leftParamErrors, leftParams, syncUrl])
 
   // Switch to the requested dashboard view and update the browser URL.
   const navigateTo = (view: DashboardView) => {
@@ -280,12 +297,6 @@ function NomadDashboard() {
     setActiveView("demo")
     syncUrl("demo", null, "single")
   }, [syncUrl])
-
-  // Smoothly scroll the requested algorithm's documentation section into view,
-  // if its element is present on the page.
-  const openLearnDocumentation = useCallback((algorithmId: string) => {
-    document.getElementById(`learn-documentation-${algorithmId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-  }, [])
 
   // Store the playback timestamp reported by a Demo animation panel
   // so the panels can use the shared time.
@@ -330,23 +341,29 @@ function NomadDashboard() {
     setCompareMode(nextRoute.compareMode)
   }, [searchParamString])
 
+  // Drop the highlighted Metrics agent once Metrics is left,
+  // so other ways back into Metrics open it without a highlight
+  useEffect(() => {
+    if (activeView !== "metrics") setMetricsAgentId(null)
+  }, [activeView])
+
   useEffect(() => {
 
     // While demo is active, replace unsupported algorithms with defaults
     // and reload visualization data when the selected algorithms, parameters
     // agent, trajectory, mode, or seed change
     if (activeView === "demo") {
-      if (!DEMO_ALGORITHM_IDS.has(leftAlgorithm)) {
+      if (leftAlgorithm && !DEMO_ALGORITHM_IDS.has(leftAlgorithm)) {
         setLeftAlgorithm("dbstop")
         return
       }
-      if (!DEMO_ALGORITHM_IDS.has(rightAlgorithm)) {
+      if (compareMode && rightAlgorithm && !DEMO_ALGORITHM_IDS.has(rightAlgorithm)) {
         setRightAlgorithm("seqscan")
         return
       }
       void runCompareVisualization(compareSeed)
     }
-  }, [activeView, compareSeed, runCompareVisualization, leftAlgorithm, rightAlgorithm])
+  }, [activeView, compareMode, compareSeed, runCompareVisualization, leftAlgorithm, rightAlgorithm])
   // Load the cached metrics options when the dahsboard mounts
   useEffect(() => {
     const pings = compareApiData?.left.scene.pings
@@ -363,8 +380,10 @@ function NomadDashboard() {
   }, [loadMetricsOptions])
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex flex-col nomad-shell">
+    <div className={`nomad-shell flex min-h-dvh flex-col ${activeView === "demo" && !compareMode ? "lg:h-dvh lg:overflow-hidden" : ""}`}>
       <NomadNav currentView={activeView} />
+      <div className="nomad-viewport min-h-0">
+        <div className="nomad-dashboard bg-background">
 
       {activeView === "home" && (
         <HomeView navigateTo={navigateTo} />
@@ -377,7 +396,6 @@ function NomadDashboard() {
           syncUrl={syncUrl}
           openLearnAlgorithm={openLearnAlgorithm}
           openLearnDemo={openLearnDemo}
-          openLearnDocumentation={openLearnDocumentation}
         />
       )}
 
@@ -425,7 +443,7 @@ function NomadDashboard() {
           metricsLeftAlgorithm={metricsLeftAlgorithm}
           metricsRightAlgorithm={metricsRightAlgorithm}
           metricsTrajectory={metricsTrajectory}
-          selectedUserId={compareApiData?.left.scene?.user_id}
+          initialSelectedUserId={metricsAgentId ?? undefined}
           leftParameterNote={leftParameterNote}
           rightParameterNote={rightParameterNote}
           metricsError={metricsError}
@@ -437,6 +455,8 @@ function NomadDashboard() {
           startTour={startMetricsTour}
         />
       )}
+        </div>
+      </div>
     </div>
   )
 }

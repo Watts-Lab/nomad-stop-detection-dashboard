@@ -106,7 +106,7 @@ export function associationOpacity(
     return associatedWithHover(
       pingIndex,
       hoverPingIndexes
-    ) ? 0.85 : 0.2
+    ) ? 1 : 0.2
   }
   
   // Determine the opacity of an X-ray anchor point based on

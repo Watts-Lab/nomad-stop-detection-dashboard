@@ -116,14 +116,14 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
     element: "[data-tour='metrics-chart']",
     popover: {
       title: "Find Each Person's Best Setting",
-      description: "A red x marks the setting that worked best for each person. The red line averages each person's best result among the settings tested up to that point. Hover over a red x to trace that person's results in green and see how their performance changes across the sweep.",
+      description: "A red x marks the setting that worked best for each person. The red line averages each person's best result among the settings tested up to that point. Click a red x to trace that person's results in green and see how their performance changes across the sweep.",
     },
   },
   {
     element: "[data-tour='metrics-controls']",
     popover: {
       title: "Choose and Compare Algorithms",
-      description: "Minute recall shows the share of true stop time recovered; higher is better. Failure types shows the average share of true stops missed or split (orange), and merged (green); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
+      description: "Minute-by-minute recall shows the share of true stop time recovered; higher is better. The Failure modes view shows separate missed (violet) and split (gold) shares, plus merged (teal); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
     },
   },
 ]

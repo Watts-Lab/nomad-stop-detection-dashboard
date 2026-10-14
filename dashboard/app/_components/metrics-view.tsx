@@ -253,14 +253,14 @@ export function MetricsView({
       ? `&user=${encodeURIComponent(selectedUserIdsRef.current.left)}`
       : ""
     setLeftMetricsPrototypeSrc(`${prototypeChartSrc(metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsLeftAlgorithm])}&view=${metricsChartView}&frame=left&${leftFixedParameters}${selectedUserParameter}${metricsCompareMode ? "&legend=space" : ""}`)
-  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, leftParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory])
+  }, [leftFixedParameters, metricsChartView, metricsCompareMode, metricsLeftAlgorithm, leftParameterNote?.sweep_parameter, metricsTrajectory])
 
   useEffect(() => {
     const selectedUserParameter = selectedUserIdsRef.current.right
       ? `&user=${encodeURIComponent(selectedUserIdsRef.current.right)}`
       : ""
     setRightMetricsPrototypeSrc(`${prototypeChartSrc(metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsRightAlgorithm])}&view=${metricsChartView}&frame=right&${rightFixedParameters}${selectedUserParameter}`)
-  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, rightParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, rightFixedParameters])
+  }, [metricsChartView, metricsCompareMode, metricsRightAlgorithm, rightParameterNote?.sweep_parameter, metricsTrajectory, rightFixedParameters])
 
   useEffect(() => {
 

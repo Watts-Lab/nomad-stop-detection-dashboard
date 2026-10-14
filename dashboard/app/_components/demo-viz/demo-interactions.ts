@@ -18,32 +18,38 @@ export function selectedPingLineData(
   }]
 }
 
-// Describe a ping for its hover tooltip and the single-selection box.
-export function pingInfoLines(
+// Describe a ping for its hover tooltip.
+export function pingTooltipHtml(
     pingIndex: number,
     timestampSeconds: number,
     chartData: DemoResultData,
-    showXray: boolean
+    showStops: boolean,
+    showXray: boolean,
+    clusterColor: (cluster: number) => string,
   ) {
     const ping = chartData.pings[pingIndex]
-    const result = chartData.result
-    const classified = pingClassifiedAt(pingIndex, timestampSeconds, chartData)
-    const cluster = !classified
-      ? "Unclassified"
-      : ping.cluster < 0
-        ? "Noise"
-        : result.kind === "density" && showXray
-          ? `${result.core[ping.i] >= 0 ? "Core" : "Border"} · Cluster ${ping.cluster}`
-          : `Cluster ${ping.cluster}`
-
-    return [
-      `Ping ${ping.i + 1}`,
-      ping.time,
-      cluster,
-      ...(classified && result.kind === "density" && showXray
-        ? [`Distance threshold: ${chartData.distanceThreshold}`]
-        : []),
+    const rows = [
+      `<div><span style="font-weight:600">${ping.i + 1}:</span> <span style="font-weight:400">${ping.time}</span></div>`,
     ]
+
+    if (!showStops) return rows.join("")
+
+    const classified = pingClassifiedAt(pingIndex, timestampSeconds, chartData)
+    if (!classified) rows.push("<div>Unclassified</div>")
+    else if (ping.cluster < 0) rows.push("<div>Noise</div>")
+    else {
+      if (chartData.result.kind === "density" && showXray) {
+        rows.push(`<div>${chartData.result.core[ping.i] >= 0 ? "Core" : "Border"}</div>`)
+      }
+      const stop = chartData.stops.find((candidate) => candidate.cluster === ping.cluster)
+      if (stop) {
+        rows.push(
+          `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:12px;height:12px;align-items:center;justify-content:center;background:${clusterColor(ping.cluster)};border:1px solid #202124"><span style="width:3px;height:3px;border-radius:50%;background:#202124"></span></span><span>${stop.startTime}–${stop.endTime}</span></div>`,
+        )
+      }
+    }
+
+    return rows.join("")
   }
 
 // Return the detected cluster for an interacted-with ping once that ping has been classified at the current playback time.

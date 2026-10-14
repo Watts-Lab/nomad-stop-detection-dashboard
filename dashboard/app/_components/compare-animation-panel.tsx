@@ -20,7 +20,7 @@ import {
 } from "./demo-viz/overlays/demo-ground-truth"
 import { containmentAreasAt, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
-import { pingInfoLines, selectedPingLineData } from "./demo-viz/demo-interactions"
+import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
   nextSequenceIndex, isPlaybackComplete, timelineValueToTimestamp,
@@ -1073,7 +1073,6 @@ export function DemoSceneRenderer({
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
         getHoverPingIndex: () => hoverPingIndex,
-        getSelectedPingIndexes: () => selectedPingIndexesRef.current,
         getContainmentAreas: () => activeContainmentAreas,
         pingTooltipPosition,
         algorithm: panel.algo,
@@ -1315,7 +1314,6 @@ export function DemoSceneRenderer({
   const selectedPings = selectedPingIndexes.length === 2 && resultData
     ? selectedPingIndexes.map((pingIndex) => resultData.pings[pingIndex])
     : null
-  const selectedPing = selectedPingIndexes.length === 1 && resultData ? resultData.pings[selectedPingIndexes[0]] : null
   const selectedPingDistance = selectedPings
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
@@ -1325,20 +1323,15 @@ export function DemoSceneRenderer({
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
-      {(selectedPings || selectedPing) && (
+      {selectedPings && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
-          {selectedPings ? <>
+          <>
             <div>Ping comparison</div>
             <div>Ping {selectedPings[0].i + 1}: {selectedPings[0].time}</div>
             <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
             <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
             <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
-          </> : pingInfoLines(
-            selectedPing!.i,
-            currentTime ?? resultData!.timeSequence[resultData!.timeSequence.length - 1],
-            resultData!,
-            showXray,
-          ).map((line) => <div key={line}>{line}</div>)}
+          </>
         </div>
       )}
       {syncMaster && variant === "full" && (

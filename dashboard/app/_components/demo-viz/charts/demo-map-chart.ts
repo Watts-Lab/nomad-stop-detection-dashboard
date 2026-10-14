@@ -3,7 +3,7 @@
 import * as echarts from "echarts"
 import type { EChartsApi, EChartsParams } from "../../../_lib/types"
 import type { DemoResultData } from "../../../_lib/demo-result-data"
-import { associatedWithHover, pingInfoLines, pingScale } from "../demo-interactions"
+import { associatedWithHover, pingScale, pingTooltipHtml } from "../demo-interactions"
 import { pingClassifiedAt } from "../overlays/demo-detected-stops"
 import { xrayAnchorFramesAt } from "../overlays/demo-xray"
 
@@ -30,7 +30,6 @@ type MapChartOptionsArgs = {
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
   getHoverPingIndex: () => number | null
-  getSelectedPingIndexes: () => number[]
   getContainmentAreas: () => Array<{ cluster: number; points: number[][]; shaded: boolean }>
   pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
   algorithm: string
@@ -48,7 +47,6 @@ export function createDemoMapChartOptions({
   getHoverBuildingId,
   getHoverPingIndexes,
   getHoverPingIndex,
-  getSelectedPingIndexes,
   getContainmentAreas,
   pingTooltipPosition,
   algorithm,
@@ -188,11 +186,13 @@ export function createDemoMapChartOptions({
       formatter(params: EChartsParams) {
         const value = paramsValue(params)
         if (params.seriesId === "core-points") {
-          const ping = getChartData().pings[value[3]]
-          return `Core point for Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}<br>Distance threshold: ${getChartData().distanceThreshold}`
+          return pingTooltipHtml(value[3], getActiveTimestamp(), getChartData(), getShowStops(), getShowXray(), clusterColor)
         }
         if (params.seriesId === "anchor-points") {
           const ping = getChartData().pings[value[3]]
+          if (!getShowStops()) {
+            return `<div><span style="font-weight:600">${ping.i + 1}:</span> <span style="font-weight:400">${ping.time}</span></div>`
+          }
           const label = algorithm === "sequential_centroid"
             ? "Centroid anchor for"
             : algorithm.startsWith("sequential_")
@@ -201,9 +201,7 @@ export function createDemoMapChartOptions({
           return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
         }
         if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
-          // Selected pings already show this in the selection box; empty content hides the tooltip.
-          if (getSelectedPingIndexes().includes(value[3])) return ""
-          return pingInfoLines(value[3], getActiveTimestamp(), getChartData(), getShowXray()).join("<br>")
+          return pingTooltipHtml(value[3], getActiveTimestamp(), getChartData(), getShowStops(), getShowXray(), clusterColor)
         }
         return ""
       },

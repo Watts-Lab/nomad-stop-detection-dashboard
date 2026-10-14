@@ -154,40 +154,6 @@ export const DEMO_ID_BY_METRICS_ALGORITHM: Record<string, string> = Object.fromE
   Object.entries(METRICS_ALGORITHM_BY_DEMO_ID).map(([demoId, metricsName]) => [metricsName, demoId]),
 )
 
-export const METRICS_SWEEP_PARAMETERS: Record<string, Array<{ value: string; label: string; min: number; max: number }>> = {
-  DBSTOP: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  Lachesis: [
-    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Sequential (Centroid)": [
-    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Sequential (First)": [
-    { value: "delta_roam", label: "delta_roam", min: 5, max: 120 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  SeqScan: [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "ST-DBSCAN": [
-    { value: "dist_thresh", label: "dist_thresh", min: 0, max: 50 },
-  ],
-  HDBSCAN: [
-    { value: "dist_thresh", label: "dist_thresh", min: 5, max: 40 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-  "Grid-Based": [
-    { value: "h3_resolution", label: "h3_resolution", min: 10, max: 13 },
-    { value: "dur_min", label: "dur_min", min: 0, max: 180 },
-  ],
-}
-
 export const METRICS_RESULTS_FILE: Record<string, string> = {
   Lachesis: "lachesis_results.parquet",
   "Sequential (Centroid)": "sequential_centroid_results.parquet",

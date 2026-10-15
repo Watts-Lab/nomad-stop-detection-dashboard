@@ -19,7 +19,7 @@ import {
   groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
 import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
-import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
+import { detectedStopBarsAt } from "./demo-viz/overlays/demo-detected-stops"
 import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
@@ -414,7 +414,6 @@ export function DemoSceneRenderer({
       previewing = false
       const latestPingIndex = latestPingIndexAt(timestampSeconds, scene.pings)
       const route = routeProgressAt(timestampSeconds, preparedSegments)
-      const detectedStopCount = detectedCountFor(timestampSeconds, chartData)
       const anchorFrames = xrayAnchorFramesAt(timestampSeconds, chartData)
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
@@ -460,7 +459,7 @@ export function DemoSceneRenderer({
           { id: "past-truth-stops", data: layerStateRef.current.showGroundTruth ? pastTruthStopData(timestampSeconds, chartData) : [] },
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
           { id: "current-truth-stop", data: layerStateRef.current.showGroundTruth ? currentTruthStopData(timestampSeconds, chartData, pulseStrength) : [] },
-          { id: "stop-bars", data: layerStateRef.current.showStops ? chartData.stopBars.slice(0, detectedStopCount) : [] },
+          { id: "stop-bars", data: layerStateRef.current.showStops ? detectedStopBarsAt(timestampSeconds, chartData) : [] },
           { id: "cursor", data: [[timestampSeconds * 1000]] }
         ]
       }, { lazyUpdate: true })

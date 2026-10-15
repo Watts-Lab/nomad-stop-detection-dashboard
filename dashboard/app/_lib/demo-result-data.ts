@@ -78,6 +78,35 @@ export function prepareDemoResultData(
         endTime: new Date(stop.end * 1000).toISOString().slice(11, 16),
     }))
 
+    // Sequential stops become identifiable when an observed member
+    // first reaches the minimum duration from the stop's start.
+    const sequentialStopDetectionTimes = new Map<number, number>()
+
+    if (
+        panel.algo === "lachesis" ||
+        panel.algo.startsWith("sequential_")
+    ) {
+        const minimumDurationSeconds =
+            Number(panel.params.dur_min ?? 5) * 60
+
+        for (const stop of stops) {
+            const members = clusterMembers.get(stop.cluster) ?? []
+
+            const detectionPingIndex = members.find(
+                (pingIndex) =>
+                    pings[pingIndex].t - stop.start >=
+                    minimumDurationSeconds,
+            )
+
+            sequentialStopDetectionTimes.set(
+                stop.cluster,
+                detectionPingIndex === undefined
+                    ? Infinity
+                    : pings[detectionPingIndex].t,
+            )
+        }
+    }
+
     const sequentialGroups = panel.algo.startsWith("sequential_")
         ? stops.map((stop) =>
             (clusterMembers.get(stop.cluster) ?? []).map(
@@ -291,6 +320,7 @@ export function prepareDemoResultData(
         pingData,
         result,
         clusterMembers,
+        sequentialStopDetectionTimes,
         stops,
         densityCorePointData,
         densityPromotionEdges,

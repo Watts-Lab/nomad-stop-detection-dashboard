@@ -19,22 +19,31 @@ export function detectedCountFor(
   return count
 }
 
-// Determine whether a ping has been classified by the algorithm
+// Determine whether a ping's stop assignment is available
 // at the current playback time.
 export function pingClassifiedAt(
-    pingIndex: number,
-    timestampSeconds: number,
-    chartData: DemoResultData
+  pingIndex: number,
+  timestampSeconds: number,
+  chartData: DemoResultData,
 ) {
-    const pingTime = chartData.pingData[pingIndex][4]
+  const ping = chartData.pingData[pingIndex]
+  const pingTime = ping[4]
+  const cluster = ping[2]
 
-    return pingTime <= timestampSeconds && (
-        chartData.result.kind !== "density" ||
-        Math.max(
-            pingTime,
-            chartData.result.aux_time[pingIndex] ?? pingTime
-        ) <= timestampSeconds
-    )
+  if (pingTime > timestampSeconds) return false
+
+  if (chartData.result.kind === "density") {
+      return Math.max(
+          pingTime,
+          chartData.result.aux_time[pingIndex] ?? pingTime,
+      ) <= timestampSeconds
+  }
+
+  const detectionTime =
+      chartData.sequentialStopDetectionTimes.get(cluster)
+
+  return detectionTime === undefined ||
+      detectionTime <= timestampSeconds
 }
 
 // Find the building assigned to the detected stop containing the hovered ping.
@@ -117,3 +126,37 @@ export function classifiedClusterMembersAt(
         )
       )
   }
+
+  // Build each stop's timeline interval using only members classified
+// by the current playback time.
+export function detectedStopBarsAt(
+  timestampSeconds: number,
+  chartData: DemoResultData,
+): number[][] {
+  return chartData.stops.flatMap((stop) => {
+    const members =
+      classifiedClusterMembersAt(
+        stop.cluster,
+        timestampSeconds,
+        chartData,
+      ) ?? []
+
+    if (!members.length) return []
+
+    let start = Infinity
+    let end = -Infinity
+
+    for (const pingIndex of members) {
+      const pingTime = chartData.pingData[pingIndex][4]
+      start = Math.min(start, pingTime)
+      end = Math.max(end, pingTime)
+    }
+
+    return [[
+      start * 1000,
+      end * 1000,
+      stop.cluster,
+      stop.index,
+    ]]
+  })
+}

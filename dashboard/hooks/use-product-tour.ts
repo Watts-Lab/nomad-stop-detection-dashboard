@@ -20,15 +20,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Inspect GPS Pings",
-      description: "Each dot represents a GPS ping from the selected agent. Hover over a dot to see if it is part of a detected stop & highlight it on the timeline.",
-    },
-  },
-  {
-    element: "[data-tour='tour-map']",
-    popover: {
-      title: "Compare Two Pings",
-      description: "Click two GPS pings to compare their distance and elapsed time. Click “Clear selection” below the timeline to reset.",
+      title: "Explore GPS Pings",
+      description: "Each dot is a GPS ping. Hover to see its stop assignment and highlight it on the timeline. Click two pings to compare distance and elapsed time; use “Clear selection” below the timeline to reset.",
     },
   },
   {
@@ -37,7 +30,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Understand Ping Types",
-      description: "Colored pings belong to detected stops. Black pings have no stop assignment at the current playback time. Outlined circles mark anchor or core points, and connecting lines show how the algorithm links them.",
+      description: "Colored pings belong to detected stops, black pings are currently unassigned. Outlined circles mark anchor or core points, and connecting lines show how the algorithm links them.",
     },
   },
   {
@@ -54,17 +47,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Understand Timeline Pings",
-      description: "Vertical bars represent GPS pings. Hover over a bar to highlight the corresponding ping and its detected stop on the map.",
-    },
-  },
-  {
-    element: "[data-tour='tour-timeline']",
-    onHighlightStarted: tourAction("ground-truth"),
-    onDeselected: clearTourAction,
-    popover: {
-      title: "Interact With Timeline Components",
-      description: "Colored bands group pings by detected stops, and blue rectangles group pings by buildings. The moving line marks playback time; drag or scroll this line to move to different parts of the trip.",
+      title: "Explore Timeline",
+      description: "Vertical bars are GPS pings; hover to highlight them and their detected stops on the map. Colored bands show detected stops, and blue rectangles show building visits. Drag or scroll the playback line to explore the trip.",
     },
   },
   {
@@ -82,17 +66,10 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     },
   },
   {
-    element: "[data-tour='tour-metrics']",
-    popover: {
-      title: "Open Aggregated Metrics",
-      description: "Aggregated Metrics displays results across all users and compares performance across different parameter settings.",
-    },
-  },
-  {
     element: "[data-tour='tour-compare-toggle']",
     popover: {
       title: "Compare Two Algorithms",
-      description: "Switch to side-by-side mode to compare two algorithms on the same trajectory. Adjust each algorithm’s parameters independently and watch their results with synchronized playback.",
+      description: "Compare two algorithms on the same trip with synchronized playback. Adjust each algorithm’s parameters independently.",
     },
   },
 ]

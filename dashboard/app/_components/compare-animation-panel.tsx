@@ -18,7 +18,7 @@ import {
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
   groundTruthRouteMarkerAt, groundTruthRouteGlowPoints
 } from "./demo-viz/overlays/demo-ground-truth"
-import { xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
+import { containmentAreasAt, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
 import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
@@ -258,8 +258,8 @@ export function DemoSceneRenderer({
     let pingFloatOffset = 0
     let previewing = false
     let hoverPingIndex: number | null = null
-    let hoverEdgeEndpoints: [number, number] | null = null
     let hoverPingIndexes: Set<number> | null = null
+    let activeContainmentAreas: Array<{ cluster: number; points: number[][]; shaded: boolean }> = []
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
@@ -290,6 +290,7 @@ export function DemoSceneRenderer({
     }
 
     const isDensityAlgorithm = chartData.result.kind === "density"
+    const isSequentialAlgorithm = panel.algo === "lachesis" || panel.algo.startsWith("sequential_")
     const distThreshold = Number(panel.params?.dist_thresh ?? panel.params?.eps_spatial ?? 0)
     const paramsValue = (params: { data?: unknown; value?: unknown }) => (params.value ?? (params.data as { value?: number[] }).value ?? params.data) as number[]
     const pingCircle = (api: EChartsApi, scale = 1) => {
@@ -419,13 +420,13 @@ export function DemoSceneRenderer({
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
+      activeContainmentAreas = isSequentialAlgorithm && layerStateRef.current.showXray
+        ? containmentAreasAt(timestampSeconds, chartData, panel.algo, latestPingIndex)
+        : []
       hoverPingIndexes = resolveHoverPingIndexes({
         timestampSeconds,
         chartData,
-        selectedPingIndexes: selectedPingIndexesRef.current,
-        hoverPingIndex,
-        hoverEdgeEndpoints,
-        anchorEdges
+        selectedPingIndexes: selectedPingIndexesRef.current
       })
       mapChart.setOption({
         series: buildDemoMapSeries({
@@ -437,7 +438,7 @@ export function DemoSceneRenderer({
           anchorEdges,
           promotionEdges,
           hoverPingIndexes,
-          hoverPingIndex,
+          containmentAreas: activeContainmentAreas,
           hoverBuildingId,
           selectedPingIndexes: selectedPingIndexesRef.current,
           showGroundTruth: layerStateRef.current.showGroundTruth,
@@ -447,6 +448,7 @@ export function DemoSceneRenderer({
           pulseStrength,
           pingFloatOffset,
           isDensityAlgorithm,
+          algorithm: panel.algo,
           clusterColor
         })
       }, { lazyUpdate: true })
@@ -490,6 +492,7 @@ export function DemoSceneRenderer({
           { id: "anchor-edges-hit-area", data: [] },
           { id: "anchor-points", data: [] },
           { id: "current-ping", data: [] },
+          { id: "containment-areas", data: [] },
           { id: "distance-circles", data: [] },
           { id: "selected-ping-line", data: selectedPingLineData(selectedPingIndexesRef.current, chartData) },
         ],
@@ -527,38 +530,20 @@ export function DemoSceneRenderer({
     }
     const activeTimestamp = () => activePlaybackTimestamp(selectedTimestampRef.current, sequenceIndex, chartData.timeSequence)
 
-    // Update the hovered ping and its ground-truth building, 
-    // Redraw highlights and reposition tooltips
+    // Update the hovered ping (a magnify accent only) and clear building hover,
+    // Redraw and reposition tooltips
     const setHoveredPing = (pingIndex: number | null) => {
-      const ping = pingIndex === null ? null : chartData.pings[pingIndex]
-      const buildingId = ping ? groundTruthAt(ping.t, chartData).current?.location ?? "" : ""
-      if (hoverPingIndex === pingIndex && hoverBuildingId === buildingId && hoverEdgeEndpoints === null) return
+      if (hoverPingIndex === pingIndex && hoverBuildingId === "") return
       hoverPingIndex = pingIndex
-      hoverEdgeEndpoints = null
-      hoverBuildingId = buildingId
-      renderScene(activeTimestamp())
-      refreshTooltipLayout()
-    }
-
-    // Update the hovered edge, clear ping/building hover
-    // Redraw the connected-ping highligh
-    const setHoveredEdge = (endpoints: [number, number] | null) => {
-      const same = hoverEdgeEndpoints !== null && endpoints !== null &&
-        hoverEdgeEndpoints[0] === endpoints[0] && hoverEdgeEndpoints[1] === endpoints[1]
-      const alreadyClear = hoverEdgeEndpoints === null && endpoints === null
-      if ((same || alreadyClear) && hoverPingIndex === null && hoverBuildingId === "") return
-      hoverEdgeEndpoints = endpoints
-      hoverPingIndex = null
       hoverBuildingId = ""
       renderScene(activeTimestamp())
       refreshTooltipLayout()
     }
 
-    // Highlight a building while clearing ping and edge hover
+    // Highlight a building while clearing ping hover
     const setHoveredBuilding = (buildingId: string) => {
-      if (hoverPingIndex === null && hoverEdgeEndpoints === null && hoverBuildingId === buildingId) return
+      if (hoverPingIndex === null && hoverBuildingId === buildingId) return
       hoverPingIndex = null
-      hoverEdgeEndpoints = null
       hoverBuildingId = buildingId
       renderScene(activeTimestamp())
       refreshTooltipLayout()
@@ -572,7 +557,7 @@ export function DemoSceneRenderer({
     })
 
     const boxOverlapsElement: (position: number[], width: number, height: number, element: HTMLDivElement | null, gap: number) => boolean = ([left, top], width, height, element, gap) => {
-      if (!element || element.style.visibility === "hidden") return false
+      if (!element || element.style.visibility === "hidden" || element.style.display === "none") return false
       return !(
         left + width + gap <= element.offsetLeft ||
         left >= element.offsetLeft + element.offsetWidth + gap ||
@@ -666,13 +651,8 @@ export function DemoSceneRenderer({
       if (action === "ground-truth") setHoveredBuilding(chartData.truthStops[0]?.location ?? "")
     }
 
-    // Route map hover events to the matching ping, anchor, or connection-edge highlight
+    // Route map hover events to the matching ping or anchor accent
     const onMapMouseOver = (params: echarts.ECElementEvent) => {
-      if (params.seriesId === "anchor-edges-hit-area" || params.seriesId === "promotion-edges-hit-area") {
-        const value = paramsValue(params)
-        setHoveredEdge([Number(value[1]), Number(value[2])])
-        return
-      }
       if (
         params.seriesId === "ghost-pings" ||
         params.seriesId === "cluster-pings" ||
@@ -726,7 +706,7 @@ export function DemoSceneRenderer({
     // Clear map hover when leaving an item or the chart, unless a tour highlight is active
     const onMapMouseOut = () => {
       mapMousePosition = null
-      if (!tourActionActive) setHoveredEdge(null)
+      if (!tourActionActive) setHoveredPing(null)
       else positionComparisonTooltip()
     }
 
@@ -1092,6 +1072,8 @@ export function DemoSceneRenderer({
         bounds,
         getHoverBuildingId: () => hoverBuildingId,
         getHoverPingIndexes: () => hoverPingIndexes,
+        getHoverPingIndex: () => hoverPingIndex,
+        getContainmentAreas: () => activeContainmentAreas,
         pingTooltipPosition,
         algorithm: panel.algo,
         getShowXray: () => layerStateRef.current.showXray,
@@ -1332,7 +1314,6 @@ export function DemoSceneRenderer({
   const selectedPings = selectedPingIndexes.length === 2 && resultData
     ? selectedPingIndexes.map((pingIndex) => resultData.pings[pingIndex])
     : null
-  const selectedPing = selectedPingIndexes.length === 1 && resultData ? resultData.pings[selectedPingIndexes[0]] : null
   const selectedPingDistance = selectedPings
     ? Math.hypot(selectedPings[1].x - selectedPings[0].x, selectedPings[1].y - selectedPings[0].y)
     : 0
@@ -1342,15 +1323,15 @@ export function DemoSceneRenderer({
 
   return (
     <div className={`relative flex h-full w-full flex-col overflow-hidden rounded-md border border-[#d7dbd2] bg-[#f8f9fc] text-[#202124] shadow-[0_16px_45px_rgba(32,33,36,0.08)] ${destinationPreview ? "pointer-events-none" : ""}`}>
-      {(selectedPings || selectedPing) && (
+      {selectedPings && (
         <div ref={comparisonTooltipRef} style={comparisonTooltipPosition} className="pointer-events-none absolute z-10 rounded-sm bg-[rgba(32,33,36,0.92)] px-2 py-1.5 text-sm text-white shadow-md">
-          {selectedPings ? <>
+          <>
             <div>Ping comparison</div>
             <div>Ping {selectedPings[0].i + 1}: {selectedPings[0].time}</div>
             <div>Ping {selectedPings[1].i + 1}: {selectedPings[1].time}</div>
             <div>Distance: {selectedPingDistance.toFixed(1)} m</div>
             <div>Time between: {elapsedTimeLabel(selectedPingElapsed)}</div>
-          </> : <div>Ping {selectedPing!.i + 1} selected</div>}
+          </>
         </div>
       )}
       {syncMaster && variant === "full" && (

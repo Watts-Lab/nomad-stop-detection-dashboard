@@ -45,7 +45,7 @@ function DestinationPreview({ trajectory }: { trajectory: string }) {
             panel={data.left}
             mode="single"
             currentTime={null}
-            onTimeChange={() => {}}
+            onTimeChange={() => { }}
             syncMaster={false}
             showGroundTruth={false}
             showStops={false}
@@ -93,6 +93,8 @@ export function DemoView({
   handleLeftAlgorithmChange,
   handleRightAlgorithmChange,
   handleNewTrajectory,
+  handleAgentSearch,
+  compareLoading,
   openMetricsFromDemo,
   startTour,
 }: {
@@ -126,6 +128,8 @@ export function DemoView({
   handleLeftAlgorithmChange: (algorithmId: string) => void
   handleRightAlgorithmChange: (algorithmId: string) => void
   handleNewTrajectory: () => void
+  handleAgentSearch: (agentId: string) => void
+  compareLoading: boolean
   openMetricsFromDemo: (agentId?: string) => void
   startTour: () => void
 }) {
@@ -134,7 +138,14 @@ export function DemoView({
   const [comparePreviewRunId, setComparePreviewRunId] = useState(0)
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const [showInformation, setShowInformation] = useState(false)
+  const [agentSearchId, setAgentSearchId] = useState("")
   const scene = compareApiData?.left.scene
+  useEffect(() => {
+    if (scene?.user_id) {
+      setAgentSearchId(scene.user_id)
+    }
+  }, [scene?.user_id])
+
   const algorithmLayersDisabled = !leftAlgo && (!compareMode || !rightAlgo)
   const dataPanel = (
     <Card className="self-start overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-data">
@@ -158,6 +169,40 @@ export function DemoView({
                 </span>
               </div>
             )}
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (!compareLoading) handleAgentSearch(agentSearchId)
+              }}
+            >
+              <label
+                htmlFor="agent-search"
+                className="block text-xs font-medium text-foreground"
+              >
+                Find agent by ID
+              </label>
+              <input
+                id="agent-search"
+                type="text"
+                value={agentSearchId}
+                onChange={(event) => setAgentSearchId(event.target.value)}
+                placeholder="Enter agent ID"
+                autoComplete="off"
+                spellCheck={false}
+                className="h-9 w-full min-w-0 rounded-md border border-[#d1d5db] bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#7629db]/25"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={compareLoading}
+                className="w-full"
+              >
+                {compareLoading ? "Loading…" : "Load Agent"}
+              </Button>
+            </form>
+
             <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">
               <RefreshCw className="h-4 w-4" />
               New Agent
@@ -250,21 +295,21 @@ export function DemoView({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-[#3b1370]">Algorithm</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                <SelectTrigger className="h-10 border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
-                  <SelectValue placeholder="Select algorithm" />
-                </SelectTrigger>
-                <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
-                  <SelectItem value="none">None</SelectItem>
-                  {demoAlgorithms.map((a) => (
-                    <SelectItem
-                      key={a.id}
-                      value={a.id}
-                      className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
-                    >
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                  <SelectTrigger className="h-10 border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                    <SelectValue placeholder="Select algorithm" />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
+                    <SelectItem value="none">None</SelectItem>
+                    {demoAlgorithms.map((a) => (
+                      <SelectItem
+                        key={a.id}
+                        value={a.id}
+                        className="bg-[#f4ecfe] font-normal text-foreground hover:bg-white focus:bg-white focus:text-foreground data-[state=checked]:bg-[#e8d8fc] data-[state=checked]:text-[#3b1370] data-[state=checked]:font-bold data-[state=checked]:hover:bg-[#e8d8fc] data-[state=checked]:focus:bg-[#e8d8fc] data-[state=checked]:focus:text-[#3b1370]"
+                      >
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">

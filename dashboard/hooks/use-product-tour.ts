@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { driver } from "driver.js"
 import "driver.js/dist/driver.css"
 import type { Driver, DriveStep } from "driver.js"
@@ -20,15 +20,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Inspect GPS Pings",
-      description: "Each dot is one GPS ping from the current agent. Hover a ping to enlarge it, show its time and status, and highlight the same ping on the timeline. Pings in the same detected stop remain emphasized while unrelated pings fade. Density algorithms also show the active distance threshold. That hover is being demonstrated now.",
-    },
-  },
-  {
-    element: "[data-tour='tour-map']",
-    popover: {
-      title: "Compare Two Pings",
-      description: "Click one ping to keep it selected, then click a second to draw a line between them and compare their distance and elapsed time. Click a selected ping again to remove it, click the map background to clear the comparison, or use Clear selection below the timeline.",
+      title: "Explore GPS Pings",
+      description: "Each dot is a GPS ping. Hover to see its stop assignment and highlight it on the timeline. Click two pings to compare distance and elapsed time; use “Clear selection” below the timeline to reset.",
     },
   },
   {
@@ -36,8 +29,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("anchor-point"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Detected Stops and Algorithm Structure",
-      description: "Colored pings show revealed detected-stop assignments; pings shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. Hover a ping to focus its detected stop or hover an edge to isolate its connected component. An anchor is highlighted now.",
+      title: "Understand Ping Types",
+      description: "Colored pings belong to detected stops, black pings are currently unassigned. Outlined circles mark anchor or core points, and connecting lines show how the algorithm links them.",
     },
   },
   {
@@ -45,8 +38,8 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("ground-truth"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Toggle Reference and Detection Layers",
-      description: "Ground Truth controls the known visited-building intervals and routes. Detected Stops controls the algorithm's colored ping assignments, anchors, and edges. The known building for a ground-truth interval lights up when that interval is hovered on the timeline; the tour is showing that highlight now.",
+      title: "Toggle Ground Truth & Detected Stops",
+      description: "Toggle Ground Truth to show known visits and routes, and Detected Stops to show the algorithm’s results. Hover over a ground-truth interval on the timeline to highlight the visited building.",
     },
   },
   {
@@ -54,45 +47,29 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onHighlightStarted: tourAction("timeline-ping"),
     onDeselected: clearTourAction,
     popover: {
-      title: "Hover Timeline Pings",
-      description: "Vertical bars are GPS pings. Hover one to raise and outline it, fade unrelated bars, and highlight that ping and its detected stop on the map. Timeline pings can also be clicked for the same two-ping comparison available on the map. The tour is demonstrating the hover now.",
-    },
-  },
-  {
-    element: "[data-tour='tour-timeline']",
-    onHighlightStarted: tourAction("ground-truth"),
-    onDeselected: clearTourAction,
-    popover: {
-      title: "Read the Timeline Layers",
-      description: "Colored vertical bars mark core-point pings, translucent bands mark detected stops, and teal rectangles mark known time inside buildings. Completed intervals fade; during playback the current interval glows and the next is light teal. The cyan line marks playback time. Drag or scroll the timeline to scrub, and use the map's play or replay controls to animate the trip.",
+      title: "Explore Timeline",
+      description: "Vertical bars are GPS pings; hover to highlight them and their detected stops on the map. Colored bands show detected stops, and blue rectangles show building visits. Drag or scroll the playback line to explore the trip.",
     },
   },
   {
     element: "[data-tour='tour-data']",
     popover: {
-      title: "Choose the Scenario and Agent",
-      description: "Changing the trajectory automatically reruns the visualization. Use New Agent to load a different agent while keeping the selected trajectory and algorithm setup.",
+      title: "Choose Scenario and Agent",
+      description: "Choose a ground-truth diary to explore. Each agent is a sparse trajectory sampled from that diary; click “New Agent” to load another sample.",
     },
   },
   {
     element: "[data-tour='tour-params']",
     popover: {
-      title: "Choose the Algorithm and Parameters",
-      description: "Changing the algorithm or any editable parameter automatically reruns the visualization.",
-    },
-  },
-  {
-    element: "[data-tour='tour-metrics']",
-    popover: {
-      title: "Open Aggregated Metrics",
-      description: "Aggregated Metrics opens the parameter-sweep results for the current algorithm. From comparison mode it carries both supported algorithms into the side-by-side metrics view, where fixed notebook parameters are listed beside the charts.",
+      title: "Choose Algorithm and Parameters",
+      description: "Select an algorithm, then adjust its parameters to explore how they affect detected stops. The visualization updates automatically.",
     },
   },
   {
     element: "[data-tour='tour-compare-toggle']",
     popover: {
       title: "Compare Two Algorithms",
-      description: "Switch to side-by-side mode, choose Left and Right algorithms with independent parameters, and run both on the same agent and trajectory. Their playback stays synchronized so you can see where they agree, split, merge, or miss a stop.",
+      description: "Compare two algorithms on the same trip with synchronized playback. Adjust each algorithm’s parameters independently.",
     },
   },
 ]
@@ -101,29 +78,29 @@ export const METRICS_TOUR_STEPS: DriveStep[] = [
   {
     element: "[data-tour='metrics-chart']",
     popover: {
-      title: "Read the Parameter Sweep",
-      description: "Each pale blue dot shows one person's result at one parameter setting. The horizontal axis shows the setting being tested, while the vertical axis shows how much of the true stop time the algorithm recovered. Higher values indicate better detection.",
+      title: "Compare Parameter Settings",
+      description: "Each blue dot shows one person’s result at a parameter setting. The horizontal axis shows the setting tested and the vertical axis shows the fraction of true stop time recovered.",
     },
   },
   {
     element: "[data-tour='metrics-chart']",
     popover: {
-      title: "See the Overall Pattern",
-      description: "The solid blue line shows the average result across all people at each setting. Faint blue paths connect results from the same person, revealing how performance can vary between people even when the overall trend looks stable.",
+      title: "See Overall Trends",
+      description: "The solid blue line shows average performance across all people at each setting. The dotted blue line shows the highest of those averages, marking the best setting overall.",
     },
   },
   {
     element: "[data-tour='metrics-chart']",
     popover: {
-      title: "Find Each Person's Best Setting",
-      description: "A red x marks the setting that worked best for each person. The red line averages each person's best result among the settings tested up to that point. Click a red x to trace that person's results in green and see how their performance changes across the sweep.",
+      title: "Explore Personal Best Results",
+      description: "Each red dot marks a person’s best result across all tested settings, and the dotted red line shows the average of those personal bests. Click a red dot to highlight that person’s results.",
     },
   },
   {
     element: "[data-tour='metrics-controls']",
     popover: {
-      title: "Choose and Compare Algorithms",
-      description: "Minute-by-minute recall shows the share of true stop time recovered; higher is better. The Failure modes view shows separate missed (violet) and split (gold) shares, plus merged (teal); lower is better. Use the controls to select an algorithm and review fixed settings. Switch to Compare to place two algorithms top and bottom using the same chart view.",
+      title: "Compare Algorithm Performance",
+      description: "Select an algorithm and choose Recall to see how much true stop time it recovers, or Failure Modes to see missed, split, and merged stops. Switch to Compare to view two algorithms together.",
     },
   },
 ]
@@ -159,15 +136,36 @@ export function useProductTour(
   prepareTour = () => {},
   steps = DEMO_TOUR_STEPS,
   storageKey = DEMO_TOUR_STORAGE_KEY,
+  restoreTour = () => {},
+  resultsReady = ready,
 ) {
   const driverRef = useRef<Driver | null>(null)
   const autoStartedRef = useRef(false)
+  const requestedRef = useRef(false)
+  const [startRequested, setStartRequested] = useState(false)
+
+  // Keep the latest cleanup callback available to the driver.
+  const restoreTourRef = useRef(restoreTour)
+  useEffect(() => {
+    restoreTourRef.current = restoreTour
+  }, [restoreTour])
 
   const startTour = useCallback(() => {
+    if (requestedRef.current) return
+
+    requestedRef.current = true
     prepareTour()
-    window.requestAnimationFrame(() => {
-      if (!driverRef.current) {
-        driverRef.current = driver({
+    setStartRequested(true)
+  }, [prepareTour])
+
+  // Wait for preparation and the corresponding results before opening.
+  useEffect(() => {
+    if (!startRequested || !ready || !resultsReady) return
+
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const tour = driver({
           showProgress: true,
           smoothScroll: true,
           stageRadius: 8,
@@ -183,16 +181,28 @@ export function useProductTour(
             broadcastMetricsTourFocus()
             clearTourAction()
             window.localStorage.setItem(storageKey, "true")
+            restoreTourRef.current()
+            requestedRef.current = false
+            driverRef.current = null
           },
         })
-      }
-      driverRef.current.drive()
+
+        driverRef.current = tour
+        setStartRequested(false)
+        tour.drive()
+      })
     })
-  }, [steps, storageKey, prepareTour])
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
+    }
+  }, [startRequested, ready, resultsReady, steps, storageKey])
 
   useEffect(() => {
     if (!ready || autoStartedRef.current) return
     if (window.localStorage.getItem(storageKey)) return
+
     autoStartedRef.current = true
     startTour()
   }, [ready, startTour, storageKey])

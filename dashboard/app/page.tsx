@@ -311,19 +311,91 @@ function NomadDashboard() {
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
   const rightParameterNote = parameterNotes[metricsRightAlgorithm]
-  const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
+  const tourReady =
+    activeView === "demo" &&
+    !compareMode &&
+    !compareLoading &&
+    Boolean(compareApiData?.left?.scene)
+
+  const tourResultsReady =
+    tourReady &&
+    Boolean(leftAlgorithm) &&
+    compareApiData?.left.algo === leftAlgorithm
+
   const metricsTourReady = activeView === "metrics"
 
-  // Prepare Demo for the guided tour by showing ground truth and detected stops.
-  // If scene data is available, move the shared time to the final ping.
+  const tourSnapshotRef = useRef<{
+    leftAlgorithm: string
+    leftParams: Record<string, string>
+    leftParamErrors: Record<string, string>
+    showGroundTruth: boolean
+    showStops: boolean
+    showXray: boolean
+    demoTime: number | null
+  } | null>(null)
+
+  // Save the user's settings and temporarily provide an algorithm if needed.
   const prepareTour = useCallback(() => {
+    if (tourSnapshotRef.current) return
+
+    tourSnapshotRef.current = {
+      leftAlgorithm,
+      leftParams: { ...leftParams },
+      leftParamErrors: { ...leftParamErrors },
+      showGroundTruth,
+      showStops,
+      showXray,
+      demoTime,
+    }
+
+    if (!leftAlgorithm) {
+      setLeftAlgorithm("lachesis")
+      setLeftParams({})
+      setLeftParamErrors({})
+    }
+
     setShowGroundTruth(true)
     setShowStops(true)
     setShowXray(true)
-    const lastPing = compareApiData?.left?.scene?.pings.slice(-1)[0]
+
+    const lastPing = compareApiData?.left.scene.pings.slice(-1)[0]
     if (lastPing) setDemoTime(lastPing.timestamp)
-  }, [compareApiData])
-  const { startTour } = useProductTour(tourReady, prepareTour)
+  }, [
+    leftAlgorithm,
+    leftParams,
+    leftParamErrors,
+    showGroundTruth,
+    showStops,
+    showXray,
+    demoTime,
+    compareApiData,
+  ])
+
+  // Called both when the tour finishes and when it is dismissed.
+  const restoreTour = useCallback(() => {
+    const snapshot = tourSnapshotRef.current
+    if (!snapshot) return
+
+    tourSnapshotRef.current = null
+
+    setLeftAlgorithm(snapshot.leftAlgorithm)
+    setLeftParams(snapshot.leftParams)
+    setLeftParamErrors(snapshot.leftParamErrors)
+    setShowGroundTruth(snapshot.showGroundTruth)
+    setShowStops(snapshot.showStops)
+    setShowXray(snapshot.showXray)
+    setDemoTime(snapshot.demoTime)
+  }, [])
+
+  const { startTour } = useProductTour(
+    tourReady,
+    prepareTour,
+    undefined,
+    undefined,
+    restoreTour,
+    tourResultsReady,
+  )
+
   const { startTour: startMetricsTour } = useProductTour(
     metricsTourReady,
     undefined,
@@ -385,76 +457,76 @@ function NomadDashboard() {
       <div className="nomad-viewport min-h-0">
         <div className="nomad-dashboard bg-background">
 
-      {activeView === "home" && (
-        <HomeView navigateTo={navigateTo} />
-      )}
+          {activeView === "home" && (
+            <HomeView navigateTo={navigateTo} />
+          )}
 
-      {activeView === "learn" && (
-        <LearnView
-          expandedAlgorithm={expandedAlgorithm}
-          setExpandedAlgorithm={setExpandedAlgorithm}
-          syncUrl={syncUrl}
-          openLearnAlgorithm={openLearnAlgorithm}
-          openLearnDemo={openLearnDemo}
-        />
-      )}
+          {activeView === "learn" && (
+            <LearnView
+              expandedAlgorithm={expandedAlgorithm}
+              setExpandedAlgorithm={setExpandedAlgorithm}
+              syncUrl={syncUrl}
+              openLearnAlgorithm={openLearnAlgorithm}
+              openLearnDemo={openLearnDemo}
+            />
+          )}
 
-      {activeView === "demo" && (
-        <DemoView
-          compareMode={compareMode}
-          showGroundTruth={showGroundTruth}
-          showStops={showStops}
-          showXray={showXray}
-          leftAlgo={leftAlgo}
-          rightAlgo={rightAlgo}
-          demoAlgorithms={demoAlgorithms}
-          leftAlgorithm={leftAlgorithm}
-          rightAlgorithm={rightAlgorithm}
-          leftParams={leftParams}
-          rightParams={rightParams}
-          leftParamErrors={leftParamErrors}
-          rightParamErrors={rightParamErrors}
-          demoTrajectory={demoTrajectory}
-          compareApiData={compareApiData}
-          compareError={compareError}
-          demoTime={demoTime}
-          setDemoTime={handleDemoTimeChange}
-          setShowGroundTruth={setShowGroundTruth}
-          setShowStops={setShowStops}
-          setShowXray={setShowXray}
-          setLeftParams={setLeftParams}
-          setRightParams={setRightParams}
-          setLeftParamErrors={setLeftParamErrors}
-          setRightParamErrors={setRightParamErrors}
-          setDemoTrajectory={setDemoTrajectory}
-          handleCompareModeToggle={handleCompareModeToggle}
-          handleLeftAlgorithmChange={handleLeftAlgorithmChange}
-          handleRightAlgorithmChange={handleRightAlgorithmChange}
-          handleNewTrajectory={handleNewTrajectory}
-          openMetricsFromDemo={openMetricsFromDemo}
-          startTour={startTour}
-        />
-      )}
+          {activeView === "demo" && (
+            <DemoView
+              compareMode={compareMode}
+              showGroundTruth={showGroundTruth}
+              showStops={showStops}
+              showXray={showXray}
+              leftAlgo={leftAlgo}
+              rightAlgo={rightAlgo}
+              demoAlgorithms={demoAlgorithms}
+              leftAlgorithm={leftAlgorithm}
+              rightAlgorithm={rightAlgorithm}
+              leftParams={leftParams}
+              rightParams={rightParams}
+              leftParamErrors={leftParamErrors}
+              rightParamErrors={rightParamErrors}
+              demoTrajectory={demoTrajectory}
+              compareApiData={compareApiData}
+              compareError={compareError}
+              demoTime={demoTime}
+              setDemoTime={handleDemoTimeChange}
+              setShowGroundTruth={setShowGroundTruth}
+              setShowStops={setShowStops}
+              setShowXray={setShowXray}
+              setLeftParams={setLeftParams}
+              setRightParams={setRightParams}
+              setLeftParamErrors={setLeftParamErrors}
+              setRightParamErrors={setRightParamErrors}
+              setDemoTrajectory={setDemoTrajectory}
+              handleCompareModeToggle={handleCompareModeToggle}
+              handleLeftAlgorithmChange={handleLeftAlgorithmChange}
+              handleRightAlgorithmChange={handleRightAlgorithmChange}
+              handleNewTrajectory={handleNewTrajectory}
+              openMetricsFromDemo={openMetricsFromDemo}
+              startTour={startTour}
+            />
+          )}
 
-      {activeView === "metrics" && (
-        <MetricsView
-          metricsCompareMode={metricsCompareMode}
-          metricsAlgorithms={metricsAlgorithms}
-          metricsLeftAlgorithm={metricsLeftAlgorithm}
-          metricsRightAlgorithm={metricsRightAlgorithm}
-          metricsTrajectory={metricsTrajectory}
-          initialSelectedUserId={metricsAgentId ?? undefined}
-          leftParameterNote={leftParameterNote}
-          rightParameterNote={rightParameterNote}
-          metricsError={metricsError}
-          setMetricsCompareMode={setMetricsCompareMode}
-          setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
-          setMetricsRightAlgorithm={setMetricsRightAlgorithm}
-          setMetricsTrajectory={setMetricsTrajectory}
-          openPinnedAgent={handleMetricsPointSelect}
-          startTour={startMetricsTour}
-        />
-      )}
+          {activeView === "metrics" && (
+            <MetricsView
+              metricsCompareMode={metricsCompareMode}
+              metricsAlgorithms={metricsAlgorithms}
+              metricsLeftAlgorithm={metricsLeftAlgorithm}
+              metricsRightAlgorithm={metricsRightAlgorithm}
+              metricsTrajectory={metricsTrajectory}
+              initialSelectedUserId={metricsAgentId ?? undefined}
+              leftParameterNote={leftParameterNote}
+              rightParameterNote={rightParameterNote}
+              metricsError={metricsError}
+              setMetricsCompareMode={setMetricsCompareMode}
+              setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
+              setMetricsRightAlgorithm={setMetricsRightAlgorithm}
+              setMetricsTrajectory={setMetricsTrajectory}
+              openPinnedAgent={handleMetricsPointSelect}
+              startTour={startMetricsTour}
+            />
+          )}
         </div>
       </div>
     </div>

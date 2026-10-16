@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { driver } from "driver.js"
 import "driver.js/dist/driver.css"
 import type { Driver, DriveStep } from "driver.js"
@@ -136,15 +136,36 @@ export function useProductTour(
   prepareTour = () => {},
   steps = DEMO_TOUR_STEPS,
   storageKey = DEMO_TOUR_STORAGE_KEY,
+  restoreTour = () => {},
+  resultsReady = ready,
 ) {
   const driverRef = useRef<Driver | null>(null)
   const autoStartedRef = useRef(false)
+  const requestedRef = useRef(false)
+  const [startRequested, setStartRequested] = useState(false)
+
+  // Keep the latest cleanup callback available to the driver.
+  const restoreTourRef = useRef(restoreTour)
+  useEffect(() => {
+    restoreTourRef.current = restoreTour
+  }, [restoreTour])
 
   const startTour = useCallback(() => {
+    if (requestedRef.current) return
+
+    requestedRef.current = true
     prepareTour()
-    window.requestAnimationFrame(() => {
-      if (!driverRef.current) {
-        driverRef.current = driver({
+    setStartRequested(true)
+  }, [prepareTour])
+
+  // Wait for preparation and the corresponding results before opening.
+  useEffect(() => {
+    if (!startRequested || !ready || !resultsReady) return
+
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const tour = driver({
           showProgress: true,
           smoothScroll: true,
           stageRadius: 8,
@@ -160,16 +181,28 @@ export function useProductTour(
             broadcastMetricsTourFocus()
             clearTourAction()
             window.localStorage.setItem(storageKey, "true")
+            restoreTourRef.current()
+            requestedRef.current = false
+            driverRef.current = null
           },
         })
-      }
-      driverRef.current.drive()
+
+        driverRef.current = tour
+        setStartRequested(false)
+        tour.drive()
+      })
     })
-  }, [steps, storageKey, prepareTour])
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
+    }
+  }, [startRequested, ready, resultsReady, steps, storageKey])
 
   useEffect(() => {
     if (!ready || autoStartedRef.current) return
     if (window.localStorage.getItem(storageKey)) return
+
     autoStartedRef.current = true
     startTour()
   }, [ready, startTour, storageKey])

@@ -31,45 +31,57 @@ export function LearnView({
         <div className={`${revealClass()} shrink-0 space-y-1`}>
           <h2 className="text-3xl font-bold">Learn Algorithms</h2>
           <p className="text-sm text-[#080d1a]">
-            Select an algorithm card to inspect assumptions, parameter behavior, and a method sketch.
+            Explore the two algorithm families, then select an algorithm to inspect its assumptions and parameters.
           </p>
         </div>
-        <div className={`${revealClass("up", 2)} space-y-5 pb-2`}>
+        <div className={`${revealClass("up", 2)} grid grid-cols-1 gap-5 pb-2 lg:grid-cols-2`}>
           {LEARN_FAMILIES.map((family, familyIndex) => (
-            <section key={family.id} className="space-y-3">
-              <h3 className="text-xl font-semibold">{family.title}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                {algorithms.filter((algo) => algo.family === family.id).map((algo, algoIndex) => (
-                  <Card
-                    key={algo.id}
-                    className={`${revealClass("up", familyIndex * 4 + algoIndex + 2)} nomad-interactive-card group flex cursor-pointer flex-col gap-0 border-2 bg-[#f8f9fc] py-0`}
-                    onClick={() => openLearnAlgorithm(algo.id)}
-                  >
-                    <CardHeader className="shrink-0 px-5 pt-5 pb-0">
-                      <CardTitle className="inline-block border-b-2 border-transparent pb-1 text-lg text-[#3b1370] transition-colors group-hover:border-[#7629db] group-hover:text-[#7629db]">
-                        {algo.name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-5 pb-5 flex-1 flex flex-col gap-3">
-                      <p className="text-sm">{algo.shortDesc}</p>
-                      <div className="relative aspect-[16/5] overflow-hidden rounded-md bg-[#111625]">
-                        <Image
-                          src={algo.cardDiagramSrc}
-                          alt={`${algo.name} card diagram`}
-                          fill
-                          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 50vw, 100vw"
-                          className="object-contain p-1"
-                        />
-                      </div>
-                      <div className="flex items-center justify-end gap-1.5 pt-1 text-xs font-medium">
-                        <span>View more</span>
-                        <Maximize2 className="h-4 w-4" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
+            <Card
+              key={family.id}
+              className={`${revealClass("up", familyIndex + 2)} min-w-0 gap-0 border-2 border-[#e6dffc] bg-white py-0`}
+            >
+              <CardHeader className="px-5 pt-5 pb-4">
+                <CardTitle className="text-xl font-semibold text-[#3b1370]">
+                  {family.title}
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="flex flex-col gap-5 px-5 pb-5">
+                <div className="overflow-hidden rounded-md bg-[#111625]">
+                  <Image
+                    src={family.diagramSrc}
+                    alt={`${family.title} overview diagram`}
+                    width={980}
+                    height={620}
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    className="block h-auto w-full"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm text-[#080d1a]">
+                    Select an algorithm to explore its details and parameters.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {algorithms
+                      .filter((algo) => algo.family === family.id)
+                      .map((algo) => (
+                        <Button
+                          key={algo.id}
+                          type="button"
+                          variant="outline"
+                          onClick={() => openLearnAlgorithm(algo.id)}
+                          className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                        >
+                          <span>{algo.name}</span>
+                          <Maximize2 className="h-4 w-4 shrink-0" />
+                        </Button>
+                      ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>

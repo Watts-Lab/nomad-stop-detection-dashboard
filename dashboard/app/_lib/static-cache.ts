@@ -10,7 +10,7 @@ import {
   type ParquetQueryFilter,
 } from "hyparquet"
 import { compressors } from "hyparquet-compressors"
-import { METRICS_ALGORITHM_BY_DEMO_ID, METRICS_SWEEP_PARAMETERS } from "./dashboard-data"
+import { FALLBACK_PARAMETER_NOTES, METRICS_ALGORITHM_BY_DEMO_ID } from "./dashboard-data"
 import { publicPath } from "./public-path"
 import type {
   AlignedStopResult,
@@ -303,7 +303,7 @@ async function resultForUser(
   if (!metricRow) throw new Error("Cached metrics are missing config_id " + config.config_id)
 
   const metricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[algorithm]
-  const sweepParameter = METRICS_SWEEP_PARAMETERS[metricsAlgorithm]?.[0]?.value
+  const sweepParameter = FALLBACK_PARAMETER_NOTES[metricsAlgorithm]?.sweep_parameter
   const sweepConfigs = sweepParameter
     ? configs
       .filter((candidate) => Object.entries(config.params).every(

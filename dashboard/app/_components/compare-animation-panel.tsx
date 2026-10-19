@@ -806,16 +806,39 @@ export function DemoSceneRenderer({
         if (selectedPingIndexesRef.current.length) clearSelectedPings()
         return
       }
+
       if (event.key === " ") {
-        if (target?.closest("button, a") || !syncMaster || variant !== "full" || event.repeat) return
+        if (
+          event.defaultPrevented ||
+          event.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          !syncMaster ||
+          variant !== "full"
+        ) return
+      
+        const interactiveTarget = target?.closest(
+          "button, a, input, select, textarea, summary, [role], [tabindex]",
+        )
+        const editableTarget =
+          target instanceof HTMLElement && target.isContentEditable
+      
+        if (interactiveTarget || editableTarget) return
+      
+        // Prevent scrolling even for repeated keydown events.
         event.preventDefault()
-        if (paused && isPlaybackComplete(sequenceIndex, chartData.timeSequence.length)
-        ) {
+        if (event.repeat) return
+      
+        if (paused && isPlaybackComplete(sequenceIndex, chartData.timeSequence.length)) {
           replayRef.current()
+        } else {
+          toggleRef.current()
         }
-        else toggleRef.current()
         return
       }
+      
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
       const selected = selectedPingIndexesRef.current
       const direction = event.key === "ArrowRight" ? 1 : -1

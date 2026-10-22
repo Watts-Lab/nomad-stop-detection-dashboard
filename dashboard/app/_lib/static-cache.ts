@@ -362,9 +362,27 @@ async function resultForUser(
 
 async function sceneForSeed(cacheRoot: string, seed: number, requestedUserId?: string) {
   const manifest = await loadManifest(cacheRoot)
-  const userId = requestedUserId && manifest.users.includes(requestedUserId)
-    ? requestedUserId
-    : manifest.users[Math.abs(seed) % manifest.users.length]
+
+  if (manifest.users.length === 0) {
+    throw new Error("No agents are available for the selected ground truth diary.")
+  }
+
+  const normalizedUserId = requestedUserId?.trim()
+
+  if (requestedUserId !== undefined) {
+    if (!normalizedUserId) {
+      throw new Error("Enter an agent ID.")
+    }
+
+    if (!manifest.users.includes(normalizedUserId)) {
+      throw new Error(
+        `Agent "${normalizedUserId}" is unavailable for the selected ground truth diary. Check the ID or select a different diary.`,
+      )
+    }
+  }
+
+  const userId = normalizedUserId
+    ?? manifest.users[Math.abs(seed) % manifest.users.length]
   const userIndex = manifest.users.indexOf(userId)
   const [scene, routes, pings, diary] = await Promise.all([
     loadScene(cacheRoot, manifest),

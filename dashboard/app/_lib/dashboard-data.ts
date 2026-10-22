@@ -28,6 +28,58 @@ export const LEARN_FAMILIES = [
   },
 ]
 
+export const LEARN_CONCEPTS = [
+  {
+    id: "merging",
+    category: "failure-modes",
+    name: "Merging",
+    description:
+      "Merging occurs when an algorithm combines two or more distinct true stops into a single detected stop.",
+  },
+  {
+    id: "splitting",
+    category: "failure-modes",
+    name: "Splitting",
+    description:
+      "Splitting occurs when an algorithm divides one true stop into two or more detected stops.",
+  },
+  {
+    id: "ping",
+    category: "glossary",
+    name: "Ping",
+    description:
+      "A single recorded location observation with a timestamp.",
+  },
+  {
+    id: "true-stop",
+    category: "glossary",
+    name: "True Stop",
+    description:
+      "An actual period spent at a destination that a stop-detection algorithm aims to identify.",
+  },
+  {
+    id: "ground-truth-diary",
+    category: "glossary",
+    name: "Ground Truth Diary",
+    description:
+      "A chronological reference record of actual visits and trips, including their locations and times, used to evaluate detected stops.",
+  },
+  {
+    id: "sampled-trajectory",
+    category: "glossary",
+    name: "Sampled Trajectory",
+    description:
+      "A sequence of location observations sampled over time to represent movement.",
+  },
+  {
+    id: "noise",
+    category: "glossary",
+    name: "Noise",
+    description:
+      "Error or variation in recorded locations that makes observations differ from the actual position.",
+  },
+]
+
 export const TRAJECTORY_OPTIONS = [
   {
     id: "two-stop",

@@ -5,7 +5,7 @@ import { Maximize2, Minimize2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import { DEMO_ALGORITHM_IDS, LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
+import { DEMO_ALGORITHM_IDS, LEARN_CONCEPTS, LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { DashboardView, DemoMode } from "../_lib/types"
 
@@ -24,14 +24,19 @@ export function LearnView({
 }) {
   const expandedLearnAlgorithm = expandedAlgorithm ? algorithms.find((a) => a.id === expandedAlgorithm) : null
   const expandedLearnFamilyTitle = expandedLearnAlgorithm ? LEARN_FAMILIES.find((family) => family.id === expandedLearnAlgorithm.family)?.title ?? "Algorithm Family" : ""
+  const expandedLearnConcept = expandedAlgorithm
+    ? LEARN_CONCEPTS.find((concept) => concept.id === expandedAlgorithm)
+    : null
+
+  const isLearnExpanded = Boolean(expandedLearnAlgorithm || expandedLearnConcept)
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-      <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-4 pb-6 transition duration-200 ${expandedLearnAlgorithm ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
+      <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-4 pb-6 transition duration-200 ${isLearnExpanded ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
         <div className={`${revealClass()} shrink-0 space-y-1`}>
           <h2 className="text-3xl font-bold">Learn Algorithms</h2>
           <p className="text-sm text-[#080d1a]">
-            Explore the two algorithm families, then select an algorithm to inspect its assumptions and parameters.
+          Explore stop-detection algorithms, failure modes, and key terminology.
           </p>
         </div>
         <div className={`${revealClass("up", 2)} grid grid-cols-1 gap-5 pb-2 lg:grid-cols-2`}>
@@ -75,6 +80,64 @@ export function LearnView({
                           className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
                         >
                           <span>{algo.name}</span>
+                          <Maximize2 className="h-4 w-4 shrink-0" />
+                        </Button>
+                      ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {[
+            {
+              id: "failure-modes",
+              title: "Failure Modes",
+              description:
+                "Explore how detected stops can merge distinct visits or split a single visit.",
+              placeholder: "Merging and splitting diagram coming soon",
+            },
+            {
+              id: "glossary",
+              title: "Glossary",
+              description:
+                "Explore the terms used to describe trajectories and stop detection.",
+              placeholder: "Term illustrations coming soon",
+            },
+          ].map((category) => (
+            <Card
+              key={category.id}
+              className="min-w-0 gap-0 border-2 border-[#e6dffc] bg-white py-0"
+            >
+              <CardHeader className="px-5 pt-5 pb-4">
+                <CardTitle className="text-xl font-semibold text-[#3b1370]">
+                  {category.title}
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="flex flex-col gap-5 px-5 pb-5">
+                <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+                  <p className="text-sm text-[#374151]">
+                    {category.placeholder}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm text-[#080d1a]">
+                    {category.description}
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {LEARN_CONCEPTS
+                      .filter((concept) => concept.category === category.id)
+                      .map((concept) => (
+                        <Button
+                          key={concept.id}
+                          type="button"
+                          variant="outline"
+                          onClick={() => openLearnAlgorithm(concept.id)}
+                          className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                        >
+                          <span>{concept.name}</span>
                           <Maximize2 className="h-4 w-4 shrink-0" />
                         </Button>
                       ))}
@@ -216,6 +279,56 @@ export function LearnView({
                   </Button>
                 </div>
               </div>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
+      <Dialog
+        open={Boolean(expandedLearnConcept)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedAlgorithm(null)
+            syncUrl("learn")
+          }
+        }}
+      >
+        {expandedLearnConcept && (
+          <DialogContent
+            className="max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border-2 border-[#e6dffc] bg-[#f8f9fc] p-5 text-[#080d1a] sm:max-w-3xl md:p-8"
+          >
+            <DialogTitle className="pr-8 text-2xl font-bold text-[#3b1370]">
+              {expandedLearnConcept.name}
+            </DialogTitle>
+
+            <DialogDescription className="text-sm text-[#374151]">
+              {expandedLearnConcept.category === "failure-modes"
+                ? "Failure Modes"
+                : "Glossary"}
+            </DialogDescription>
+
+            <p className="text-sm leading-relaxed md:text-base">
+              {expandedLearnConcept.description}
+            </p>
+
+            <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+              <p className="text-sm text-[#374151]">
+                Illustration for {expandedLearnConcept.name.toLowerCase()} coming soon
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setExpandedAlgorithm(null)
+                  syncUrl("learn")
+                }}
+                className="border-[#e6dffc] bg-[#e8d8fc] text-[#3b1370] hover:bg-white"
+              >
+                Collapse
+                <Minimize2 className="h-4 w-4" />
+              </Button>
             </div>
           </DialogContent>
         )}

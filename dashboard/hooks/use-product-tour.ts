@@ -21,14 +21,14 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Inspect GPS Pings",
-      description: "Each dot is one GPS ping from the current agent. Hover a ping to enlarge it, show its time and status, and highlight the same ping on the timeline. Pings in the same detected stop remain emphasized while unrelated pings fade. Density algorithms also show the active distance threshold. That hover is being demonstrated now.",
+      description: "Each dot is one GPS ping from the current agent. Hover a ping to enlarge and outline it, show its time and status, and highlight the same ping on the timeline. That hover is being demonstrated now.",
     },
   },
   {
     element: "[data-tour='tour-map']",
     popover: {
       title: "Compare Two Pings",
-      description: "Click one ping to keep it selected, then click a second to draw a line between them and compare their distance and elapsed time. Click a selected ping again to remove it, click the map background to clear the comparison, or use Clear selection below the timeline.",
+      description: "Click one ping to keep it selected: its details stay on screen and its detected stop stays emphasized while unrelated pings fade. With X-ray on, density algorithms and Lachesis also draw the distance threshold around it. Click a second ping to draw a line between them and compare their distance and elapsed time. Click a selected ping again to remove it, click the map background to clear the comparison, or use Clear selection below the timeline.",
     },
   },
   {
@@ -37,7 +37,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Detected Stops and Algorithm Structure",
-      description: "Colored pings show revealed detected-stop assignments; pings shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. Hover a ping to focus its detected stop or hover an edge to isolate its connected component. An anchor is highlighted now.",
+      description: "Colored pings show revealed detected-stop assignments; pings shown only in black have no revealed assignment at the current playback time. Larger outlined circles are anchor or core points, and connecting lines show relationships created by the selected algorithm. For sequential algorithms, X-ray also shows the area the next ping must land in to join the current stop: dashed while the stop is shorter than dur_min, shaded once it qualifies, and gray around noise pings. An anchor is highlighted now.",
     },
   },
   {
@@ -55,7 +55,7 @@ const DEMO_TOUR_STEPS: DriveStep[] = [
     onDeselected: clearTourAction,
     popover: {
       title: "Hover Timeline Pings",
-      description: "Vertical bars are GPS pings. Hover one to raise and outline it, fade unrelated bars, and highlight that ping and its detected stop on the map. Timeline pings can also be clicked for the same two-ping comparison available on the map. The tour is demonstrating the hover now.",
+      description: "Vertical bars are GPS pings. Hover one to raise and outline it, fade unrelated bars, and highlight that ping on the map. Timeline pings can also be clicked for the same two-ping comparison available on the map. The tour is demonstrating the hover now.",
     },
   },
   {

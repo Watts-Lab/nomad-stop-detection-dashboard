@@ -47,7 +47,7 @@ export function LearnView({
               </CardHeader>
 
               <CardContent className="flex flex-col gap-5 px-5 pb-5">
-                <div className="overflow-hidden rounded-md bg-[#111625]">
+                <div className="overflow-hidden rounded-md bg-[#e5e7eb]">
                   <Image
                     src={family.diagramSrc}
                     alt={`${family.title} overview diagram`}
@@ -131,7 +131,7 @@ export function LearnView({
                     <p className="break-words text-sm leading-relaxed text-[#080d1a] md:text-base">
                       {expandedLearnAlgorithm.description}
                     </p>
-                    <div className="min-w-0 overflow-hidden rounded-md bg-[#111625]">
+                    <div className="min-w-0 overflow-hidden rounded-md bg-[#e5e7eb]">
                       <Image
                         src={expandedLearnAlgorithm.expandedDiagramSrc}
                         alt={`${expandedLearnAlgorithm.name} expanded diagram`}

@@ -16,8 +16,16 @@ export const DENSITY_CARD_DIAGRAM = publicPath("/assets/diagram-svgs/density_bas
 export const DENSITY_EXPANDED_DIAGRAM = publicPath("/assets/diagram-svgs/density_based.svg")
 
 export const LEARN_FAMILIES = [
-  { id: "sequential", title: "Sequential Algorithms" },
-  { id: "density", title: "Density-Based Algorithms" },
+  {
+    id: "sequential",
+    title: "Sequential Algorithms",
+    diagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+  },
+  {
+    id: "density",
+    title: "Density-Based Algorithms",
+    diagramSrc: DENSITY_CARD_DIAGRAM,
+  },
 ]
 
 export const TRAJECTORY_OPTIONS = [

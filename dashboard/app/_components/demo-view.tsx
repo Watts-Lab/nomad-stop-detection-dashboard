@@ -250,7 +250,7 @@ export function DemoView({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-[#3b1370]">Algorithm</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                <SelectTrigger className="h-10 border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                <SelectTrigger className="h-auto min-h-10 w-full whitespace-normal text-left *:data-[slot=select-value]:line-clamp-none border-[#d1d5db] bg-[#f4ecfe] text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
                   <SelectValue placeholder="Select algorithm" />
                 </SelectTrigger>
                 <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
@@ -341,7 +341,7 @@ export function DemoView({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-[#3b1370]">Left</h4>
                 <Select value={leftAlgorithm} onValueChange={handleLeftAlgorithmChange}>
-                  <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                  <SelectTrigger className="h-auto min-h-10 w-full whitespace-normal text-left *:data-[slot=select-value]:line-clamp-none border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
                     <SelectValue placeholder="Select algorithm" />
                   </SelectTrigger>
                   <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">
@@ -370,7 +370,7 @@ export function DemoView({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-[#3b1370]">Right</h4>
                 <Select value={rightAlgorithm} onValueChange={handleRightAlgorithmChange}>
-                  <SelectTrigger className="h-10 border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
+                  <SelectTrigger className="h-auto min-h-10 w-full whitespace-normal text-left *:data-[slot=select-value]:line-clamp-none border-[#d1d5db] bg-white text-base text-foreground hover:bg-white focus:ring-[#7629db]/25">
                     <SelectValue placeholder="Select algorithm" />
                   </SelectTrigger>
                   <SelectContent className="border-[#d1d5db] bg-[#f4ecfe] text-foreground">

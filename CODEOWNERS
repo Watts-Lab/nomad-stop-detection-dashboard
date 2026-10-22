@@ -2,8 +2,8 @@
 # the repo. Unless a later match takes precedence,
 # global owners will be requested for
 # review when someone opens a pull request.
-*       @paco-barreras
 *       @santosl529
-*       @anoushkamenonn
 *       @ruiqipan
 *       @tina-ni
+*       @anoushkamenonn
+*       @paco-barreras

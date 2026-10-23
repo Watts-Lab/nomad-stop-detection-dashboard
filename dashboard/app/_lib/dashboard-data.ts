@@ -44,6 +44,20 @@ export const LEARN_CONCEPTS = [
       "Splitting occurs when an algorithm divides one true stop into two or more detected stops.",
   },
   {
+    id: "missing",
+    category: "failure-modes",
+    name: "Missing",
+    description:
+      "Missing occurs when a true stop is not identified by the algorithm.",
+  },
+  {
+    id: "temporal-overlap",
+    category: "failure-modes",
+    name: "Temporal Overlap",
+    description:
+      "Temporal overlap occurs when distinct detected stops overlap in time, rather than remaining temporally separated.",
+  },
+  {
     id: "ping",
     category: "glossary",
     name: "Ping",

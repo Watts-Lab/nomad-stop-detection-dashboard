@@ -36,7 +36,7 @@ export function LearnView({
         <div className={`${revealClass()} shrink-0 space-y-1`}>
           <h2 className="text-3xl font-bold">Learn Algorithms</h2>
           <p className="text-sm text-[#080d1a]">
-          Explore stop-detection algorithms, failure modes, and key terminology.
+            Explore stop-detection algorithms, failure modes, and key terminology.
           </p>
         </div>
         <div className={`${revealClass("up", 2)} grid grid-cols-1 gap-5 pb-2 lg:grid-cols-2`}>
@@ -115,34 +115,76 @@ export function LearnView({
               </CardHeader>
 
               <CardContent className="flex flex-col gap-5 px-5 pb-5">
-                <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
-                  <p className="text-sm text-[#374151]">
-                    {category.placeholder}
-                  </p>
-                </div>
+                {category.id === "glossary" ? (
+                  <div className="overflow-x-auto rounded-md border border-[#c9afe8]">
+                    <table className="w-full text-left text-sm text-[#080d1a]">
+                      <thead className="bg-[#dbc2fa]">
+                        <tr>
+                          <th scope="col" className="px-3 py-2 font-semibold">
+                            Term
+                          </th>
+                          <th scope="col" className="px-3 py-2 font-semibold">
+                            Definition
+                          </th>
+                        </tr>
+                      </thead>
 
-                <div className="space-y-3">
-                  <p className="text-sm text-[#080d1a]">
-                    {category.description}
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {LEARN_CONCEPTS
-                      .filter((concept) => concept.category === category.id)
-                      .map((concept) => (
-                        <Button
-                          key={concept.id}
-                          type="button"
-                          variant="outline"
-                          onClick={() => openLearnAlgorithm(concept.id)}
-                          className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
-                        >
-                          <span>{concept.name}</span>
-                          <Maximize2 className="h-4 w-4 shrink-0" />
-                        </Button>
-                      ))}
+                      <tbody>
+                        {LEARN_CONCEPTS
+                          .filter((concept) => concept.category === "glossary")
+                          .map((concept) => (
+                            <tr
+                              key={concept.id}
+                              className="border-t border-[#c9afe8] even:bg-[#f4ecfe]"
+                            >
+                              <th scope="row" className="px-3 py-3 align-top font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => openLearnAlgorithm(concept.id)}
+                                  className="rounded-sm text-left text-[#3b1370] underline underline-offset-4 hover:text-[#7629db] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]"
+                                >
+                                  {concept.name}
+                                </button>
+                              </th>
+                              <td className="px-3 py-3 align-top leading-relaxed">
+                                {concept.description}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+                    <p className="text-sm text-[#374151]">
+                      {category.placeholder}
+                    </p>
+                  </div>
+                )}
+                {category.id !== "glossary" && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-[#080d1a]">
+                      {category.description}
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {LEARN_CONCEPTS
+                        .filter((concept) => concept.category === category.id)
+                        .map((concept) => (
+                          <Button
+                            key={concept.id}
+                            type="button"
+                            variant="outline"
+                            onClick={() => openLearnAlgorithm(concept.id)}
+                            className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                          >
+                            <span>{concept.name}</span>
+                            <Maximize2 className="h-4 w-4 shrink-0" />
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

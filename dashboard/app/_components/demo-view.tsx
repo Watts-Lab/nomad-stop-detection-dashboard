@@ -38,7 +38,7 @@ function DestinationPreview({ trajectory }: { trajectory: string }) {
   }, [trajectory])
 
   return (
-    <div className="relative mx-auto mt-2 aspect-square w-4/5">
+    <div className="relative mx-auto aspect-square w-4/5">
       <div className="absolute left-1/2 top-0 aspect-square w-[125%] origin-top -translate-x-1/2 scale-[0.8]">
         {data ? (
           <DemoSceneRenderer
@@ -145,6 +145,7 @@ export function DemoView({
             value={demoTrajectory}
             onChange={setDemoTrajectory}
             preview={(trajectory) => <DestinationPreview key={trajectory} trajectory={trajectory} />}
+            showGenerationSettings
           />
         </div>
         <div className="space-y-2">
@@ -176,7 +177,7 @@ export function DemoView({
 
   // Apply reveal classes to the header and active panel layout.
   return (
-    <div className={`nomad-page-frame flex min-h-0 min-w-0 flex-1 flex-col gap-3 pt-4 ${compareMode ? "" : "lg:overflow-hidden"}`}>
+    <div className="nomad-page-frame flex min-h-0 min-w-0 flex-1 flex-col gap-3 pt-4">
       <div className={`${revealClass()} flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex items-center gap-2">
           <h2 className="text-3xl font-bold">{compareMode ? "Compare Algorithms" : "Demo Single Algorithm"}</h2>
@@ -221,10 +222,10 @@ export function DemoView({
       </div>
 
       {!compareMode ? (
-        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_264px] gap-3 items-stretch`}>
+        <div className={`${revealClass("panel", 2)} grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_264px] gap-3 items-start`}>
           {dataPanel}
           <div className="flex min-h-0 flex-col gap-3">
-            <div className="aspect-[2/3] min-h-0 lg:flex-1 lg:aspect-auto">
+            <div className="aspect-[2/3] min-h-0 lg:aspect-auto lg:h-[calc(100dvh-10rem)] lg:min-h-[32rem]">
               <CompareAnimationPanel
                 panel={compareApiData?.left}
                 mode="single"
@@ -240,7 +241,7 @@ export function DemoView({
             {compareError && <p className="text-xs text-red-500">{compareError}</p>}
           </div>
           <Card className="min-h-0 overflow-hidden bg-[#f8f9fc] py-4" data-tour="tour-params">
-            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
+            <CardContent className="min-h-0 flex-1 space-y-3 px-4">
               <div className="flex justify-start">
                 <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2" data-tour="tour-compare-toggle">
                   <Columns2 className="h-4 w-4" />
@@ -327,7 +328,7 @@ export function DemoView({
             />
           </div>
           <Card className="order-2 min-h-0 overflow-hidden bg-[#f8f9fc] py-4 md:col-span-4 xl:order-4 xl:col-span-1">
-            <CardContent className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 md:grid-cols-2 xl:grid-cols-1">
+            <CardContent className="grid min-h-0 flex-1 content-start gap-4 px-4 md:grid-cols-2 xl:grid-cols-1">
               <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-center md:justify-between xl:col-span-1 xl:flex-col xl:items-stretch">
                 <Button variant="outline" size="sm" onClick={handleCompareModeToggle} className="gap-2">
                   <Square className="h-4 w-4" />

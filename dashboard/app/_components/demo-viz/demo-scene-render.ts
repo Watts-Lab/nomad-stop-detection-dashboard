@@ -7,7 +7,7 @@ import {
 } from "./demo-interactions"
 import { pingClassifiedAt, selectedAssignedBuildingData, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
 import { groundTruthBuildingGlowData, groundTruthBuildingsSeriesData } from "./overlays/demo-ground-truth"
-import { xrayDistanceCircleData, xrayGridCellsAt } from "./overlays/demo-xray"
+import { xrayDistanceCircleData } from "./overlays/demo-xray"
 
 type ResolveHoverPingIndexesArgs = {
     timestampSeconds: number
@@ -161,10 +161,6 @@ export function buildDemoMapSeries({
                 showStops,
                 selectedPingIndexes
             )
-        },
-        {
-            id: "grid-cells",
-            data: showXray ? xrayGridCellsAt(timestampSeconds, chartData) : []
         },
         {
             id: "completed-paths",

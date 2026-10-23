@@ -357,7 +357,6 @@ async function resultForUser(
     const h3_cell = listValues(row.h3_cell, "h3_cell", trajectoryLength).map(
       (value) => value == null ? "" : String(value),
     )
-    if (h3_cell.some((cell) => !cell)) throw new Error("Cached Grid-Based cells contain missing values")
     result = { kind: "grid", cluster, h3_cell }
   } else if (entry.result_kind === "labels") {
     result = { kind: "labels", cluster }

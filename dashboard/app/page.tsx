@@ -168,25 +168,25 @@ function NomadDashboard() {
     }
   }, [])
 
-  // Change the left/single Demo algorithm & clear its parameter overrides
-  // and validation errors so the new algorithm stats with its defaults
+  // Change the left/single Demo algorithm and initialize its Demo parameters.
+  // Clear validation errors so the new algorithm starts with its defaults.
   // The demo-loading effect responds to the updated state
   const handleLeftAlgorithmChange = useCallback((algorithmId: string) => {
     const nextAlgorithm = algorithmId === "none" ? "" : algorithmId
     setLeftAlgorithm(nextAlgorithm)
     setShowStops(Boolean(nextAlgorithm || (compareMode && rightAlgorithm)))
-    setLeftParams({})
+    setLeftParams(nextAlgorithm === "gridbased" ? { h3_resolution: "12" } : {})
     setLeftParamErrors({})
   }, [compareMode, rightAlgorithm])
 
-  // Change the right Demo algorithm and clear its parameter overrides
-  // and validation errors so the new algorithm starts with its defaults.
+  // Change the right Demo algorithm and initialize its Demo parameters.
+  // Clear validation errors so the new algorithm starts with its defaults.
   // The Demo-loading effect responds to the updated state.
   const handleRightAlgorithmChange = useCallback((algorithmId: string) => {
     const nextAlgorithm = algorithmId === "none" ? "" : algorithmId
     setRightAlgorithm(nextAlgorithm)
     setShowStops(Boolean(leftAlgorithm || nextAlgorithm))
-    setRightParams({})
+    setRightParams(nextAlgorithm === "gridbased" ? { h3_resolution: "12" } : {})
     setRightParamErrors({})
   }, [leftAlgorithm])
 
@@ -287,11 +287,11 @@ function NomadDashboard() {
   }, [syncUrl])
 
   // Open an algorithm from Learn in single-algorithm Demo mode.
-  // Clear its parameter overrides and validation errors,
+  // Initialize its Demo parameters and clear validation errors,
   // then update the active view and browser URL.
   const openLearnDemo = useCallback((algorithmId: string) => {
     setLeftAlgorithm(algorithmId)
-    setLeftParams({})
+    setLeftParams(algorithmId === "gridbased" ? { h3_resolution: "12" } : {})
     setLeftParamErrors({})
     setCompareMode(false)
     setActiveView("demo")

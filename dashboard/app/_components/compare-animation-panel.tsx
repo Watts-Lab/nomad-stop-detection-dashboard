@@ -420,7 +420,7 @@ export function DemoSceneRenderer({
       nextPathVisible = layerStateRef.current.showGroundTruth && Boolean(groundTruthAt(timestampSeconds, chartData).current && route.next)
       const anchorEdges = anchorFrames.flatMap((frame) => frame.edges)
       const promotionEdges = chartData.densityPromotionEdges.filter((edge) => edge.value[3] <= timestampSeconds)
-      activeContainmentAreas = isSequentialAlgorithm && layerStateRef.current.showXray
+      activeContainmentAreas = (isSequentialAlgorithm || chartData.result.kind === "grid") && layerStateRef.current.showXray
         ? containmentAreasAt(timestampSeconds, chartData, panel.algo, latestPingIndex)
         : []
       hoverPingIndexes = resolveHoverPingIndexes({
@@ -485,7 +485,6 @@ export function DemoSceneRenderer({
           { id: "ghost-pings", data: previewPings },
           { id: "noise-pings", data: [] },
           { id: "cluster-pings", data: [] },
-          { id: "grid-cells", data: [] },
           { id: "promotion-edges", data: [] },
           { id: "promotion-edges-hit-area", data: [] },
           { id: "core-points", data: [] },

@@ -331,32 +331,6 @@ export function createDemoMapChartOptions({
         },
       },
       {
-        id: "grid-cells",
-        name: "H3 containment cells",
-        type: "custom",
-        coordinateSystem: "cartesian2d",
-        silent: true,
-        z: 3,
-        data: [],
-        renderItem(_params: EChartsParams, api: EChartsApi) {
-          const cluster = Number(api.value(1))
-          const current = Number(api.value(2)) === 1
-          const color = cluster >= 0 ? clusterColor(cluster) : "#64748b"
-          return {
-            type: "polygon",
-            shape: {
-              points: getChartData().gridCells[Number(api.value(0))].map((point) => api.coord(point))
-            },
-            style: {
-              fill: color,
-              stroke: color,
-              lineWidth: (current ? 2.5 : 1.2) * mapZoomScale(api),
-              opacity: current ? 0.38 : 0.2,
-            }
-          }
-        }
-      },
-      {
         id: "completed-paths",
         name: "Inferred street route",
         type: "lines",

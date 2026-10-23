@@ -33,7 +33,7 @@ export function prepareDemoResultData(
     ])
 
     const gridCells: number[][][] = []
-    const gridCellFrames: Array<[number, number, number]> = []
+    const gridCellFrames: Array<[number, number, number, boolean]> = []
     if (result.kind === "grid") {
         const cellIndexes = new Map<string, number>()
         const timeThreshold = panel.params.time_thresh * 60
@@ -56,9 +56,9 @@ export function prepareDemoResultData(
                 ]))
             }
 
-            const confirmed = index - runStart + 1 >= panel.params.min_cluster_size &&
+            const confirmed = index - runStart + 1 >= (panel.params.min_cluster_size ?? 2) &&
                 ping.t - pings[runStart].t >= minDuration
-            gridCellFrames.push([cellIndex, ping.t, confirmed ? ping.cluster : -1])
+            gridCellFrames.push([cellIndex, ping.t, ping.cluster, confirmed && ping.cluster >= 0])
         })
     }
 

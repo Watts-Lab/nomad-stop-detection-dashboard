@@ -23,19 +23,51 @@ export function xrayAnchorFramesAt(
   return Array.from(framesByStop.values())
 }
 
+// Nest successive stops in the same H3 cell in playback order.
 export function xrayGridCellsAt(timestampSeconds: number, chartData: DemoResultData) {
-  const visible = new Map<number, [number, number, number]>()
-  let currentCell = -1
+  const pastFrames = new Map<number, DemoResultData["gridCellFrames"][number]>()
+  let current: DemoResultData["gridCellFrames"][number] | undefined
 
-  for (const [cellIndex, time, cluster] of chartData.gridCellFrames) {
+  for (const frame of chartData.gridCellFrames) {
+    const [, time, cluster, confirmed] = frame
     if (time > timestampSeconds) break
-    visible.set(cellIndex, [cellIndex, cluster, 0])
-    currentCell = cellIndex
+    if (confirmed) {
+      pastFrames.set(cluster, frame)
+    }
+    current = frame
   }
 
-  const current = visible.get(currentCell)
-  if (current) current[2] = 1
-  return Array.from(visible.values())
+  if (!current) return []
+  pastFrames.delete(current[2])
+  const frames = [...pastFrames.values(), current]
+  const cellCounts = new Map<number, number>()
+  frames.forEach(([cellIndex]) => {
+    cellCounts.set(cellIndex, (cellCounts.get(cellIndex) ?? 0) + 1)
+  })
+  const cellDepths = new Map<number, number>()
+
+  return frames.map((frame) => {
+    const [cellIndex, , cluster, confirmed] = frame
+    const depth = cellDepths.get(cellIndex) ?? 0
+    cellDepths.set(cellIndex, depth + 1)
+    const points = chartData.gridCells[cellIndex]
+    // H3 closes the boundary by repeating its first vertex; count it only once.
+    const vertices = points[0][0] === points[points.length - 1][0] &&
+      points[0][1] === points[points.length - 1][1] ? points.slice(0, -1) : points
+    const centerX = vertices.reduce((sum, [x]) => sum + x, 0) / vertices.length
+    const centerY = vertices.reduce((sum, [, y]) => sum + y, 0) / vertices.length
+    // Equal scale steps keep outlines evenly spaced around the same cell center.
+    const scale = 1 - depth / Math.max(5, cellCounts.get(cellIndex) ?? 1)
+
+    return {
+      cluster,
+      points: depth === 0 ? points : points.map(([x, y]) => [
+        centerX + (x - centerX) * scale,
+        centerY + (y - centerY) * scale,
+      ]),
+      shaded: frame === current && confirmed,
+    }
+  })
 }
 
 // Determine which points should display an X-ray distance-radius circle.
@@ -93,7 +125,7 @@ function circleIntersectionPolygon(centers: number[][], radius: number) {
   )
 }
 
-// Return the containment areas of a sequential algorithm at the current playback time:
+// Return grid cells or sequential containment areas at the current playback time:
 // the region the next ping must fall in to join the latest ping's candidate, plus the
 // final areas of stops already left behind. Lachesis bounds the candidate's diameter
 // (intersection of circles around every ping); the first- and centroid-anchored
@@ -105,6 +137,8 @@ export function containmentAreasAt(
   algorithm: string,
   latestPingIndex: number,
 ) {
+  if (chartData.result.kind === "grid") return xrayGridCellsAt(timestampSeconds, chartData)
+
   const latestPing = chartData.pings[latestPingIndex]
   const membersOf = (cluster: number) =>
     (chartData.clusterMembers.get(cluster) ?? []).map((pingIndex) => chartData.pings[pingIndex])

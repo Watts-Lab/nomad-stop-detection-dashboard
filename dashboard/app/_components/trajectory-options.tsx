@@ -10,10 +10,12 @@ export function TrajectoryOptions({
   value,
   onChange,
   preview,
+  showGenerationSettings = false,
 }: {
   value: string
   onChange: (trajectoryId: string) => void
   preview?: (trajectoryId: string) => ReactNode
+  showGenerationSettings?: boolean
 }) {
   const descriptionIdPrefix = useId()
   const [trajectoryInfoId, setTrajectoryInfoId] = useState<string | null>(null)
@@ -48,7 +50,7 @@ export function TrajectoryOptions({
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                onClick={() => setTrajectoryInfoId(trajectoryInfoId === trajectory.id ? null : trajectory.id)}
+                onClick={() => setTrajectoryInfoId(showingInfo ? null : trajectory.id)}
                 aria-expanded={showingInfo}
                 aria-controls={descriptionId}
                 className={`rounded-full hover:bg-muted ${showingInfo ? "bg-muted text-foreground" : "text-muted-foreground"}`}
@@ -58,10 +60,24 @@ export function TrajectoryOptions({
               </Button>
             </div>
             {showingInfo && (
-              <div id={descriptionId} className="mx-2 mb-2 space-y-1.5">
+              <div id={descriptionId} className="space-y-3 px-2 pb-2 pt-3">
                 {preview?.(trajectory.id)}
-                <div className="rounded-md border bg-muted/40 px-2.5 py-2 text-[13px] leading-snug text-muted-foreground">
-                  {trajectory.note}
+                <div className="rounded-md border bg-muted/40 p-3 text-sm leading-snug text-muted-foreground">
+                  <p>{trajectory.note}</p>
+                  {showGenerationSettings && (
+                    <dl className="mt-3 space-y-3 border-t border-border/70 pt-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1">
+                        <dt className="font-semibold text-foreground">Ping interval</dt>
+                        <dd className="text-right font-medium tabular-nums text-foreground">{trajectory.generationSettings.beta_ping}</dd>
+                        <dd className="col-span-2 text-xs">Mean gap; higher = fewer pings.</dd>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1">
+                        <dt className="font-semibold text-foreground">Horizontal accuracy</dt>
+                        <dd className="text-right font-medium tabular-nums text-foreground">{trajectory.generationSettings.ha}</dd>
+                        <dd className="col-span-2 text-xs">Higher values add more noise.</dd>
+                      </div>
+                    </dl>
+                  )}
                 </div>
               </div>
             )}

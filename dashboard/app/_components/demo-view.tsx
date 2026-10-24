@@ -94,6 +94,7 @@ export function DemoView({
   handleRightAlgorithmChange,
   handleNewTrajectory,
   handleAgentSearch,
+  availableAgentIds,
   compareLoading,
   openMetricsFromDemo,
   startTour,
@@ -129,6 +130,7 @@ export function DemoView({
   handleRightAlgorithmChange: (algorithmId: string) => void
   handleNewTrajectory: () => void
   handleAgentSearch: (agentId: string) => void
+  availableAgentIds: string[]
   compareLoading: boolean
   openMetricsFromDemo: (agentId?: string) => void
   startTour: () => void
@@ -139,6 +141,7 @@ export function DemoView({
   const [comparePlaybackState, setComparePlaybackState] = useState<"playing" | "paused" | "complete">("complete")
   const [showInformation, setShowInformation] = useState(false)
   const [agentSearchId, setAgentSearchId] = useState("")
+  const [agentSearchError, setAgentSearchError] = useState<string | null>(null)
   const scene = compareApiData?.left.scene
   useEffect(() => {
     if (scene?.user_id) {
@@ -173,7 +176,26 @@ export function DemoView({
               className="space-y-2"
               onSubmit={(event) => {
                 event.preventDefault()
-                if (!compareLoading) handleAgentSearch(agentSearchId)
+
+                const agentId = agentSearchId.trim()
+
+                if (!agentId) {
+                  setAgentSearchError("Enter an agent ID.")
+                  return
+                }
+
+                if (!availableAgentIds.includes(agentId)) {
+                  setAgentSearchError(
+                    `Agent "${agentId}" is unavailable for the selected ground truth diary. Check the ID or select a different diary.`
+                  )
+                  return
+                }
+
+                setAgentSearchError(null)
+
+                if (!compareLoading && agentId !== scene?.user_id) {
+                  handleAgentSearch(agentId)
+                }
               }}
             >
               <label
@@ -184,23 +206,51 @@ export function DemoView({
               </label>
               <input
                 id="agent-search"
+                list="available-agent-ids"
                 type="text"
                 value={agentSearchId}
-                onChange={(event) => setAgentSearchId(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value
+                  const agentId = value.trim()
+
+                  setAgentSearchId(value)
+                  setAgentSearchError(null)
+
+                  if (!agentId || availableAgentIds.length === 0) return
+
+                  if (availableAgentIds.includes(agentId)) {
+                    if (agentId !== scene?.user_id) {
+                      handleAgentSearch(agentId)
+                    }
+                  } else if (
+                    !availableAgentIds.some((id) =>
+                      id.toLowerCase().includes(agentId.toLowerCase())
+                    )
+                  ) {
+                    setAgentSearchError(
+                      `Agent "${agentId}" is unavailable for the selected ground truth diary. Check the ID or select a different diary.`
+                    )
+                  }
+                }}
+                onBlur={() => {
+                  setAgentSearchId(scene?.user_id ?? "")
+                  setAgentSearchError(null)
+                }}
                 placeholder="Enter agent ID"
                 autoComplete="off"
                 spellCheck={false}
                 className="h-9 w-full min-w-0 rounded-md border border-[#d1d5db] bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#7629db]/25"
               />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                disabled={compareLoading}
-                className="w-full"
-              >
-                {compareLoading ? "Loading…" : "Load Agent"}
-              </Button>
+              <datalist id="available-agent-ids">
+                {availableAgentIds.map((agentId) => (
+                  <option key={agentId} value={agentId} />
+                ))}
+              </datalist>
+              {agentSearchError && (
+                <p role="alert" className="text-xs text-red-500">
+                  {agentSearchError}
+                </p>
+              )}
             </form>
 
             <Button variant="outline" onClick={handleNewTrajectory} size="lg" className="w-full">

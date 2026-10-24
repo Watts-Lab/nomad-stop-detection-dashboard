@@ -14,7 +14,7 @@ import {
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
 import { publicPath } from "./_lib/public-path"
-import { loadCompareData } from "./_lib/static-cache"
+import { loadAgentIds, loadCompareData } from "./_lib/static-cache"
 import { METRICS_TOUR_STEPS, METRICS_TOUR_STORAGE_KEY, useProductTour } from "@/hooks/use-product-tour"
 import type {
   CompareApiResponse,
@@ -61,6 +61,7 @@ function NomadDashboard() {
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsAgentId, setMetricsAgentId] = useState<string | null>(null)
   const [metricsError, setMetricsError] = useState<string | null>(null)
+  const [availableAgentIds, setAvailableAgentIds] = useState<string[]>([])
 
   // Update browser URL to reflect the selected view
   // Include the algorithm for Learn & the single/compare mode for Demo
@@ -140,13 +141,52 @@ function NomadDashboard() {
     }
   }, [leftAlgorithm, rightAlgorithm, leftParams, rightParams, compareMode, requestedUserId, demoTrajectory])
 
+  useEffect(() => {
+    let cancelled = false
+
+    setAvailableAgentIds([])
+
+    loadAgentIds(demoTrajectory).then(
+      (agentIds) => {
+        if (!cancelled) setAvailableAgentIds(agentIds)
+      },
+      () => {
+        if (!cancelled) {
+          setCompareError("Unable to load available agents. Please try again.")
+        }
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [demoTrajectory])
+  
   // Handle New Agent buttom by clearing explicitly requested agent
   // incrementing seed & requesting visualization data with new seed
   // Updating the seed triggers the Demo-loading effect below
-  const handleNewTrajectory = useCallback(() => {
-    setRequestedUserId(null)
-    setCompareSeed((seed) => seed + 1)
-  }, [])
+  const handleNewTrajectory = useCallback(async () => {
+    try {
+      const agentIds = await loadAgentIds(demoTrajectory)
+      const currentAgentId = compareApiData?.left.scene.user_id
+
+      const otherAgentIds = agentIds.filter((id) => id !== currentAgentId)
+      const candidates = otherAgentIds.length > 0 ? otherAgentIds : agentIds
+
+      if (candidates.length === 0) {
+        setCompareError("No agents are available for the selected ground truth diary.")
+        return
+      }
+
+      const randomAgentId =
+        candidates[Math.floor(Math.random() * candidates.length)]
+
+      setRequestedUserId(randomAgentId)
+      setCompareSeed((seed) => seed + 1)
+    } catch {
+      setCompareError("Unable to load available agents. Please try again.")
+    }
+  }, [demoTrajectory, compareApiData?.left.scene.user_id])
 
   // Load a specific agent without changing algorithms or parameters.
   const handleAgentSearch = useCallback((agentId: string) => {
@@ -445,6 +485,7 @@ function NomadDashboard() {
               handleRightAlgorithmChange={handleRightAlgorithmChange}
               handleNewTrajectory={handleNewTrajectory}
               handleAgentSearch={handleAgentSearch}
+              availableAgentIds={availableAgentIds}
               compareLoading={compareLoading}
               openMetricsFromDemo={openMetricsFromDemo}
               startTour={startTour}

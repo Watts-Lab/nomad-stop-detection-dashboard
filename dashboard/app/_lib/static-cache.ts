@@ -436,6 +436,12 @@ async function buildPanel(
   } satisfies ComparePanelResponse
 }
 
+export async function loadAgentIds(trajectory: string): Promise<string[]> {
+  const cacheRoot = cacheRootForTrajectory(trajectory)
+  const manifest = await loadManifest(cacheRoot)
+  return [...manifest.users]
+}
+
 export async function loadCompareData(payload: ComparePayload): Promise<CompareApiResponse> {
   const mode = payload.mode === "single" ? "single" : "compare"
   const seed = Number.isFinite(payload.seed) ? Number(payload.seed) : 1

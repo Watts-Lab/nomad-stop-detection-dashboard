@@ -29,51 +29,59 @@ export const LEARN_FAMILIES = [
 ]
 
 export const LEARN_CONCEPTS = [
+  // Glossary: Mobility semantics
   {
-    id: "merging",
-    category: "failure-modes",
-    name: "Merging",
+    id: "trajectory",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Trajectory",
     description:
-      "Merging occurs when an algorithm combines two or more distinct true stops into a single detected stop.",
-  },
-  {
-    id: "splitting",
-    category: "failure-modes",
-    name: "Splitting",
-    description:
-      "Splitting occurs when an algorithm divides one true stop into two or more detected stops.",
-  },
-  {
-    id: "missing",
-    category: "failure-modes",
-    name: "Missing",
-    description:
-      "Missing occurs when a true stop is not identified by the algorithm.",
-  },
-  {
-    id: "temporal-overlap",
-    category: "failure-modes",
-    name: "Temporal Overlap",
-    description:
-      "Temporal overlap occurs when distinct detected stops overlap in time, rather than remaining temporally separated.",
+      "Path of a moving individual over time, either continuously, or as a sequence of trips and visits.",
   },
   {
     id: "ping",
     category: "glossary",
+    section: "Mobility semantics",
     name: "Ping",
     description:
-      "A single recorded location observation with a timestamp.",
+      "Noisy location record, consisting of a coordinate pair and a timestamp (x, y, t).",
+  },
+  {
+    id: "horizontal-accuracy",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Horizontal accuracy",
+    description:
+      "Reported radius r around a position fix within which the true location is estimated to lie with 68% probability, following the convention adopted in this study.",
   },
   {
     id: "true-stop",
     category: "glossary",
-    name: "True Stop",
+    section: "Mobility semantics",
+    name: "Stop",
     description:
-      "An actual period spent at a destination that a stop-detection algorithm aims to identify.",
+      "Part of a trajectory with stationary behavior. The definition and resolution might vary depending on the application.",
+  },
+  {
+    id: "visit",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Visit",
+    description:
+      "Part of a trajectory occurring within a place, typically associated with a single stop.",
+  },
+  {
+    id: "mobility-diary",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Mobility diary",
+    description:
+      "Discretized representation of a trajectory as a sequence of visits to places and trips.",
   },
   {
     id: "ground-truth-diary",
     category: "glossary",
+    section: "Mobility semantics",
     name: "Ground Truth Diary",
     description:
       "A chronological reference record of actual visits and trips, including their locations and times, used to evaluate detected stops.",
@@ -81,6 +89,7 @@ export const LEARN_CONCEPTS = [
   {
     id: "sampled-trajectory",
     category: "glossary",
+    section: "Mobility semantics",
     name: "Sampled Trajectory",
     description:
       "A sequence of location observations sampled over time to represent movement.",
@@ -88,9 +97,136 @@ export const LEARN_CONCEPTS = [
   {
     id: "noise",
     category: "glossary",
+    section: "Mobility semantics",
     name: "Noise",
     description:
       "Error or variation in recorded locations that makes observations differ from the actual position.",
+  },
+
+  // Glossary: Stop-detection semantics
+  {
+    id: "detected-stop",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Detected stop",
+    description:
+      "Estimate of a stop, typically represented as a group of pings clustered by a stop-detection algorithm.",
+  },
+  {
+    id: "attributed-stop",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Attributed stop",
+    description:
+      "Detected stop assigned to an inferred location.",
+  },
+  {
+    id: "temporal-separation",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Temporal separation",
+    description:
+      "Lack of temporal overlap in the stops, and visits, of an individual. Stop detection must guarantee this property.",
+  },
+  {
+    id: "containment-area",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Containment area",
+    description:
+      "Spatial region where consecutive pings must remain for a sequential algorithm to identify them as a stop.",
+  },
+  {
+    id: "anchor-point",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Anchor point",
+    description:
+      "Center of a circle defining the containment area at a given stage of a sequential stop-detection algorithm.",
+  },
+  {
+    id: "core-point",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Core point",
+    description:
+      "Ping with sufficient neighbors to satisfy a density criterion.",
+  },
+  {
+    id: "border-point",
+    category: "glossary",
+    section: "Stop-detection semantics",
+    name: "Border point",
+    description:
+      "Non-core ping that neighbors at least one core ping.",
+  },
+
+  // Failure modes
+  {
+    id: "splitting",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Split stop",
+    description:
+      "True stop temporally overlapping multiple detected stops.",
+  },
+  {
+    id: "missing",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Missing stop",
+    description:
+      "True stop with no temporal overlap with any detected stop.",
+  },
+  {
+    id: "merging",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Merged stop",
+    description:
+      "True stop overlapping a detected stop that also overlaps another true stop and is attributed to a different location.",
+  },
+  {
+    id: "displaced-stop",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Displaced stop",
+    description:
+      "True stop overlapping a detected stop attributed to an incorrect location, without merging with another true stop.",
+  },
+  {
+    id: "temporal-overlap",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Temporal Overlap",
+    description:
+      "Temporal overlap occurs when distinct detected stops overlap in time, rather than remaining temporally separated.",
+  },
+
+  // Performance metrics
+  {
+    id: "recall",
+    category: "failure-modes",
+    section: "Performance metrics",
+    name: "Recall (min-by-min)",
+    description:
+      "Proportion of true stop minutes attributed to the correct location.",
+  },
+  {
+    id: "precision",
+    category: "failure-modes",
+    section: "Performance metrics",
+    name: "Precision (min-by-min)",
+    description:
+      "Proportion of location-attributed minutes assigned to the correct location.",
+  },
+  {
+    id: "accuracy",
+    category: "failure-modes",
+    section: "Performance metrics",
+    name: "Accuracy (min-by-min)",
+    description:
+      "Proportion of all minutes correctly attributed to a location or to no location.",
   },
 ]
 

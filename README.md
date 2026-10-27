@@ -56,3 +56,18 @@ Regenerate the source caches with:
 python3 -m pip install -r build_cache/requirements.txt
 python3 build_cache/generate_demo_caches.py
 ```
+
+### Ping-generation settings
+
+`build_cache/generate_configs.py` defines `beta_ping` and `ha`, applied by
+`build_cache/generate_gt_trajectories.py` when sampling pings:
+
+- **Ping interval (`beta_ping`):** mean interval in minutes; higher values produce
+  fewer pings. See NOMAD's [ping sampler](https://github.com/Watts-Lab/nomad/blob/52930945824e6cb7b1f44ae01034a5a2a673acc9/nomad/traj_gen.py#L990-L1027).
+- **Horizontal accuracy (`ha`):** positional noise scale in generator blocks;
+  higher values add more noise. See the [parameter documentation](https://github.com/Watts-Lab/nomad/blob/52930945824e6cb7b1f44ae01034a5a2a673acc9/nomad/traj_gen.py#L851-L867)
+  and [noise sampler](https://github.com/Watts-Lab/nomad/blob/52930945824e6cb7b1f44ae01034a5a2a673acc9/nomad/traj_gen.py#L1057-L1086).
+
+Demo previews display static dataset values or ranges from `TRAJECTORY_OPTIONS` in
+`dashboard/app/_lib/dashboard-data.ts`. Keep these aligned with the generator
+configuration when regenerating datasets. They do not change with **New Agent**.

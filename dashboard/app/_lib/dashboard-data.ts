@@ -31,21 +31,25 @@ export const LEARN_FAMILIES = [
 export const TRAJECTORY_OPTIONS = [
   {
     id: "two-stop",
+    generationSettings: { beta_ping: "7 min", ha: "1 block" },
     name: "Two-stop trajectory",
     note: "(Default trajectory) Two stops of equal duration at nearby destinations of equal size.",
   },
   {
     id: "four-stop-low-ha",
+    generationSettings: { beta_ping: "4–9 min", ha: "≈0.77 blocks" },
     name: "Four-stop",
     note: "Heterogeneous trajectory consisting of four stops to destinations of varying sizes, but equal durations.",
   },
   {
     id: "four-stop-high-ha",
+    generationSettings: { beta_ping: "4–9 min", ha: "1 block" },
     name: "Four-stop (noisier)",
     note: "Same as 'Four-stop' but with increased noise in its horizontal accuracy.",
   },
   {
     id: "commute-return",
+    generationSettings: { beta_ping: "7 min", ha: "1 block" },
     name: "Commute return",
     note: "Trajectory representing recurring visits to a same destination, starting with a short visit in one destination, followed by a lengthier visit at a second destination, and a final visit to the starting destination.",
   },

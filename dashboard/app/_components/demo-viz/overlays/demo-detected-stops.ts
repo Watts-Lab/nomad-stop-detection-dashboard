@@ -37,40 +37,42 @@ export function pingClassifiedAt(
     )
 }
 
-// Find the building assigned to the detected stop containing the hovered ping.
-export function hoveredAssignedBuildingData(
+// Find the buildings assigned to the detected stops containing the selected pings.
+export function selectedAssignedBuildingData(
     timestampSeconds: number,
     chartData: DemoResultData,
     showStops: boolean,
-    hoverPingIndex: number | null
+    selectedPingIndexes: number[]
 ) {
-    if (!showStops || hoverPingIndex === null) return []
+    if (!showStops) return []
 
-    if (
-        !pingClassifiedAt(
-            hoverPingIndex,
-            timestampSeconds,
-            chartData
+    const clusters = new Set(
+        selectedPingIndexes
+            .filter((pingIndex) =>
+                pingClassifiedAt(
+                    pingIndex,
+                    timestampSeconds,
+                    chartData
+                )
+            )
+            .map((pingIndex) => chartData.pingData[pingIndex][2])
+            .filter((cluster) => cluster >= 0)
+    )
+
+    return Array.from(clusters).flatMap((cluster) => {
+        const stop = chartData.stops.find(
+            (candidate) => candidate.cluster === cluster
         )
-    ) {
-        return []
-    }
 
-    const cluster = chartData.pingData[hoverPingIndex]?.[2] ?? -1
-
-    if (cluster < 0) return []
-    const stop = chartData.stops.find(
-        (candidate) => candidate.cluster === cluster
-    )
-
-    const buildingId = stop?.destination.id
-    if (!buildingId) return []
-    const buildingIndex = chartData.buildings.findIndex(
-        (building) => building.id === buildingId
-    )
-    return buildingIndex >= 0
-        ? [[buildingIndex, cluster]]
-        : []
+        const buildingId = stop?.destination.id
+        if (!buildingId) return []
+        const buildingIndex = chartData.buildings.findIndex(
+            (building) => building.id === buildingId
+        )
+        return buildingIndex >= 0
+            ? [[buildingIndex, cluster]]
+            : []
+    })
 }
 
 // Return noise pings that have occurred by the current playback time.

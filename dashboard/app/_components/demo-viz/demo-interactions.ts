@@ -18,6 +18,40 @@ export function selectedPingLineData(
   }]
 }
 
+// Describe a ping for its hover tooltip.
+export function pingTooltipHtml(
+    pingIndex: number,
+    timestampSeconds: number,
+    chartData: DemoResultData,
+    showStops: boolean,
+    showXray: boolean,
+    clusterColor: (cluster: number) => string,
+  ) {
+    const ping = chartData.pings[pingIndex]
+    const rows = [
+      `<div><span style="font-weight:600">${ping.i + 1}:</span> <span style="font-weight:400">${ping.time}</span></div>`,
+    ]
+
+    if (!showStops) return rows.join("")
+
+    const classified = pingClassifiedAt(pingIndex, timestampSeconds, chartData)
+    if (!classified) rows.push("<div>Unclassified</div>")
+    else if (ping.cluster < 0) rows.push("<div>Noise</div>")
+    else {
+      if (chartData.result.kind === "density" && showXray) {
+        rows.push(`<div>${chartData.result.core[ping.i] >= 0 ? "Core" : "Border"}</div>`)
+      }
+      const stop = chartData.stops.find((candidate) => candidate.cluster === ping.cluster)
+      if (stop) {
+        rows.push(
+          `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;width:12px;height:12px;align-items:center;justify-content:center;background:${clusterColor(ping.cluster)};border:1px solid #202124"><span style="width:3px;height:3px;border-radius:50%;background:#202124"></span></span><span>${stop.startTime}–${stop.endTime}</span></div>`,
+        )
+      }
+    }
+
+    return rows.join("")
+  }
+
 // Return the detected cluster for an interacted-with ping once that ping has been classified at the current playback time.
 export function activePingClusterAt(
     pingIndex: number,
@@ -56,34 +90,6 @@ export function relatedPingIndexesAt(
       timestampSeconds,
       chartData
     ) ?? [pingIndex]
-  }
-
-// Return all pings in the connected component containing the currently hovered edge.
-export function connectedPingIndexes(
-    hoverEdgeEndpoints: [number, number],
-    anchorEdges: DemoResultData["anchorFrames"][number]["edges"]
-  ) {
-    const connectedPings = new Set<number>(hoverEdgeEndpoints)
-    const pending: number[] = [...hoverEdgeEndpoints]
-  
-    while (pending.length) {
-      const current = pending.pop()!
-      anchorEdges.forEach((edge) => {
-        const neighbor = edge.value[1] === current
-          ? edge.value[2]
-          : edge.value[2] === current
-            ? edge.value[1]
-            : null
-        if (
-          neighbor !== null &&
-          !connectedPings.has(neighbor)
-        ) {
-          connectedPings.add(neighbor)
-          pending.push(neighbor)
-        }
-      })
-    }
-    return connectedPings
   }
 
 // Determine whether a ping belongs to the currently highlighted interaction set.
@@ -137,13 +143,16 @@ export function associationOpacity(
     ) ? 0.7 : 0.1
   }
   
-  // Slightly enlarge a ping when it belongs to the active
-  // hover or selection set.
+  // Magnify the hovered ping as an accent, and slightly enlarge
+  // pings that belong to the selection set.
   export function pingScale(
     pingIndex: number,
-    hoverPingIndexes: Set<number> | null
+    hoverPingIndexes: Set<number> | null,
+    hoverPingIndex: number | null
   ) {
-    return hoverPingIndexes?.has(pingIndex)
-      ? 1.1
-      : 1
+    return pingIndex === hoverPingIndex
+      ? 1.25
+      : hoverPingIndexes?.has(pingIndex)
+        ? 1.1
+        : 1
   }

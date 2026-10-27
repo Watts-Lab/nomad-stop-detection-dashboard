@@ -1,8 +1,9 @@
 /* OWN ECHARTS MAP CONFIGURATION */
 
+import type { TooltipComponentOption } from "echarts"
 import type { EChartsApi, EChartsParams } from "../../../_lib/types"
 import type { DemoResultData } from "../../../_lib/demo-result-data"
-import { associatedWithHover, pingScale } from "../demo-interactions"
+import { associatedWithHover, pingScale, pingTooltipHtml } from "../demo-interactions"
 import { pingClassifiedAt } from "../overlays/demo-detected-stops"
 import { xrayAnchorFramesAt } from "../overlays/demo-xray"
 
@@ -28,6 +29,10 @@ type MapChartOptionsArgs = {
   bounds: MapChartBounds
   getHoverBuildingId: () => string
   getHoverPingIndexes: () => Set<number> | null
+  getHoverPingIndex: () => number | null
+  getContainmentAreas: () => Array<{ cluster: number; points: number[][]; shaded: boolean }>
+  pingTooltipPosition: NonNullable<TooltipComponentOption["position"]>
+  algorithm: string
   getShowXray: () => boolean
   getShowStops: () => boolean
   destinationPreview: boolean
@@ -41,6 +46,10 @@ export function createDemoMapChartOptions({
   bounds,
   getHoverBuildingId,
   getHoverPingIndexes,
+  getHoverPingIndex,
+  getContainmentAreas,
+  pingTooltipPosition,
+  algorithm,
   getShowXray,
   getShowStops,
   getActiveTimestamp,
@@ -71,9 +80,16 @@ export function createDemoMapChartOptions({
 
   const renderGpsPing = (_params: EChartsParams, api: EChartsApi) => {
     const pingIndex = Number(api.value(3))
+    // Accent only when this dot is the ping's visible mark, not the center of a cluster ping.
+    // The dot is small, so it grows more than the regular hover scale.
+    const outlined = pingIndex === getHoverPingIndex() && !(
+      getShowStops() &&
+      Number(api.value(2)) >= 0 &&
+      pingClassifiedAt(pingIndex, getActiveTimestamp(), getChartData())
+    )
     const circle = pingCircle(
       api,
-      0.28 * pingScale(pingIndex, getHoverPingIndexes())
+      0.28 * (outlined ? 1.5 : pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex()))
     )
 
     return {
@@ -87,7 +103,9 @@ export function createDemoMapChartOptions({
       style: {
         fill: associatedWithHover(pingIndex, getHoverPingIndexes())
           ? "#000000"
-          : "#9ba0a3"
+          : "#9ba0a3",
+        stroke: outlined ? "#ffffff" : undefined,
+        lineWidth: mapZoomScale(api)
       }
     }
   }
@@ -96,7 +114,7 @@ export function createDemoMapChartOptions({
     const pingIndex = Number(api.value(3))
     const circle = pingCircle(
       api,
-      1.3 * pingScale(pingIndex, getHoverPingIndexes())
+      1.3 * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
     )
 
     return {
@@ -117,6 +135,13 @@ export function createDemoMapChartOptions({
       }
     }
   }
+
+  const paramsValue = (params: { data?: unknown; value?: unknown }) =>
+    (
+      params.value ??
+      (params.data as { value?: number[] }).value ??
+      params.data
+    ) as number[]
 
   return {
     animation: false,
@@ -149,7 +174,38 @@ export function createDemoMapChartOptions({
         preventDefaultMouseMove: true,
       },
     ],
-    tooltip: { show: false },
+    tooltip: {
+      trigger: "item",
+      renderMode: "html",
+      borderWidth: 0,
+      confine: true,
+      backgroundColor: "rgba(32, 33, 36, 0.92)",
+      textStyle: { color: "#ffffff" },
+      extraCssText: "pointer-events: none;",
+      position: pingTooltipPosition,
+      formatter(params: EChartsParams) {
+        const value = paramsValue(params)
+        if (params.seriesId === "core-points") {
+          return pingTooltipHtml(value[3], getActiveTimestamp(), getChartData(), getShowStops(), getShowXray(), clusterColor)
+        }
+        if (params.seriesId === "anchor-points") {
+          const ping = getChartData().pings[value[3]]
+          if (!getShowStops()) {
+            return `<div><span style="font-weight:600">${ping.i + 1}:</span> <span style="font-weight:400">${ping.time}</span></div>`
+          }
+          const label = algorithm === "sequential_centroid"
+            ? "Centroid anchor for"
+            : algorithm.startsWith("sequential_")
+              ? "Anchor for"
+              : "Cached anchor for"
+          return `${label} Stop ${value[2]}<br>Ping ${ping.i + 1}<br>${ping.time}`
+        }
+        if (params.seriesId === "cluster-pings" || params.seriesId === "noise-pings" || params.seriesId === "current-ping" || params.seriesId === "ping-hit-area") {
+          return pingTooltipHtml(value[3], getActiveTimestamp(), getChartData(), getShowStops(), getShowXray(), clusterColor)
+        }
+        return ""
+      },
+    },
     series: [
       {
         id: "streets",
@@ -399,15 +455,16 @@ export function createDemoMapChartOptions({
       
           const circle = pingCircle(
             api,
-            markScale * pingScale(pingIndex, getHoverPingIndexes())
+            markScale * pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           )
       
+          // Pad the target beyond the drawn mark so small pings are easy to hover.
           return {
             type: "circle",
             shape: {
               cx: circle.center[0],
               cy: circle.center[1],
-              r: circle.radius
+              r: circle.radius + 5
             },
             style: {
               fill: "rgba(0, 0, 0, 0.001)"
@@ -434,8 +491,9 @@ export function createDemoMapChartOptions({
         renderItem(_params: EChartsParams, api: EChartsApi) {
           const pingIndex = Number(api.value(3))
           const circle = pingCircle(api)
-          const scale = pingScale(pingIndex, getHoverPingIndexes())
+          const scale = pingScale(pingIndex, getHoverPingIndexes(), getHoverPingIndex())
           const strokeScale = mapZoomScale(api)
+          const hovered = pingIndex === getHoverPingIndex()
 
           return {
             type: "group",
@@ -450,8 +508,8 @@ export function createDemoMapChartOptions({
                 },
                 style: {
                   fill: clusterColor(Number(api.value(2))),
-                  stroke: "#202124",
-                  lineWidth: 1.6 * strokeScale,
+                  stroke: hovered ? "#ffffff" : "#202124",
+                  lineWidth: (hovered ? 1.2 : 1.6) * strokeScale,
                   opacity: Number(api.value(5))
                 }
               },
@@ -577,6 +635,34 @@ export function createDemoMapChartOptions({
             }
           }
         }
+      },
+      {
+        id: "containment-areas",
+        name: "Containment area",
+        type: "custom",
+        coordinateSystem: "cartesian2d",
+        silent: true,
+        z: 3,
+        data: [],
+        renderItem(params: EChartsParams, api: EChartsApi) {
+          const area = getContainmentAreas()[params.dataIndex]
+          if (!area) return null
+          const scale = mapZoomScale(api)
+          // Noise candidates get a neutral outline
+          const color = area.cluster < 0 ? "#8b8b8b" : clusterColor(area.cluster)
+          return {
+            type: "polygon",
+            shape: { points: area.points.map((point) => api.coord(point)) },
+            style: area.shaded
+              ? { fill: color, opacity: 0.2 }
+              : {
+                fill: "transparent",
+                stroke: color,
+                lineWidth: 1.4 * scale,
+                lineDash: [5 * scale, 4 * scale],
+              },
+          }
+        },
       },
       {
         id: "distance-circles",

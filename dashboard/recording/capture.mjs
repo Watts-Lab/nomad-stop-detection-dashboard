@@ -15,6 +15,7 @@ const RECORDING_TIME = "2024-01-01T00:01:00Z"
 const recordingRoot = path.dirname(fileURLToPath(import.meta.url))
 const outputPath = path.join(recordingRoot, "home-stop-preview.mp4")
 const publicOutputPath = path.resolve(recordingRoot, "../public/videos/home-stop-preview.mp4")
+const publicGifPath = path.resolve(recordingRoot, "../public/videos/home-stop-preview.gif")
 
 const server = await createServer({
   configFile: path.join(recordingRoot, "vite.config.ts"),
@@ -97,8 +98,23 @@ try {
   if (exitCode !== 0) throw new Error(encoderError)
 
   await copyFile(outputPath, publicOutputPath)
+  const gifEncoder = spawn(ffmpegPath, [
+    "-y",
+    "-i", outputPath,
+    "-filter_complex",
+    "fps=15,scale=960:-1:flags=lanczos,split[frames][palette];[palette]palettegen=max_colors=128[colors];[frames][colors]paletteuse=dither=bayer",
+    publicGifPath,
+  ], { stdio: ["ignore", "ignore", "pipe"] })
+  let gifEncoderError = ""
+  gifEncoder.stderr.on("data", (chunk) => {
+    gifEncoderError += chunk
+  })
+  const [gifExitCode] = await once(gifEncoder, "close")
+  if (gifExitCode !== 0) throw new Error(gifEncoderError)
+
   console.log(outputPath)
   console.log(publicOutputPath)
+  console.log(publicGifPath)
 } finally {
   if (encoder && !encoder.killed && encoder.exitCode === null) encoder.kill()
   await browser?.close()

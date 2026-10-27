@@ -14,6 +14,18 @@ export type ComparePanelResponse = {
   scene: CompareScene
   params: Record<string, number>
   result: AlignedStopResult
+  // null for the placeholder panel shown before an algorithm is selected
+  metrics: {
+    recall: number
+    missed_fraction: number
+    merged_fraction: number
+    split_fraction: number
+    best: {
+      recall: number
+      parameter: string
+      value: number
+    } | null
+  } | null
 }
 
 export type CompareApiResponse = {

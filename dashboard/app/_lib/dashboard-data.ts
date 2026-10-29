@@ -105,14 +105,6 @@ export const LEARN_CONCEPTS = [
       "Detected stop assigned to an inferred location.",
   },
   {
-    id: "temporal-separation",
-    category: "glossary",
-    section: "Stop-detection semantics",
-    name: "Temporal separation",
-    description:
-      "Lack of temporal overlap in the stops, and visits, of an individual. Stop detection must guarantee this property.",
-  },
-  {
     id: "containment-area",
     category: "glossary",
     section: "Stop-detection semantics",
@@ -185,33 +177,7 @@ export const LEARN_CONCEPTS = [
     name: "Temporal Overlap",
     description:
       "Temporal overlap occurs when distinct detected stops overlap in time, rather than remaining temporally separated.",
-  },
-
-  // Performance metrics
-  {
-    id: "recall",
-    category: "failure-modes",
-    section: "Performance metrics",
-    name: "Recall (min-by-min)",
-    description:
-      "Proportion of true stop minutes attributed to the correct location.",
-  },
-  {
-    id: "precision",
-    category: "failure-modes",
-    section: "Performance metrics",
-    name: "Precision (min-by-min)",
-    description:
-      "Proportion of location-attributed minutes assigned to the correct location.",
-  },
-  {
-    id: "accuracy",
-    category: "failure-modes",
-    section: "Performance metrics",
-    name: "Accuracy (min-by-min)",
-    description:
-      "Proportion of all minutes correctly attributed to a location or to no location.",
-  },
+  }
 ]
 
 export const TRAJECTORY_OPTIONS = [

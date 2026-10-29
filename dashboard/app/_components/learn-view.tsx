@@ -91,8 +91,8 @@ export function LearnView({
           {[
             {
               id: "failure-modes",
-              title: "Failure Modes and Performance Metrics",
-              sections: ["Failure modes", "Performance metrics"],
+              title: "Failure Modes",
+              sections: ["Failure modes"],
             },
             {
               id: "glossary",
@@ -110,65 +110,47 @@ export function LearnView({
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="px-5 pb-5">
-                <div className="overflow-x-auto rounded-md border border-[#c9afe8]">
-                  <table className="w-full text-left text-sm text-[#080d1a]">
-                  <thead className="bg-[#3b1370] text-white">
-                      <tr>
-                        <th scope="col" className="w-1/3 px-3 py-2 font-semibold">
-                          Term
-                        </th>
-                        <th scope="col" className="px-3 py-2 font-semibold">
-                          Definition
-                        </th>
-                      </tr>
-                    </thead>
-
-                    {category.sections.map((section) => (
-                      <tbody key={section}>
-                        <tr className="border-t border-[#c9afe8] bg-[#f3f4f6]">
-                          <th
-                            colSpan={2}
-                            scope="rowgroup"
-                            className="px-3 py-2 font-semibold text-[#3b1370]"
-                          >
-                            {section}
-                          </th>
-                        </tr>
-
-                        {LEARN_CONCEPTS
-                          .filter(
-                            (concept) =>
-                              concept.category === category.id &&
-                              concept.section === section,
-                          )
-                          .map((concept, index) => (
-                            <tr
-                              key={concept.id}
-                              className={`border-t border-[#c9afe8] ${index % 2 === 0 ? "bg-white" : "bg-[#f4ecfe]"
-                                }`}
-                            >
-                              <th
-                                scope="row"
-                                className="px-3 py-3 align-top font-medium"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => openLearnAlgorithm(concept.id)}
-                                  className="rounded-sm text-left text-[#3b1370] underline underline-offset-4 hover:text-[#7629db] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]"
-                                >
-                                  {concept.name}
-                                </button>
-                              </th>
-                              <td className="px-3 py-3 align-top leading-relaxed">
-                                {concept.description}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    ))}
-                  </table>
+              <CardContent className="flex flex-col gap-5 px-5 pb-5">
+                <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+                  <p className="text-sm text-[#374151]">
+                    {category.id === "glossary"
+                      ? "Glossary illustration coming soon"
+                      : "Failure modes and performance metrics illustration coming soon"}
+                  </p>
                 </div>
+
+                <p className="text-sm text-[#080d1a]">
+                  Select a term to explore its definition.
+                </p>
+
+                {category.sections.map((section) => (
+                  <section key={section} className="space-y-3">
+                    <h3 className="text-sm font-semibold text-[#3b1370]">
+                      {section}
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {LEARN_CONCEPTS
+                        .filter(
+                          (concept) =>
+                            concept.category === category.id &&
+                            concept.section === section,
+                        )
+                        .map((concept) => (
+                          <Button
+                            key={concept.id}
+                            type="button"
+                            variant="outline"
+                            onClick={() => openLearnAlgorithm(concept.id)}
+                            className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                          >
+                            <span>{concept.name}</span>
+                            <Maximize2 className="h-4 w-4 shrink-0" />
+                          </Button>
+                        ))}
+                    </div>
+                  </section>
+                ))}
               </CardContent>
             </Card>
           ))}
@@ -241,7 +223,7 @@ export function LearnView({
 
                     <div className="overflow-x-auto rounded-md border border-[#c9afe8]">
                       <table className="w-full text-sm text-[#080d1a]">
-                      <thead className="bg-[#3b1370] text-white">
+                        <thead className="bg-[#3b1370] text-white">
                           <tr>
                             <th className="px-3 py-2 text-left font-semibold">Name</th>
                             <th className="px-3 py-2 text-left font-semibold">Default</th>
@@ -320,41 +302,16 @@ export function LearnView({
       >
         {expandedLearnConcept && (
           <DialogContent
-            className="max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border-2 border-[#e6dffc] bg-[#f8f9fc] p-5 text-[#080d1a] sm:max-w-3xl md:p-8"
-          >
-            <DialogTitle className="pr-8 text-2xl font-bold text-[#3b1370]">
-              {expandedLearnConcept.name}
-            </DialogTitle>
-
-            <DialogDescription className="text-sm text-[#374151]">
-              {expandedLearnConcept.section}
-            </DialogDescription>
-
-            <p className="text-sm leading-relaxed md:text-base">
-              {expandedLearnConcept.description}
-            </p>
-
-            <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
-              <p className="text-sm text-[#374151]">
-                Illustration for {expandedLearnConcept.name.toLowerCase()} coming soon
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setExpandedAlgorithm(null)
-                  syncUrl("learn")
-                }}
-                className="border-[#e6dffc] bg-[#e8d8fc] text-[#3b1370] hover:bg-white"
-              >
-                Collapse
-                <Minimize2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogContent>
+          className="max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border-2 border-[#e6dffc] bg-white p-6 text-[#080d1a] sm:max-w-lg md:p-8"
+        >
+          <DialogTitle className="pr-8 text-2xl font-bold text-[#3b1370]">
+            {expandedLearnConcept.name}
+          </DialogTitle>
+        
+          <DialogDescription className="text-base leading-relaxed text-[#080d1a]">
+            {expandedLearnConcept.description}
+          </DialogDescription>
+        </DialogContent>
         )}
       </Dialog>
     </div>

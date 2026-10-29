@@ -79,22 +79,6 @@ export const LEARN_CONCEPTS = [
       "Discretized representation of a trajectory as a sequence of visits to places and trips.",
   },
   {
-    id: "ground-truth-diary",
-    category: "glossary",
-    section: "Mobility semantics",
-    name: "Ground Truth Diary",
-    description:
-      "A chronological reference record of actual visits and trips, including their locations and times, used to evaluate detected stops.",
-  },
-  {
-    id: "sampled-trajectory",
-    category: "glossary",
-    section: "Mobility semantics",
-    name: "Sampled Trajectory",
-    description:
-      "A sequence of location observations sampled over time to represent movement.",
-  },
-  {
     id: "noise",
     category: "glossary",
     section: "Mobility semantics",

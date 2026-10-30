@@ -115,7 +115,7 @@ export function LearnView({
                   <p className="text-sm text-[#374151]">
                     {category.id === "glossary"
                       ? "Glossary illustration coming soon"
-                      : "Failure modes and performance metrics illustration coming soon"}
+                      : "Failure modes illustration coming soon"}
                   </p>
                 </div>
 

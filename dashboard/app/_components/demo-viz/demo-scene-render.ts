@@ -2,10 +2,10 @@
 
 import type { DemoResultData } from "../../_lib/demo-result-data"
 import {
-    connectedPingIndexes, relatedPingIndexesAt, anchorOpacity,
+    relatedPingIndexesAt, anchorOpacity,
     associationOpacity, edgeOpacity, selectedPingLineData
 } from "./demo-interactions"
-import { hoveredAssignedBuildingData, pingClassifiedAt, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
+import { pingClassifiedAt, selectedAssignedBuildingData, visibleClusterPingsAt, visibleNoisePingsAt } from "./overlays/demo-detected-stops"
 import { groundTruthBuildingGlowData, groundTruthBuildingsSeriesData } from "./overlays/demo-ground-truth"
 import { xrayDistanceCircleData } from "./overlays/demo-xray"
 
@@ -13,49 +13,17 @@ type ResolveHoverPingIndexesArgs = {
     timestampSeconds: number
     chartData: DemoResultData
     selectedPingIndexes: number[]
-    hoverPingIndex: number | null
-    hoverEdgeEndpoints: [number, number] | null
-    anchorEdges: Array<{
-        coords: number[][]
-        value: number[]
-    }>
 }
 
-// Determine which pings should be highlighted based on the current
-// selection, hovered ping, or hovered connection edge.
+// Determine which pings should be highlighted based on the current selection.
+// Hover only magnifies the hovered ping, so it doesn't change this set.
 export function resolveHoverPingIndexes({
     timestampSeconds,
     chartData,
-    selectedPingIndexes,
-    hoverPingIndex,
-    hoverEdgeEndpoints,
-    anchorEdges
+    selectedPingIndexes
 }: ResolveHoverPingIndexesArgs): Set<number> | null {
     if (selectedPingIndexes.length === 2) {
-        const indexes = new Set(selectedPingIndexes)
-
-        if (hoverPingIndex !== null) {
-            indexes.add(hoverPingIndex)
-        }
-
-        return indexes
-    }
-
-    if (hoverEdgeEndpoints) {
-        return connectedPingIndexes(
-            hoverEdgeEndpoints,
-            anchorEdges
-        )
-    }
-
-    if (hoverPingIndex !== null) {
-        return new Set(
-            relatedPingIndexesAt(
-                hoverPingIndex,
-                timestampSeconds,
-                chartData
-            )
-        )
+        return new Set(selectedPingIndexes)
     }
 
     if (selectedPingIndexes.length) {
@@ -115,7 +83,7 @@ type BuildDemoMapSeriesArgs = {
     anchorEdges: DemoResultData["densityPromotionEdges"]
     promotionEdges: DemoResultData["densityPromotionEdges"]
     hoverPingIndexes: Set<number> | null
-    hoverPingIndex: number | null
+    containmentAreas: Array<{ cluster: number; points: number[][]; shaded: boolean }>
     hoverBuildingId: string
     selectedPingIndexes: number[]
     showGroundTruth: boolean
@@ -124,6 +92,7 @@ type BuildDemoMapSeriesArgs = {
     nextPathVisible: boolean
     pulseStrength: number
     isDensityAlgorithm: boolean
+    algorithm: string
     clusterColor: (cluster: number) => string
     pingFloatOffset: number
 }
@@ -137,7 +106,7 @@ export function buildDemoMapSeries({
     anchorEdges,
     promotionEdges,
     hoverPingIndexes,
-    hoverPingIndex,
+    containmentAreas,
     hoverBuildingId,
     selectedPingIndexes,
     showGroundTruth,
@@ -147,6 +116,7 @@ export function buildDemoMapSeries({
     pulseStrength,
     pingFloatOffset,
     isDensityAlgorithm,
+    algorithm,
     clusterColor
 }: BuildDemoMapSeriesArgs) {
     const styledXrayPoint = (point: number[]) => [
@@ -185,11 +155,11 @@ export function buildDemoMapSeries({
         },
         {
             id: "assigned-building-outline",
-            data: hoveredAssignedBuildingData(
+            data: selectedAssignedBuildingData(
                 timestampSeconds,
                 chartData,
                 showStops,
-                hoverPingIndex
+                selectedPingIndexes
             )
         },
         {
@@ -298,19 +268,18 @@ export function buildDemoMapSeries({
             ),
         },
         {
+            id: "containment-areas",
+            data: containmentAreas.map((area) => [area.cluster])
+        },
+        {
             id: "distance-circles",
             data: xrayDistanceCircleData(
                 chartData,
-                anchorFrames,
                 showXray,
                 isDensityAlgorithm,
-                hoverPingIndex,
-                hoverPingIndex !== null &&
-                pingClassifiedAt(
-                    hoverPingIndex,
-                    timestampSeconds,
-                    chartData
-                )
+                algorithm === "lachesis",
+                selectedPingIndexes,
+                timestampSeconds
             )
         },
         {

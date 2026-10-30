@@ -319,6 +319,7 @@ export function prepareDemoResultData(
         distanceThreshold: Number(
             panel.params.delta_roam ?? panel.params.dist_thresh ?? 0,
         ),
+        durMin: Number(panel.params.dur_min ?? 5),
         timeSequence: sceneData.timeSequence,
     }
 }

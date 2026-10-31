@@ -39,7 +39,7 @@ export function LearnView({
             Explore stop-detection algorithms, failure modes, and key terminology.
           </p>
         </div>
-        <div className={`${revealClass("up", 2)} grid grid-cols-1 gap-5 pb-2 lg:grid-cols-2`}>
+        <div className={`${revealClass("up", 2)} grid grid-cols-1 items-start gap-5 pb-2 lg:grid-cols-2`}>
           {LEARN_FAMILIES.map((family, familyIndex) => (
             <Card
               key={family.id}
@@ -56,34 +56,28 @@ export function LearnView({
                   <Image
                     src={family.diagramSrc}
                     alt={`${family.title} overview diagram`}
-                    width={980}
-                    height={620}
+                    width={1105}
+                    height={600}
                     sizes="(min-width: 1024px) 50vw, 100vw"
                     className="block h-auto w-full"
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <p className="text-sm text-[#080d1a]">
-                    Select an algorithm to explore its details and parameters.
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {algorithms
-                      .filter((algo) => algo.family === family.id)
-                      .map((algo) => (
-                        <Button
-                          key={algo.id}
-                          type="button"
-                          variant="outline"
-                          onClick={() => openLearnAlgorithm(algo.id)}
-                          className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
-                        >
-                          <span>{algo.name}</span>
-                          <Maximize2 className="h-4 w-4 shrink-0" />
-                        </Button>
-                      ))}
-                  </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {algorithms
+                    .filter((algo) => algo.family === family.id)
+                    .map((algo) => (
+                      <Button
+                        key={algo.id}
+                        type="button"
+                        variant="outline"
+                        onClick={() => openLearnAlgorithm(algo.id)}
+                        className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                      >
+                        <span>{algo.name}</span>
+                        <Maximize2 className="h-4 w-4 shrink-0" />
+                      </Button>
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -92,16 +86,12 @@ export function LearnView({
             {
               id: "failure-modes",
               title: "Failure Modes",
-              description:
-                "Explore how detected stops can merge distinct visits or split a single visit.",
-              placeholder: "Merging and splitting diagram coming soon",
+              sections: ["Failure modes"],
             },
             {
               id: "glossary",
               title: "Glossary",
-              description:
-                "Explore the terms used to describe trajectories and stop detection.",
-              placeholder: "Term illustrations coming soon",
+              sections: ["Mobility semantics", "Trajectory Data semantics"],
             },
           ].map((category) => (
             <Card
@@ -115,61 +105,29 @@ export function LearnView({
               </CardHeader>
 
               <CardContent className="flex flex-col gap-5 px-5 pb-5">
-                {category.id === "glossary" ? (
-                  <div className="overflow-x-auto rounded-md border border-[#c9afe8]">
-                    <table className="w-full text-left text-sm text-[#080d1a]">
-                      <thead className="bg-[#dbc2fa]">
-                        <tr>
-                          <th scope="col" className="px-3 py-2 font-semibold">
-                            Term
-                          </th>
-                          <th scope="col" className="px-3 py-2 font-semibold">
-                            Definition
-                          </th>
-                        </tr>
-                      </thead>
+                <div className="flex aspect-[221/120] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+                  <p className="text-sm text-[#374151]">
+                    {category.id === "glossary"
+                      ? "Glossary illustration coming soon"
+                      : "Failure modes illustration coming soon"}
+                  </p>
+                </div>
 
-                      <tbody>
-                        {LEARN_CONCEPTS
-                          .filter((concept) => concept.category === "glossary")
-                          .map((concept) => (
-                            <tr
-                              key={concept.id}
-                              className="border-t border-[#c9afe8] even:bg-[#f4ecfe]"
-                            >
-                              <th scope="row" className="px-3 py-3 align-top font-medium">
-                                <button
-                                  type="button"
-                                  onClick={() => openLearnAlgorithm(concept.id)}
-                                  className="rounded-sm text-left text-[#3b1370] underline underline-offset-4 hover:text-[#7629db] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7629db]"
-                                >
-                                  {concept.name}
-                                </button>
-                              </th>
-                              <td className="px-3 py-3 align-top leading-relaxed">
-                                {concept.description}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
-                    <p className="text-sm text-[#374151]">
-                      {category.placeholder}
-                    </p>
-                  </div>
-                )}
-                {category.id !== "glossary" && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-[#080d1a]">
-                      {category.description}
-                    </p>
+                {category.sections.map((section) => (
+                  <section key={section} className="space-y-3">
+                    {category.id === "glossary" && (
+                      <h3 className="text-sm font-semibold text-[#3b1370]">
+                        {section}
+                      </h3>
+                    )}
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className={`grid grid-cols-1 gap-2 ${category.id === "glossary" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                       {LEARN_CONCEPTS
-                        .filter((concept) => concept.category === category.id)
+                        .filter(
+                          (concept) =>
+                            concept.category === category.id &&
+                            concept.section === section,
+                        )
                         .map((concept) => (
                           <Button
                             key={concept.id}
@@ -183,8 +141,8 @@ export function LearnView({
                           </Button>
                         ))}
                     </div>
-                  </div>
-                )}
+                  </section>
+                ))}
               </CardContent>
             </Card>
           ))}
@@ -257,7 +215,7 @@ export function LearnView({
 
                     <div className="overflow-x-auto rounded-md border border-[#c9afe8]">
                       <table className="w-full text-sm text-[#080d1a]">
-                        <thead className="bg-[#dbc2fa]">
+                        <thead className="bg-[#3b1370] text-white">
                           <tr>
                             <th className="px-3 py-2 text-left font-semibold">Name</th>
                             <th className="px-3 py-2 text-left font-semibold">Default</th>
@@ -336,43 +294,16 @@ export function LearnView({
       >
         {expandedLearnConcept && (
           <DialogContent
-            className="max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border-2 border-[#e6dffc] bg-[#f8f9fc] p-5 text-[#080d1a] sm:max-w-3xl md:p-8"
-          >
-            <DialogTitle className="pr-8 text-2xl font-bold text-[#3b1370]">
-              {expandedLearnConcept.name}
-            </DialogTitle>
-
-            <DialogDescription className="text-sm text-[#374151]">
-              {expandedLearnConcept.category === "failure-modes"
-                ? "Failure Modes"
-                : "Glossary"}
-            </DialogDescription>
-
-            <p className="text-sm leading-relaxed md:text-base">
-              {expandedLearnConcept.description}
-            </p>
-
-            <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
-              <p className="text-sm text-[#374151]">
-                Illustration for {expandedLearnConcept.name.toLowerCase()} coming soon
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setExpandedAlgorithm(null)
-                  syncUrl("learn")
-                }}
-                className="border-[#e6dffc] bg-[#e8d8fc] text-[#3b1370] hover:bg-white"
-              >
-                Collapse
-                <Minimize2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogContent>
+          className="max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border-2 border-[#e6dffc] bg-white p-6 text-[#080d1a] sm:max-w-lg md:p-8"
+        >
+          <DialogTitle className="pr-8 text-2xl font-bold text-[#3b1370]">
+            {expandedLearnConcept.name}
+          </DialogTitle>
+        
+          <DialogDescription className="text-base leading-relaxed text-[#080d1a]">
+            {expandedLearnConcept.description}
+          </DialogDescription>
+        </DialogContent>
         )}
       </Dialog>
     </div>

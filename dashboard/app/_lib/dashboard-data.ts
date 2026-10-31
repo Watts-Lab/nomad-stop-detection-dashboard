@@ -36,23 +36,7 @@ export const LEARN_CONCEPTS = [
     section: "Mobility semantics",
     name: "Trajectory",
     description:
-      "Path of a moving individual over time, either continuously, or as a sequence of trips and visits.",
-  },
-  {
-    id: "ping",
-    category: "glossary",
-    section: "Mobility semantics",
-    name: "Ping",
-    description:
-      "Noisy location record, consisting of a coordinate pair and a timestamp (x, y, t).",
-  },
-  {
-    id: "horizontal-accuracy",
-    category: "glossary",
-    section: "Mobility semantics",
-    name: "Horizontal accuracy",
-    description:
-      "Reported radius r around a position fix within which the true location is estimated to lie with 68% probability, following the convention adopted in this study.",
+      "Path of a moving individual over time, taking place in continuous space.",
   },
   {
     id: "true-stop",
@@ -60,7 +44,7 @@ export const LEARN_CONCEPTS = [
     section: "Mobility semantics",
     name: "Stop",
     description:
-      "Part of a trajectory with stationary behavior. The definition and resolution might vary depending on the application.",
+      "Part of a trajectory with stationary behavior.",
   },
   {
     id: "visit",
@@ -76,65 +60,49 @@ export const LEARN_CONCEPTS = [
     section: "Mobility semantics",
     name: "Mobility diary",
     description:
-      "Discretized representation of a trajectory as a sequence of visits to places and trips.",
+      "Discretized representation of a trajectory as a sequence of visits to places and trips between them.",
   },
   {
-    id: "noise",
+    id: "micro-mobility",
     category: "glossary",
     section: "Mobility semantics",
-    name: "Noise",
+    name: "Micro-mobility",
     description:
-      "Error or variation in recorded locations that makes observations differ from the actual position.",
+      "Trajectory variability not captured by mobility diaries, such as movements within a stop or deviations from an expected path during trips.",
   },
 
-  // Glossary: Stop-detection semantics
+  // Glossary: Trajectory Data semantics
+  {
+    id: "ping",
+    category: "glossary",
+    section: "Trajectory Data semantics",
+    name: "Pings",
+    description:
+      "Noisy location records, consisting of coordinate pairs and timestamps (x, y, t).",
+  },
   {
     id: "detected-stop",
     category: "glossary",
-    section: "Stop-detection semantics",
+    section: "Trajectory Data semantics",
     name: "Detected stop",
     description:
-      "Estimate of a stop, typically represented as a group of pings clustered by a stop-detection algorithm.",
+      "Estimate of a stop. For GPS data, it is a cluster of pings in the output of a stop-detection algorithm.",
   },
   {
     id: "attributed-stop",
     category: "glossary",
-    section: "Stop-detection semantics",
+    section: "Trajectory Data semantics",
     name: "Attributed stop",
     description:
-      "Detected stop assigned to an inferred location.",
+      "Detected stop assigned to an inferred location by means of a visit (or location) attribution algorithm.",
   },
   {
-    id: "containment-area",
+    id: "horizontal-accuracy",
     category: "glossary",
-    section: "Stop-detection semantics",
-    name: "Containment area",
+    section: "Trajectory Data semantics",
+    name: "Horizontal accuracy",
     description:
-      "Spatial region where consecutive pings must remain for a sequential algorithm to identify them as a stop.",
-  },
-  {
-    id: "anchor-point",
-    category: "glossary",
-    section: "Stop-detection semantics",
-    name: "Anchor point",
-    description:
-      "Center of a circle defining the containment area at a given stage of a sequential stop-detection algorithm.",
-  },
-  {
-    id: "core-point",
-    category: "glossary",
-    section: "Stop-detection semantics",
-    name: "Core point",
-    description:
-      "Ping with sufficient neighbors to satisfy a density criterion.",
-  },
-  {
-    id: "border-point",
-    category: "glossary",
-    section: "Stop-detection semantics",
-    name: "Border point",
-    description:
-      "Non-core ping that neighbors at least one core ping.",
+      "Estimate of the measurement spatial error of the GPS sensor. It is the distance r such that the true position is within r of the measurement with 68% probability.",
   },
 
   // Failure modes
@@ -170,14 +138,6 @@ export const LEARN_CONCEPTS = [
     description:
       "True stop overlapping a detected stop attributed to an incorrect location, without merging with another true stop.",
   },
-  {
-    id: "temporal-overlap",
-    category: "failure-modes",
-    section: "Failure modes",
-    name: "Temporal Overlap",
-    description:
-      "Temporal overlap occurs when distinct detected stops overlap in time, rather than remaining temporally separated.",
-  }
 ]
 
 export const TRAJECTORY_OPTIONS = [

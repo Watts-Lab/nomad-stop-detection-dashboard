@@ -56,34 +56,28 @@ export function LearnView({
                   <Image
                     src={family.diagramSrc}
                     alt={`${family.title} overview diagram`}
-                    width={980}
-                    height={620}
+                    width={1105}
+                    height={600}
                     sizes="(min-width: 1024px) 50vw, 100vw"
                     className="block h-auto w-full"
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <p className="text-sm text-[#080d1a]">
-                    Select an algorithm to explore its details and parameters.
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {algorithms
-                      .filter((algo) => algo.family === family.id)
-                      .map((algo) => (
-                        <Button
-                          key={algo.id}
-                          type="button"
-                          variant="outline"
-                          onClick={() => openLearnAlgorithm(algo.id)}
-                          className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
-                        >
-                          <span>{algo.name}</span>
-                          <Maximize2 className="h-4 w-4 shrink-0" />
-                        </Button>
-                      ))}
-                  </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {algorithms
+                    .filter((algo) => algo.family === family.id)
+                    .map((algo) => (
+                      <Button
+                        key={algo.id}
+                        type="button"
+                        variant="outline"
+                        onClick={() => openLearnAlgorithm(algo.id)}
+                        className="h-auto min-h-11 justify-between gap-2 whitespace-normal border-[#e6dffc] bg-white px-3 py-3 text-left text-sm font-semibold text-[#3b1370] hover:border-[#dbc2fa] hover:bg-[#f4ecfe] hover:text-[#7629db]"
+                      >
+                        <span>{algo.name}</span>
+                        <Maximize2 className="h-4 w-4 shrink-0" />
+                      </Button>
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -97,7 +91,7 @@ export function LearnView({
             {
               id: "glossary",
               title: "Glossary",
-              sections: ["Mobility semantics", "Stop-detection semantics"],
+              sections: ["Mobility semantics", "Trajectory Data semantics"],
             },
           ].map((category) => (
             <Card
@@ -111,7 +105,7 @@ export function LearnView({
               </CardHeader>
 
               <CardContent className="flex flex-col gap-5 px-5 pb-5">
-                <div className="flex aspect-[980/620] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
+                <div className="flex aspect-[221/120] items-center justify-center rounded-md border border-dashed border-[#9ca3af] bg-[#e5e7eb] p-6 text-center">
                   <p className="text-sm text-[#374151]">
                     {category.id === "glossary"
                       ? "Glossary illustration coming soon"
@@ -119,17 +113,15 @@ export function LearnView({
                   </p>
                 </div>
 
-                <p className="text-sm text-[#080d1a]">
-                  Select a term to explore its definition.
-                </p>
-
                 {category.sections.map((section) => (
                   <section key={section} className="space-y-3">
-                    <h3 className="text-sm font-semibold text-[#3b1370]">
-                      {section}
-                    </h3>
+                    {category.id === "glossary" && (
+                      <h3 className="text-sm font-semibold text-[#3b1370]">
+                        {section}
+                      </h3>
+                    )}
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className={`grid grid-cols-1 gap-2 ${category.id === "glossary" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                       {LEARN_CONCEPTS
                         .filter(
                           (concept) =>

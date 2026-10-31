@@ -32,12 +32,9 @@ export function LearnView({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-      <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-4 pb-6 transition duration-200 ${isLearnExpanded ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
-        <div className={`${revealClass()} shrink-0 space-y-1`}>
-          <h2 className="text-3xl font-bold">Learn Algorithms</h2>
-          <p className="text-sm text-[#080d1a]">
-            Explore stop-detection algorithms, failure modes, and key terminology.
-          </p>
+      <div className={`nomad-page-frame flex min-h-0 flex-col gap-3 py-3 pb-6 transition duration-200 ${isLearnExpanded ? "scale-[0.99] opacity-55 blur-[1.5px]" : ""}`}>
+        <div className={`${revealClass()} flex shrink-0 items-center gap-2`}>
+          <h2 className="text-3xl font-bold">Learn Algorithms and Mobility Semantics</h2>
         </div>
         <div className={`${revealClass("up", 2)} grid grid-cols-1 items-start gap-5 pb-2 lg:grid-cols-2`}>
           {LEARN_FAMILIES.map((family, familyIndex) => (

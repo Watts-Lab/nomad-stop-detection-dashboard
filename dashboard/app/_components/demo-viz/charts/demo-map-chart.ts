@@ -1,6 +1,6 @@
 /* OWN ECHARTS MAP CONFIGURATION */
 
-import * as echarts from "echarts"
+import type { TooltipComponentOption } from "echarts"
 import type { EChartsApi, EChartsParams } from "../../../_lib/types"
 import type { DemoResultData } from "../../../_lib/demo-result-data"
 import { associatedWithHover, pingScale, pingTooltipHtml } from "../demo-interactions"
@@ -31,7 +31,7 @@ type MapChartOptionsArgs = {
   getHoverPingIndexes: () => Set<number> | null
   getHoverPingIndex: () => number | null
   getContainmentAreas: () => Array<{ cluster: number; points: number[][]; shaded: boolean }>
-  pingTooltipPosition: NonNullable<echarts.TooltipComponentOption["position"]>
+  pingTooltipPosition: NonNullable<TooltipComponentOption["position"]>
   algorithm: string
   getShowXray: () => boolean
   getShowStops: () => boolean

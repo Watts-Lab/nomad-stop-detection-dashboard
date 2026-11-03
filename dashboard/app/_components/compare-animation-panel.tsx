@@ -20,6 +20,7 @@ import {
 } from "./demo-viz/overlays/demo-ground-truth"
 import { containmentAreasAt, xrayAnchorFramesAt } from "./demo-viz/overlays/demo-xray"
 import { detectedCountFor } from "./demo-viz/overlays/demo-detected-stops"
+import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./demo-viz/demo-tooltip-layout"
 import { selectedPingLineData } from "./demo-viz/demo-interactions"
 import {
   sequenceIndexAt, latestPingIndexAt, activePlaybackTimestamp, playbackStateFor,
@@ -28,7 +29,6 @@ import {
 } from "./demo-viz/demo-playback"
 import { createDemoMapChartOptions } from "./demo-viz/charts/demo-map-chart"
 import { createDemoTimelineChartOptions } from "./demo-viz/charts/demo-timeline-chart"
-import { boxIntersectsPoint, boxIntersectsSelection, tooltipPositions } from "./demo-viz/demo-tooltip-layout"
 import { partialPath, routeProgressAt } from "./demo-viz/demo-route-animation"
 import { buildDemoMapSeries, resolveHoverPingIndexes, currentPingData } from "./demo-viz/demo-scene-render"
 
@@ -46,6 +46,15 @@ const GROUND_TRUTH_COLOR = "#0f766e"
 const FUTURE_GROUND_TRUTH_COLOR = "#4b918d"
 const MAP_FOCUS_FADE_OPACITY = 0.2
 type PlaybackState = "playing" | "paused" | "complete"
+
+const clusterColor = (cluster: number) => {
+  if (cluster < 0) return "#626760"
+  const hue =
+    CLUSTER_HUE_START +
+    ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
+  const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
+  return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
+}
 
 // Format elapsed seconds as minutes and seconds for the ping-comparison tooltip
 const elapsedTimeLabel = (seconds: number) => {
@@ -90,8 +99,8 @@ export function DemoSceneRenderer({
   const scene = panel.scene
   const destinationPreview = variant === "destination-preview"
   const mapRef = useRef<HTMLDivElement | null>(null)
-  const timelineRef = useRef<HTMLDivElement | null>(null)
   const comparisonTooltipRef = useRef<HTMLDivElement | null>(null)
+  const timelineRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<() => void>(() => { })
   const replayRef = useRef<() => void>(() => { })
   const stepToPingRef = useRef<(direction: number) => void>(() => { })
@@ -106,8 +115,8 @@ export function DemoSceneRenderer({
   const selectedPingIndexesRef = useRef<number[]>([])
   const renderSceneRef = useRef<((timestampSeconds: number) => void) | null>(null)
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "complete">("complete")
-  const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
   const [comparisonTooltipPosition, setComparisonTooltipPosition] = useState({ left: 12, top: 12, visibility: "hidden" as "hidden" | "visible" })
+  const [selectedPingIndexes, setSelectedPingIndexes] = useState<number[]>([])
 
   // Prepare scene-derived map and timeline data shared across algorithm and config results.
   const sceneData = useMemo(
@@ -260,11 +269,11 @@ export function DemoSceneRenderer({
     let hoverPingIndex: number | null = null
     let hoverPingIndexes: Set<number> | null = null
     let activeContainmentAreas: Array<{ cluster: number; points: number[][]; shaded: boolean }> = []
+    let pingTooltipElement: HTMLDivElement | null = null
     let mapMousePosition: number[] | null = null
     let mapPointerDown: number[] | null = null
     let mapPingClickHandled = false
     let backgroundClearFrame = 0
-    let pingTooltipElement: HTMLDivElement | null = null
     let hoverBuildingId = ""
     let tourActionActive = false
     const frameDelay = variant === "preview" ? 30 : 60
@@ -277,16 +286,6 @@ export function DemoSceneRenderer({
       const nextState = playbackStateFor(paused, sequenceIndex, chartData.timeSequence.length)
       setPlaybackState(nextState)
       onPlaybackStateChangeRef.current?.(nextState)
-    }
-
-    // Spread cluster colors across a hue range that avoids the current ping's red.
-    const clusterColor = (cluster: number) => {
-      if (cluster < 0) return "#1f2326"
-      const hue =
-        CLUSTER_HUE_START +
-        ((cluster * 0.618034 + CLUSTER_HUE_PHASE) % 1) * CLUSTER_HUE_SPAN
-      const warmth = Math.cos((hue - CLUSTER_HUE_PEAK) * Math.PI / 180)
-      return `hsl(${hue}, ${73 + warmth * 18}%, ${51 + warmth * 11}%)`
     }
 
     const isDensityAlgorithm = chartData.result.kind === "density"
@@ -505,6 +504,7 @@ export function DemoSceneRenderer({
           { id: "next-truth-stop", data: [] },
           { id: "current-truth-stop", data: [] },
           { id: "stop-bars", data: [] },
+          { id: "selected-ping-times", data: [] },
           { id: "cursor", data: [] },
         ],
       }, { lazyUpdate: true })
@@ -666,12 +666,6 @@ export function DemoSceneRenderer({
       }
     }
 
-    // Track the pointer position and move the comparison tooltip out of its way
-    const onMapPointerMove: (event: { offsetX: number; offsetY: number }) => void = (event) => {
-      mapMousePosition = [event.offsetX, event.offsetY]
-      if (selectedPingIndexesRef.current.length) positionComparisonTooltip()
-    }
-
     // Record where the pointer press begins so background clicks can be distinguished from drags
     const onMapSelectionPointerDown: (event: PointerEvent) => void = (event) => {
       if (backgroundClearFrame) window.cancelAnimationFrame(backgroundClearFrame)
@@ -734,7 +728,6 @@ export function DemoSceneRenderer({
 
     // Link timeline hover to the corresponding map ping, core point, or ground-truth building
     const onTimelineMouseOver = (params: echarts.ECElementEvent) => {
-      mapMousePosition = null
       const value = paramsValue(params)
       if (params.seriesId === "ping-ticks") {
         const pingIndex = Number(value[0])
@@ -749,11 +742,10 @@ export function DemoSceneRenderer({
       if (params.seriesId === "next-truth-stop") setHoveredBuilding(chartData.truthStops[Number(value[2])].location)
     }
 
-    // Clear timeline-driven hover and hide the ping tooltip unless a tour highlight is active
+    // Clear timeline-driven hover unless a tour highlight is active.
     const onTimelineMouseOut = () => {
       if (!tourActionActive) {
         setHoveredPing(null)
-        mapChart.dispatchAction({ type: "hideTip" })
       }
     }
 
@@ -813,7 +805,6 @@ export function DemoSceneRenderer({
       selectedPingIndexesRef.current = next
       setSelectedPingIndexes(next)
       renderScene(activeTimestamp())
-      refreshTooltipLayout()
     }
 
     // Align the playback sequence index with the supplied timestamp
@@ -1013,10 +1004,9 @@ export function DemoSceneRenderer({
         (defaultBounds.view.maxX - defaultBounds.view.minX)
       syncMapLineStyles()
       timelineChart.resize()
-      refreshTooltipLayout()
     }
 
-    // Position the hover tooltip within the chart while avoiding the hovered point, 
+    // Position the hover tooltip within the chart while avoiding the hovered point,
     // selection, and comparison tooltip
     const pingTooltipPosition: TooltipComponentPositionCallback = (point, _params, element, _rect, size) => {
       const padding = 8
@@ -1086,7 +1076,6 @@ export function DemoSceneRenderer({
     )
     const pingHitAreaSeriesIndex = (mapChart.getOption().series as Array<{ id?: string }>)
       .findIndex((series) => series.id === "ping-hit-area")
-
     timelineChart.setOption(
       createDemoTimelineChartOptions({
         getChartData: () => chartData,
@@ -1150,10 +1139,8 @@ export function DemoSceneRenderer({
     mapChart.on("click", onMapClick)
     const onMapZoom = () => {
       syncMapLineStyles()
-      refreshTooltipLayout()
     }
     mapChart.on("dataZoom", onMapZoom)
-    mapChart.getZr().on("mousemove", onMapPointerMove)
     timelineChart.on("mouseover", onTimelineMouseOver)
     timelineChart.on("globalout", onTimelineMouseOut)
     timelineChart.on("click", onTimelineClick)
@@ -1248,7 +1235,6 @@ export function DemoSceneRenderer({
       mapChart.off("globalout", onMapMouseOut)
       mapChart.off("click", onMapClick)
       mapChart.off("dataZoom", onMapZoom)
-      mapChart.getZr().off("mousemove", onMapPointerMove)
       timelineChart.off("mouseover", onTimelineMouseOver)
       timelineChart.off("globalout", onTimelineMouseOut)
       timelineChart.off("click", onTimelineClick)
@@ -1260,7 +1246,7 @@ export function DemoSceneRenderer({
       mapEl.style.touchAction = previousTouchAction
       timelineEl.style.touchAction = previousTimelineTouchAction
     }
-  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, scene.pings, syncMaster, variant])
+  }, [destinationPreview, mode, onPreviewComplete, onTimeChange, panel.algo, panel.params?.dist_thresh, panel.params?.eps_spatial, scene.pings, syncMaster, variant])
 
   useEffect(() => {
     layerStateRef.current = { showGroundTruth, showStops, showXray }

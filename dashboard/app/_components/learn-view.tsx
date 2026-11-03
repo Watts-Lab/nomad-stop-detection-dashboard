@@ -1,13 +1,38 @@
 /* RENDER LEARN PAGE EXPLAINING STOP DETECTION ALGOS & CONCEPTS */
 
 import Image from "next/image"
-import { Maximize2, Minimize2, Play } from "lucide-react"
+import { Download, Maximize2, Minimize2, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { DEMO_ALGORITHM_IDS, LEARN_FAMILIES, algorithms } from "../_lib/dashboard-data"
 import { revealClass } from "../_lib/dashboard-utils"
 import type { DashboardView, DemoMode } from "../_lib/types"
+
+/** Download a diagram as a PNG with a 1960px width, preserving its aspect ratio. */
+async function downloadDiagramPng(source = "") {
+  try {
+    const image = new window.Image()
+    image.src = source
+    await image.decode()
+
+    const canvas = document.createElement("canvas")
+    canvas.width = 1960
+    canvas.height = Math.round(canvas.width * image.naturalHeight / image.naturalWidth)
+    const context = canvas.getContext("2d")
+    if (!context) throw new Error("Canvas is unavailable")
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    const link = document.createElement("a")
+    link.download = source.substring(source.lastIndexOf("/") + 1).replace(/\.svg$/i, ".png")
+    link.href = canvas.toDataURL("image/png")
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  } catch {
+    window.alert("Unable to download the PNG. Please try again or download the SVG instead.")
+  }
+}
 
 export function LearnView({
   expandedAlgorithm,
@@ -56,6 +81,18 @@ export function LearnView({
                     sizes="(min-width: 1024px) 50vw, 100vw"
                     className="block h-auto w-full"
                   />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button asChild variant="outline" size="sm" className="border-[#e6dffc] text-[#3b1370] hover:bg-[#f4ecfe] hover:text-[#7629db]">
+                    <a href={family.expandedDiagramSrc} download aria-label={`Download ${family.title} full diagram as SVG`}>
+                      <Download aria-hidden="true" />
+                      Download SVG
+                    </a>
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => downloadDiagramPng(family.expandedDiagramSrc)} aria-label={`Download ${family.title} full diagram as PNG`} className="border-[#e6dffc] text-[#3b1370] hover:bg-[#f4ecfe] hover:text-[#7629db]">
+                    <Download aria-hidden="true" />
+                    Download PNG
+                  </Button>
                 </div>
 
                 <div className="space-y-3">
@@ -139,6 +176,18 @@ export function LearnView({
                         height={620}
                         className="block h-auto w-full max-w-full"
                       />
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button asChild variant="outline" size="sm" className="border-[#e6dffc] text-[#3b1370] hover:bg-[#f4ecfe] hover:text-[#7629db]">
+                        <a href={expandedLearnAlgorithm.expandedDiagramSrc} download aria-label={`Download ${expandedLearnAlgorithm.name} expanded diagram as SVG`}>
+                          <Download aria-hidden="true" />
+                          Download SVG
+                        </a>
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => downloadDiagramPng(expandedLearnAlgorithm.expandedDiagramSrc)} aria-label={`Download ${expandedLearnAlgorithm.name} diagram as PNG`} className="border-[#e6dffc] text-[#3b1370] hover:bg-[#f4ecfe] hover:text-[#7629db]">
+                        <Download aria-hidden="true" />
+                        Download PNG
+                      </Button>
                     </div>
                     <p id={`learn-documentation-${expandedLearnAlgorithm.id}`} className="scroll-mt-4 break-words text-sm text-[#080d1a]">
                       Source: {expandedLearnAlgorithm.source}

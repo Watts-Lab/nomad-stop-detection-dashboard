@@ -20,11 +20,13 @@ export const LEARN_FAMILIES = [
     id: "sequential",
     title: "Sequential Algorithms",
     diagramSrc: SEQUENTIAL_CARD_DIAGRAM,
+    expandedDiagramSrc: SEQUENTIAL_EXPANDED_DIAGRAM,
   },
   {
     id: "density",
     title: "Density-Based Algorithms",
     diagramSrc: DENSITY_CARD_DIAGRAM,
+    expandedDiagramSrc: DENSITY_EXPANDED_DIAGRAM,
   },
 ]
 

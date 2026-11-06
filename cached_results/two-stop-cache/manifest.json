@@ -1,6 +1,6 @@
 {
   "config_key": "2_stops",
-  "format": "stop-detection-dashboard-parquet-cache-v4",
+  "format": "stop-detection-dashboard-parquet-cache-v5",
   "algorithm_keys": [
     "lachesis",
     "sequential_centroid",
@@ -34,7 +34,7 @@
     },
     "gridbased": {
       "display_name": "Grid-Based",
-      "result_kind": "labels",
+      "result_kind": "grid",
       "configs": "gridbased/configs.json",
       "results": "gridbased/results.parquet",
       "metrics": "gridbased/metrics.parquet"

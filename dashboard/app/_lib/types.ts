@@ -5,6 +5,7 @@ DEFINES SHARED DATA STRUCTURES USED THROUGH DASHBOARD
 
 export type AlignedStopResult =
   | { kind: "labels"; cluster: number[] }
+  | { kind: "grid"; cluster: number[]; h3_cell: string[] }
   | { kind: "anchor"; cluster: number[]; aux_time: Array<number | null> }
   | { kind: "density"; cluster: number[]; core: number[]; aux_time: Array<number | null> }
 

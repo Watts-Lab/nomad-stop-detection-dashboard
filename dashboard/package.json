@@ -46,6 +46,7 @@
     "driver.js": "^1.6.0",
     "echarts": "^6.1.0",
     "embla-carousel-react": "8.6.0",
+    "h3-js": "4.5.0",
     "hyparquet": "^1.26.2",
     "hyparquet-compressors": "^1.1.1",
     "input-otp": "1.4.2",

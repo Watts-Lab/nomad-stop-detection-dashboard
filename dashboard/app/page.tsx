@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DemoView } from "./_components/demo-view"
 import { HomeView } from "./_components/home-view"
@@ -10,7 +10,6 @@ import {
   DEMO_ALGORITHM_IDS,
   FALLBACK_PARAMETER_NOTES,
   METRICS_ALGORITHM_BY_DEMO_ID,
-  METRICS_SWEEP_PARAMETERS,
   algorithms,
 } from "./_lib/dashboard-data"
 import { dashboardRouteState, validateAlgorithmParams } from "./_lib/dashboard-utils"
@@ -59,8 +58,6 @@ function NomadDashboard() {
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
   const [metricsTopAlgorithm, setMetricsTopAlgorithm] = useState("Lachesis")
   const [metricsBottomAlgorithm, setMetricsBottomAlgorithm] = useState("Sequential (Centroid)")
-  const [metricsTopParameter, setMetricsTopParameter] = useState("delta_roam")
-  const [metricsBottomParameter, setMetricsBottomParameter] = useState("delta_roam")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsAgentId, setMetricsAgentId] = useState<string | null>(null)
   const [metricsError, setMetricsError] = useState<string | null>(null)
@@ -204,11 +201,9 @@ function NomadDashboard() {
 
     if (topMetricsAlgorithm) {
       setMetricsTopAlgorithm(topMetricsAlgorithm)
-      setMetricsTopParameter(METRICS_SWEEP_PARAMETERS[topMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     if (bottomMetricsAlgorithm) {
       setMetricsBottomAlgorithm(bottomMetricsAlgorithm)
-      setMetricsBottomParameter(METRICS_SWEEP_PARAMETERS[bottomMetricsAlgorithm]?.[0]?.value ?? "dist_thresh")
     }
     setMetricsCompareMode(compareMode && Boolean(bottomMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
@@ -316,8 +311,6 @@ function NomadDashboard() {
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
   const topParameterNote = parameterNotes[metricsTopAlgorithm]
   const bottomParameterNote = parameterNotes[metricsBottomAlgorithm]
-  const topSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsTopAlgorithm] ?? [], [metricsTopAlgorithm])
-  const bottomSweepParameters = useMemo(() => METRICS_SWEEP_PARAMETERS[metricsBottomAlgorithm] ?? [], [metricsBottomAlgorithm])
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
 
@@ -386,24 +379,6 @@ function NomadDashboard() {
     void loadMetricsOptions()
   }, [loadMetricsOptions])
 
-  useEffect(() => {
-
-    // Keep the top Metrics sweep parameter valid for its algorithm,
-    // selecting the first available option or a fallback when needed
-    if (!topSweepParameters.some((param) => param.value === metricsTopParameter)) {
-      setMetricsTopParameter(topSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [topSweepParameters, metricsTopParameter])
-
-  useEffect(() => {
-
-    // Keep the bottom Metrics sweep parameter valid for its algorithm,
-    // selecting the first available option or a fallback when needed 
-    if (!bottomSweepParameters.some((param) => param.value === metricsBottomParameter)) {
-      setMetricsBottomParameter(bottomSweepParameters[0]?.value ?? "dist_thresh")
-    }
-  }, [bottomSweepParameters, metricsBottomParameter])
-
   return (
     <div className={`nomad-shell flex min-h-dvh flex-col ${activeView === "demo" && !compareMode ? "lg:h-dvh lg:overflow-hidden" : ""}`}>
       <NomadNav currentView={activeView} />
@@ -467,8 +442,6 @@ function NomadDashboard() {
           metricsAlgorithms={metricsAlgorithms}
           metricsTopAlgorithm={metricsTopAlgorithm}
           metricsBottomAlgorithm={metricsBottomAlgorithm}
-          metricsTopParameter={metricsTopParameter}
-          metricsBottomParameter={metricsBottomParameter}
           metricsTrajectory={metricsTrajectory}
           initialSelectedUserId={metricsAgentId ?? undefined}
           topParameterNote={topParameterNote}
@@ -477,8 +450,6 @@ function NomadDashboard() {
           setMetricsCompareMode={setMetricsCompareMode}
           setMetricsTopAlgorithm={setMetricsTopAlgorithm}
           setMetricsBottomAlgorithm={setMetricsBottomAlgorithm}
-          setMetricsTopParameter={setMetricsTopParameter}
-          setMetricsBottomParameter={setMetricsBottomParameter}
           setMetricsTrajectory={setMetricsTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}

@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DEMO_ID_BY_METRICS_ALGORITHM, METRICS_SWEEP_PARAMETERS } from "../_lib/dashboard-data"
-import { prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
+import { DEMO_ID_BY_METRICS_ALGORITHM} from "../_lib/dashboard-data"
+import { parameterDisplayName, prototypeChartSrc, revealClass } from "../_lib/dashboard-utils"
 import { METRICS_TOUR_FOCUS_EVENT } from "@/hooks/use-product-tour"
 import { TrajectoryOptions } from "./trajectory-options"
 import type { MetricsParameterNote } from "../_lib/types"
@@ -50,7 +50,7 @@ function PinnedAgentCard({
             <span className="text-xs font-mono text-foreground">{pinned.value}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-foreground">by-minute recall</span>
+            <span className="text-xs font-semibold text-foreground">min-by-min recall</span>
             <span className="text-xs font-mono text-foreground">{pinned.recall.toFixed(3)}</span>
           </div>
           <Button size="sm" onClick={() => openDemo(pinned)} className="nomad-action w-full">
@@ -66,7 +66,7 @@ function PinnedAgentCard({
   )
 }
 
-// Display the algorithm's fixed parameters as read-only rows.
+// Display the chart's x-axis and its fixed filters as read-only rows.
 function MetricsParameterRows({
   algorithm,
   note,
@@ -83,7 +83,14 @@ function MetricsParameterRows({
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-[#3b1370]">Parameters</h4>
+      <h4 className="text-sm font-medium text-[#3b1370]">Chart configuration</h4>
+      <div className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] px-3 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-mono text-muted-foreground">x-axis</span>
+          <span className="text-xs font-mono text-foreground">{parameterDisplayName(note?.sweep_parameter ?? "delta_roam")}</span>
+        </div>
+      </div>
+      <h4 className="text-sm font-medium text-[#3b1370]">Filters held constant</h4>
       {rows.map(([name, value]) => (
         <div key={`${algorithm}-${name}-${value}`} className="rounded-md border border-[#d1d5db] bg-[#f8f9fc] px-3 py-2">
           <div className="flex items-center justify-between gap-3">
@@ -201,8 +208,6 @@ export function MetricsView({
   metricsAlgorithms,
   metricsTopAlgorithm,
   metricsBottomAlgorithm,
-  metricsTopParameter,
-  metricsBottomParameter,
   metricsTrajectory,
   initialSelectedUserId,
   topParameterNote,
@@ -211,8 +216,6 @@ export function MetricsView({
   setMetricsCompareMode,
   setMetricsTopAlgorithm,
   setMetricsBottomAlgorithm,
-  setMetricsTopParameter,
-  setMetricsBottomParameter,
   setMetricsTrajectory,
   openPinnedAgent,
   startTour,
@@ -221,8 +224,6 @@ export function MetricsView({
   metricsAlgorithms: string[]
   metricsTopAlgorithm: string
   metricsBottomAlgorithm: string
-  metricsTopParameter: string
-  metricsBottomParameter: string
   metricsTrajectory: string
   initialSelectedUserId?: string
   topParameterNote: MetricsParameterNote | undefined
@@ -231,8 +232,6 @@ export function MetricsView({
   setMetricsCompareMode: (value: boolean) => void
   setMetricsTopAlgorithm: (algorithm: string) => void
   setMetricsBottomAlgorithm: (algorithm: string) => void
-  setMetricsTopParameter: (parameter: string) => void
-  setMetricsBottomParameter: (parameter: string) => void
   setMetricsTrajectory: (trajectory: string) => void
   openPinnedAgent: (pinned: PinnedAgent) => void
   startTour: () => void
@@ -245,8 +244,8 @@ export function MetricsView({
 
   const topFixedParameters = topParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
   const bottomFixedParameters = bottomParameterNote?.fixed_parameters.map((parameter) => `fixed=${encodeURIComponent(parameter)}`).join("&") ?? ""
-  const topMetricsPrototypeSrc = `${prototypeChartSrc(metricsTopAlgorithm, metricsTopParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsTopAlgorithm])}&view=${metricsChartView}&frame=top&${topFixedParameters}`
-  const bottomMetricsPrototypeSrc = `${prototypeChartSrc(metricsBottomAlgorithm, metricsBottomParameter, metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsBottomAlgorithm])}&view=${metricsChartView}&frame=bottom&${bottomFixedParameters}`
+  const topMetricsPrototypeSrc = `${prototypeChartSrc(metricsTopAlgorithm, topParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsTopAlgorithm])}&view=${metricsChartView}&frame=top&${topFixedParameters}`
+  const bottomMetricsPrototypeSrc = `${prototypeChartSrc(metricsBottomAlgorithm, bottomParameterNote?.sweep_parameter ?? "delta_roam", metricsTrajectory, DEMO_ID_BY_METRICS_ALGORITHM[metricsBottomAlgorithm])}&view=${metricsChartView}&frame=bottom&${bottomFixedParameters}`
 
   useEffect(() => {
 
@@ -368,10 +367,7 @@ export function MetricsView({
               </label>
               <Select
                 value={metricsTopAlgorithm}
-                onValueChange={(algorithm) => {
-                  setMetricsTopAlgorithm(algorithm)
-                  setMetricsTopParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
-                }}
+                onValueChange={setMetricsTopAlgorithm}
               >
                 <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -387,10 +383,7 @@ export function MetricsView({
                   <label className="text-sm font-medium text-[#3b1370]">Bottom</label>
                   <Select
                     value={metricsBottomAlgorithm}
-                    onValueChange={(algorithm) => {
-                      setMetricsBottomAlgorithm(algorithm)
-                      setMetricsBottomParameter(METRICS_SWEEP_PARAMETERS[algorithm]?.[0]?.value ?? "dist_thresh")
-                    }}
+                    onValueChange={setMetricsBottomAlgorithm}
                   >
                     <SelectTrigger className="h-10 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>

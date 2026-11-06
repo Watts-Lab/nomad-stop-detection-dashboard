@@ -2,7 +2,7 @@
 REUSABLE HELPER FUNCTIONS FOR PARAM HANDLING, VALIDATION, ROUTE/STATE UTILITIES
 */
 
-import { DASHBOARD_VIEWS, DEMO_EDITABLE_PARAMS, METRICS_RESULTS_FILE, algorithms } from "./dashboard-data"
+import { DASHBOARD_VIEWS, DEMO_EDITABLE_PARAMS, LEARN_CONCEPTS, METRICS_RESULTS_FILE, algorithms } from "./dashboard-data"
 import { publicPath } from "./public-path"
 import type { AlgorithmDefinition } from "./dashboard-data"
 import type { DashboardView } from "./types"
@@ -14,7 +14,14 @@ export function dashboardRouteState(searchParamString: string) {
     ? (rawView as DashboardView)
     : "home"
   const rawAlgo = params.get("algo")
-  const expandedAlgorithm = activeView === "learn" && rawAlgo && algorithms.some((a) => a.id === rawAlgo) ? rawAlgo : null
+  const isLearnItem = rawAlgo !== null && (
+    algorithms.some((algorithm) => algorithm.id === rawAlgo) ||
+    LEARN_CONCEPTS.some((concept) => concept.id === rawAlgo)
+  )
+  
+  const expandedAlgorithm = activeView === "learn" && isLearnItem
+    ? rawAlgo
+    : null
   const compareMode = activeView === "demo" && params.get("mode") === "compare"
 
   return { activeView, expandedAlgorithm, compareMode }

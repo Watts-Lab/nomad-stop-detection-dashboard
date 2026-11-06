@@ -10,7 +10,7 @@ import {
   type ParquetQueryFilter,
 } from "hyparquet"
 import { compressors } from "hyparquet-compressors"
-import { METRICS_ALGORITHM_BY_DEMO_ID, METRICS_SWEEP_PARAMETERS } from "./dashboard-data"
+import { FALLBACK_PARAMETER_NOTES, METRICS_ALGORITHM_BY_DEMO_ID } from "./dashboard-data"
 import { publicPath } from "./public-path"
 import type {
   AlignedStopResult,
@@ -106,7 +106,17 @@ async function readParquet(cacheRoot: string, relativePath: string, selection: P
   const url = cacheRoot + "/" + relativePath
   let file = parquetFileCache.get(url)
   if (!file) {
-    file = asyncBufferFromUrl({ url }).then((buffer) => cachedAsyncBuffer(buffer))
+    // Pages can gzip HEAD responses, so get the uncompressed size from a range response.
+    file = fetch(url, { headers: { Range: "bytes=0-0" } }).then(async (response) => {
+      if (!response.ok) throw new Error("Failed to load " + relativePath)
+      if (response.status === 200) return cachedAsyncBuffer(await response.arrayBuffer())
+
+      const byteLength = Number(response.headers.get("Content-Range")?.split("/")[1])
+      if (!Number.isSafeInteger(byteLength) || byteLength < 1) {
+        throw new Error("Invalid parquet range response for " + relativePath)
+      }
+      return cachedAsyncBuffer(await asyncBufferFromUrl({ url, byteLength }))
+    })
     parquetFileCache.set(url, file)
   }
   return parquetReadObjects({ file: await file, compressors, ...selection })
@@ -302,7 +312,7 @@ async function resultForUser(
   if (!metricRow) throw new Error("Cached metrics are missing config_id " + config.config_id)
 
   const metricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[algorithm]
-  const sweepParameter = METRICS_SWEEP_PARAMETERS[metricsAlgorithm]?.[0]?.value
+  const sweepParameter = FALLBACK_PARAMETER_NOTES[metricsAlgorithm]?.sweep_parameter
   const sweepConfigs = sweepParameter
     ? configs
       .filter((candidate) => Object.entries(config.params).every(

@@ -380,7 +380,7 @@ function NomadDashboard() {
   }, [loadMetricsOptions])
 
   return (
-    <div className={`nomad-shell flex min-h-dvh flex-col ${activeView === "demo" && !compareMode ? "lg:h-dvh lg:overflow-hidden" : ""}`}>
+    <div className="nomad-shell flex min-h-dvh flex-col">
       <NomadNav currentView={activeView} />
       <div className="nomad-viewport min-h-0">
         <div className="nomad-dashboard bg-background">

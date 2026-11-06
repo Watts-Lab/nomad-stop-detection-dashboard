@@ -26,6 +26,7 @@ export function pingClassifiedAt(
     timestampSeconds: number,
     chartData: DemoResultData
 ) {
+    if (!chartData.pingVisible[pingIndex]) return false
     const pingTime = chartData.pingData[pingIndex][4]
 
     return pingTime <= timestampSeconds && (

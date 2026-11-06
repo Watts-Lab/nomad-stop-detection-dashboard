@@ -429,7 +429,7 @@ export function createDemoMapChartOptions({
         type: "custom",
         coordinateSystem: "cartesian2d",
         z: 10,
-        data: destinationPreview ? [] : getChartData().pingData,
+        data: destinationPreview ? [] : getChartData().pingData.filter((point) => getChartData().pingVisible[point[3]]),
         renderItem(_params: EChartsParams, api: EChartsApi) {
           const pingIndex = Number(api.value(3))
           const timestampSeconds = getActiveTimestamp()

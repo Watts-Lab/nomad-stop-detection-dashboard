@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { ComparePanelResponse, EChartsApi } from "../_lib/types"
 import { prepareDemoSceneData } from "../_lib/demo-scene-data"
 import { prepareDemoResultData } from "../_lib/demo-result-data"
+import { stopsFromLabels } from "@/lib/stop-detection"
 import {
   groundTruthAt, pastTruthStopData, currentTruthStopData, nextTruthStopData,
   groundTruthBuildingsSeriesData, groundTruthBuildingGlowData, groundTruthRouteLength,
@@ -457,7 +458,7 @@ export function DemoSceneRenderer({
 
       timelineChart.setOption({
         series: [
-          { id: "ping-ticks", data: chartData.pingData.map((_, index) => [index]) },
+          { id: "ping-ticks", data: chartData.pingData.filter((point) => chartData.pingVisible[point[3]]).map((point) => [point[3]]) },
           { id: "core-point-ticks", data: layerStateRef.current.showXray ? chartData.coreTimelineData : [] },
           { id: "past-truth-stops", data: layerStateRef.current.showGroundTruth ? pastTruthStopData(timestampSeconds, chartData) : [] },
           { id: "next-truth-stop", data: layerStateRef.current.showGroundTruth ? nextTruthStopData(timestampSeconds, chartData) : [] },
@@ -471,7 +472,7 @@ export function DemoSceneRenderer({
     // Reveal the requested number of pings 
     // Temporarily hiding algorithm results and playback layers
     const renderTrajectoryPreview = (pingCount: number) => {
-      const previewPings = chartData.pingData.slice(0, pingCount)
+      const previewPings = chartData.pingData.slice(0, pingCount).filter((point) => chartData.pingVisible[point[3]])
       nextPathVisible = false
       stopNextPathFlow()
       mapChart.setOption({
@@ -499,7 +500,7 @@ export function DemoSceneRenderer({
       }, { lazyUpdate: true })
       timelineChart.setOption({
         series: [
-          { id: "ping-ticks", data: previewPings.map((_, index) => [index]) },
+          { id: "ping-ticks", data: previewPings.map((point) => [point[3]]) },
           { id: "core-point-ticks", data: [] },
           { id: "past-truth-stops", data: [] },
           { id: "next-truth-stop", data: [] },
@@ -533,6 +534,7 @@ export function DemoSceneRenderer({
     // Update the hovered ping (a magnify accent only) and clear building hover,
     // Redraw and reposition tooltips
     const setHoveredPing = (pingIndex: number | null) => {
+      if (pingIndex !== null && !chartData.pingVisible[pingIndex]) pingIndex = null
       if (hoverPingIndex === pingIndex && hoverBuildingId === "") return
       hoverPingIndex = pingIndex
       hoverBuildingId = ""
@@ -616,6 +618,7 @@ export function DemoSceneRenderer({
     // Toggle ping selection; allow two selected pings
     // Start a new selection when a third is clicked
     const selectPing = (pingIndex: number) => {
+      if (!chartData.pingVisible[pingIndex]) return
       const selected = selectedPingIndexesRef.current
       const next = selected.includes(pingIndex)
         ? selected.filter((selectedPingIndex) => selectedPingIndex !== pingIndex)
@@ -633,7 +636,7 @@ export function DemoSceneRenderer({
       renderScene(activeTimestamp())
     }
     const tourCorePingIndexes = new Set(chartData.coreTimelineData.map((point) => point[2]))
-    const tourTimelinePingIndex = chartData.pings.find((ping) => !tourCorePingIndexes.has(ping.i))?.i ?? 0
+    const tourTimelinePingIndex = chartData.pings.find((ping) => chartData.pingVisible[ping.i] && !tourCorePingIndexes.has(ping.i))?.i ?? 0
     const tourAnchorPingIndex = chartData.anchorFrames[0]?.point[3] ?? chartData.densityCorePointData[0]?.[3] ?? tourTimelinePingIndex
     // Apply or clear guided-tour highlights for example pings, anchors, 
     // and ground-truth buildings in single mode
@@ -728,8 +731,9 @@ export function DemoSceneRenderer({
 
     // Ask ECharts to show the tooltip for the specified ping's hit area
     const showMapPingTip = (pingIndex: number) => {
-      if (pingHitAreaSeriesIndex < 0) return
-      mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex: pingIndex })
+      if (pingHitAreaSeriesIndex < 0 || !chartData.pingVisible[pingIndex]) return
+      const dataIndex = chartData.pingVisible.slice(0, pingIndex).filter(Boolean).length
+      mapChart.dispatchAction({ type: "showTip", seriesIndex: pingHitAreaSeriesIndex, dataIndex })
     }
 
     // Link timeline hover to the corresponding map ping, core point, or ground-truth building
@@ -1110,9 +1114,16 @@ export function DemoSceneRenderer({
     }
     updateResultRef.current = (data) => {
       chartData = data
+      selectedPingIndexesRef.current = selectedPingIndexesRef.current.filter((index) => data.pingVisible[index])
+      setSelectedPingIndexes(selectedPingIndexesRef.current)
+      if (hoverPingIndex !== null && !data.pingVisible[hoverPingIndex]) {
+        hoverPingIndex = null
+      }
+      mapChart.dispatchAction({ type: "hideTip" })
       renderSceneRef.current?.(
         selectedTimestampRef.current ?? data.timeSequence[data.timeSequence.length - 1],
       )
+      refreshTooltipLayout()
     }
     const initialTimestamp = destinationPreview
       ? 0
@@ -1457,7 +1468,7 @@ export function CompareAnimationPanel({
     ? (pings.length / ((pings[pings.length - 1].timestamp - pings[0].timestamp) / 3600)).toFixed(1)
     : ""
   const trueStopCount = panel?.scene.truth.filter((stop) => stop.location !== null).length ?? 0
-  const detectedStopCount = panel ? new Set(panel.result.cluster.filter((label) => label >= 0)).size : 0
+  const detectedStopCount = panel ? stopsFromLabels(panel.scene.pings, panel.result.cluster).length : 0
 
   return (
     <Card className="h-full min-h-0 gap-0 overflow-hidden bg-[#f8f9fc] py-0">

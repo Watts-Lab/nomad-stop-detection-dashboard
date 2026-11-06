@@ -123,12 +123,14 @@ export function sequentialLabels(
 }
 
 export function stopsFromLabels(pings: TrajectoryPing[], labels: number[]): DetectedStop[] {
-  return Array.from(new Set(labels.filter((label) => label >= 0))).map((cluster, index) => {
+  const stops = []
+  for (const cluster of new Set(labels.filter((label) => label >= 0))) {
     const members = pings.filter((_ping, pingIndex) => labels[pingIndex] === cluster)
+    if (members[members.length - 1].timestamp - members[0].timestamp <= 0) continue
     const x = members.reduce((sum, ping) => sum + ping.x, 0) / members.length
     const y = members.reduce((sum, ping) => sum + ping.y, 0) / members.length
-    return {
-      index,
+    stops.push({
+      index: stops.length,
       cluster,
       x,
       y,
@@ -137,6 +139,7 @@ export function stopsFromLabels(pings: TrajectoryPing[], labels: number[]): Dete
       duration: Math.floor((members[members.length - 1].timestamp - members[0].timestamp) / 60),
       nPings: members.length,
       diameter: diameter(members),
-    }
-  })
+    })
+  }
+  return stops
 }

@@ -109,6 +109,8 @@ export function containmentAreasAt(
     .filter((stop) => stop.cluster !== latestPing.cluster && stop.end <= timestampSeconds)
     .map((stop) => ({ cluster: stop.cluster, points: areaFor(membersOf(stop.cluster)), shaded: false }))
 
+  if (!chartData.pingVisible[latestPingIndex]) return pastAreas
+
   if (latestPing.cluster < 0) {
     return [...pastAreas, { cluster: -1, points: areaFor([latestPing]), shaded: false }]
   }

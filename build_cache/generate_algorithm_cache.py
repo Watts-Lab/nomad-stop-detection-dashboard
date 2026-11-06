@@ -442,6 +442,10 @@ def run_user_job(user_id):
             },
             traj_cols=TRAJ_COLS,
         )
+        # Use elapsed seconds: summarized durations are rounded down to minutes.
+        cluster_times = detection_input["timestamp"].groupby(result["cluster"]).agg(["first", "last"])
+        retained_clusters = cluster_times.index[cluster_times["last"] > cluster_times["first"]]
+        stops = stops.loc[stops["cluster"].isin(retained_clusters)]
         metrics = compute_stop_detection_metrics(
             stops=stops,
             truth=truth,

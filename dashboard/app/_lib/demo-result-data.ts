@@ -17,6 +17,9 @@ export function prepareDemoResultData(
 ) {
     const scene = panel.scene
     const result = panel.result
+    const detectedStops = stopsFromLabels(scene.pings, result.cluster)
+    const retainedClusters = new Set(detectedStops.map((stop) => stop.cluster))
+    const pingVisible = result.cluster.map((cluster) => cluster < 0 || retainedClusters.has(cluster))
 
     const pings = sceneData.pings.map((ping, index) => ({
         ...ping,
@@ -34,7 +37,7 @@ export function prepareDemoResultData(
     const clusterMembers = new Map<number, number[]>()
 
     pings.forEach((ping) => {
-        if (ping.cluster < 0) return
+        if (ping.cluster < 0 || !pingVisible[ping.i]) return
 
         const members = clusterMembers.get(ping.cluster)
 
@@ -66,7 +69,7 @@ export function prepareDemoResultData(
         }
     }
 
-    const stops = stopsFromLabels(scene.pings, result.cluster).map((stop) => ({
+    const stops = detectedStops.map((stop) => ({
         ...stop,
         destination: destinationFor(stop.x, stop.y),
         radius: Math.max(
@@ -146,7 +149,7 @@ export function prepareDemoResultData(
                     ? pings.flatMap((ping) => {
                         const auxTime = result.aux_time[ping.i]
 
-                        if (ping.cluster < 0 || auxTime == null) return []
+                        if (ping.cluster < 0 || !pingVisible[ping.i] || auxTime == null) return []
 
                         const anchorIndex =
                             sceneData.pingIndexByTimestamp.get(auxTime)
@@ -193,7 +196,7 @@ export function prepareDemoResultData(
     const densityCorePointData =
         result.kind === "density"
             ? pings.flatMap((ping) =>
-                ping.cluster >= 0 && result.core[ping.i] >= 0
+                pingVisible[ping.i] && ping.cluster >= 0 && result.core[ping.i] >= 0
                     ? [
                         [
                             ping.x,
@@ -215,7 +218,7 @@ export function prepareDemoResultData(
             ? pings.flatMap((ping) => {
                 const auxTime = result.aux_time[ping.i]
 
-                if (ping.cluster < 0 || auxTime == null) return []
+                if (ping.cluster < 0 || !pingVisible[ping.i] || auxTime == null) return []
 
                 const sourceIndex =
                     sceneData.pingIndexByTimestamp.get(auxTime)
@@ -289,6 +292,7 @@ export function prepareDemoResultData(
         blockSide: sceneData.blockSide,
         pings,
         pingData,
+        pingVisible,
         result,
         clusterMembers,
         stops,

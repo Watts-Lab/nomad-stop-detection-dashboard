@@ -51,6 +51,7 @@ export function currentPingData(
     hoverPingIndexes: Set<number> | null,
     pingFloatOffset: number,
   ) {
+    if (!chartData.pingVisible[latestPingIndex]) return []
     const ping = chartData.pingData[latestPingIndex]
     const cluster =
       showStops &&
@@ -185,7 +186,7 @@ export function buildDemoMapSeries({
         ...(nextPathVisible ? [] : [{ id: "next-path", data: [] }]),
         {
             id: "ghost-pings",
-            data: chartData.pingData,
+            data: chartData.pingData.filter((point) => chartData.pingVisible[point[3]]),
         },
         {
             id: "noise-pings",
@@ -284,7 +285,7 @@ export function buildDemoMapSeries({
         },
         {
             id: "ping-hit-area",
-            data: chartData.pingData
+            data: chartData.pingData.filter((point) => chartData.pingVisible[point[3]])
         },
         {
             id: "selected-ping-line",

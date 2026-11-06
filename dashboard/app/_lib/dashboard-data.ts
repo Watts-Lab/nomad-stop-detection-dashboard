@@ -28,6 +28,118 @@ export const LEARN_FAMILIES = [
   },
 ]
 
+export const LEARN_CONCEPTS = [
+  // Glossary: Mobility semantics
+  {
+    id: "trajectory",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Trajectory",
+    description:
+      "Path of a moving individual over time, taking place in continuous space.",
+  },
+  {
+    id: "true-stop",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Stop",
+    description:
+      "Part of a trajectory with stationary behavior.",
+  },
+  {
+    id: "visit",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Visit",
+    description:
+      "Part of a trajectory occurring within a place, typically associated with a single stop.",
+  },
+  {
+    id: "mobility-diary",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Mobility diary",
+    description:
+      "Discretized representation of a trajectory as a sequence of visits to places and trips between them.",
+  },
+  {
+    id: "micro-mobility",
+    category: "glossary",
+    section: "Mobility semantics",
+    name: "Micro-mobility",
+    description:
+      "Trajectory variability not captured by mobility diaries, such as movements within a stop or deviations from an expected path during trips.",
+  },
+
+  // Glossary: Trajectory Data semantics
+  {
+    id: "ping",
+    category: "glossary",
+    section: "Trajectory Data semantics",
+    name: "Pings",
+    description:
+      "Noisy location records, consisting of coordinate pairs and timestamps (x, y, t).",
+  },
+  {
+    id: "detected-stop",
+    category: "glossary",
+    section: "Trajectory Data semantics",
+    name: "Detected stop",
+    description:
+      "Estimate of a stop. For GPS data, it is a cluster of pings in the output of a stop-detection algorithm.",
+  },
+  {
+    id: "attributed-stop",
+    category: "glossary",
+    section: "Trajectory Data semantics",
+    name: "Attributed stop",
+    description:
+      "Detected stop assigned to an inferred location by means of a visit (or location) attribution algorithm.",
+  },
+  {
+    id: "horizontal-accuracy",
+    category: "glossary",
+    section: "Trajectory Data semantics",
+    name: "Horizontal accuracy",
+    description:
+      "Estimate of the measurement spatial error of the GPS sensor. It is the distance r such that the true position is within r of the measurement with 68% probability.",
+  },
+
+  // Failure modes
+  {
+    id: "splitting",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Split stop",
+    description:
+      "True stop temporally overlapping multiple detected stops.",
+  },
+  {
+    id: "missing",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Missing stop",
+    description:
+      "True stop with no temporal overlap with any detected stop.",
+  },
+  {
+    id: "merging",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Merged stop",
+    description:
+      "True stop overlapping a detected stop that also overlaps another true stop and is attributed to a different location.",
+  },
+  {
+    id: "displaced-stop",
+    category: "failure-modes",
+    section: "Failure modes",
+    name: "Displaced stop",
+    description:
+      "True stop overlapping a detected stop attributed to an incorrect location, without merging with another true stop.",
+  },
+]
+
 export const TRAJECTORY_OPTIONS = [
   {
     id: "two-stop",

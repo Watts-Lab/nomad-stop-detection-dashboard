@@ -56,8 +56,8 @@ function NomadDashboard() {
   const compareRequestIdRef = useRef(0)
   const [metricsOptions, setMetricsOptions] = useState<MetricsOptionsResponse | null>(null)
   const [metricsCompareMode, setMetricsCompareMode] = useState(false)
-  const [metricsLeftAlgorithm, setMetricsLeftAlgorithm] = useState("Lachesis")
-  const [metricsRightAlgorithm, setMetricsRightAlgorithm] = useState("Sequential (Centroid)")
+  const [metricsTopAlgorithm, setMetricsTopAlgorithm] = useState("Lachesis")
+  const [metricsBottomAlgorithm, setMetricsBottomAlgorithm] = useState("Sequential (Centroid)")
   const [metricsTrajectory, setMetricsTrajectory] = useState("two-stop")
   const [metricsAgentId, setMetricsAgentId] = useState<string | null>(null)
   const [metricsError, setMetricsError] = useState<string | null>(null)
@@ -149,7 +149,7 @@ function NomadDashboard() {
   }, [])
 
   // Load the cached Metrics configuration, including available algorithms
-  // parameter notes and default left/right algorithms
+  // parameter notes and default top/bottom algorithms
   // Clear any previous Metrics error and report a filure if loading fails
   const loadMetricsOptions = useCallback(async () => {
     try {
@@ -161,8 +161,8 @@ function NomadDashboard() {
       }
       const data = (await res.json()) as MetricsOptionsResponse
       setMetricsOptions(data)
-      setMetricsLeftAlgorithm(data.defaults.left_algorithm ?? "Lachesis")
-      setMetricsRightAlgorithm(data.defaults.right_algorithm ?? "Sequential (Centroid)")
+      setMetricsTopAlgorithm(data.defaults.top_algorithm ?? "Lachesis")
+      setMetricsBottomAlgorithm(data.defaults.bottom_algorithm ?? "Sequential (Centroid)")
     } catch (err) {
       setMetricsError(err instanceof Error ? err.message : "Failed to load metrics options")
     }
@@ -192,20 +192,20 @@ function NomadDashboard() {
 
   // Open Aggregated Metrics using the Metrics equivalents of the Demo algorithms.
   // For each available mapping, select its initial sweep parameter.
-  // Enable Metrics comparison when Demo comparison is active and the right
+  // Enable Metrics comparison when Demo comparison is active and the bottom
   // algorithm has a Metrics mapping, then update the active view and URL.
   // Highlight the given agent's curve, if any, on the Metrics charts.
   const openMetricsFromDemo = useCallback((agentId?: string) => {
-    const leftMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
-    const rightMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
+    const topMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[leftAlgorithm]
+    const bottomMetricsAlgorithm = METRICS_ALGORITHM_BY_DEMO_ID[rightAlgorithm]
 
-    if (leftMetricsAlgorithm) {
-      setMetricsLeftAlgorithm(leftMetricsAlgorithm)
+    if (topMetricsAlgorithm) {
+      setMetricsTopAlgorithm(topMetricsAlgorithm)
     }
-    if (rightMetricsAlgorithm) {
-      setMetricsRightAlgorithm(rightMetricsAlgorithm)
+    if (bottomMetricsAlgorithm) {
+      setMetricsBottomAlgorithm(bottomMetricsAlgorithm)
     }
-    setMetricsCompareMode(compareMode && Boolean(rightMetricsAlgorithm))
+    setMetricsCompareMode(compareMode && Boolean(bottomMetricsAlgorithm))
     setMetricsTrajectory(demoTrajectory)
     setMetricsAgentId(agentId ?? null)
     setActiveView("metrics")
@@ -309,8 +309,8 @@ function NomadDashboard() {
   const demoAlgorithms = algorithms.filter((a) => DEMO_ALGORITHM_IDS.has(a.id))
   const metricsAlgorithms = metricsOptions?.algorithms ?? ["Lachesis", "Sequential (Centroid)"]
   const parameterNotes: Record<string, MetricsParameterNote> = metricsOptions?.parameter_notes ?? FALLBACK_PARAMETER_NOTES
-  const leftParameterNote = parameterNotes[metricsLeftAlgorithm]
-  const rightParameterNote = parameterNotes[metricsRightAlgorithm]
+  const topParameterNote = parameterNotes[metricsTopAlgorithm]
+  const bottomParameterNote = parameterNotes[metricsBottomAlgorithm]
   const tourReady = activeView === "demo" && !compareMode && !compareLoading && Boolean(compareApiData?.left?.scene)
   const metricsTourReady = activeView === "metrics"
 
@@ -440,16 +440,16 @@ function NomadDashboard() {
         <MetricsView
           metricsCompareMode={metricsCompareMode}
           metricsAlgorithms={metricsAlgorithms}
-          metricsLeftAlgorithm={metricsLeftAlgorithm}
-          metricsRightAlgorithm={metricsRightAlgorithm}
+          metricsTopAlgorithm={metricsTopAlgorithm}
+          metricsBottomAlgorithm={metricsBottomAlgorithm}
           metricsTrajectory={metricsTrajectory}
           initialSelectedUserId={metricsAgentId ?? undefined}
-          leftParameterNote={leftParameterNote}
-          rightParameterNote={rightParameterNote}
+          topParameterNote={topParameterNote}
+          bottomParameterNote={bottomParameterNote}
           metricsError={metricsError}
           setMetricsCompareMode={setMetricsCompareMode}
-          setMetricsLeftAlgorithm={setMetricsLeftAlgorithm}
-          setMetricsRightAlgorithm={setMetricsRightAlgorithm}
+          setMetricsTopAlgorithm={setMetricsTopAlgorithm}
+          setMetricsBottomAlgorithm={setMetricsBottomAlgorithm}
           setMetricsTrajectory={setMetricsTrajectory}
           openPinnedAgent={handleMetricsPointSelect}
           startTour={startMetricsTour}

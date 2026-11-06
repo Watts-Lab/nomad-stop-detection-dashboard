@@ -50,8 +50,7 @@
     const xMaxParam = params.get("xmax");
     const fixedParameters = Object.fromEntries(params.getAll("fixed").map((parameter) => parameter.replaceAll("'", "").toLowerCase().split("=")));
     const demoAlgoId = params.get("algo") || "";
-    const frameId = params.get("frame") || "left";
-    const initialUserId = params.get("user");
+    const frameId = params.get("frame") || "top";
     const DATA_URL = `./${params.get("data") || "lachesis_results.parquet"}`;
 
     const chart = echarts.init(document.getElementById("chart"));
@@ -591,7 +590,7 @@
 
         // Hovering a point only enlarges it to invite a click; clicking a maximum point pins
         // that agent, drawing its curve and filling the side card until it is unpinned or replaced.
-        let pinnedPoint = perUserMaxData.find((point) => point[2] === initialUserId) || null;
+        let pinnedPoint = null;
 
         // Identify maximum-point events, including events on their larger invisible hit areas
         const isPerUserMaxSeries = (name) => name === "User max" || name === "User max hit area";
@@ -625,10 +624,11 @@
         };
 
         // Notify the parent Metrics view of the pinned agent and settings, or send null values when unpinned
-        const postPinChange = () => {
+        const postPinChange = (restored = false) => {
           window.parent.postMessage({
             type: "nomad-metrics-pin-change",
             frame: frameId,
+            restored,
             algoId: demoAlgoId,
             param: xField,
             userId: pinnedPoint ? pinnedPoint[2] : null,
@@ -638,10 +638,13 @@
           }, window.location.origin);
         };
 
-        if (pinnedPoint) {
+        window.addEventListener("message", (event) => {
+          if (event.origin !== window.location.origin || event.data?.type !== "nomad-metrics-restore-pin") return;
+          pinnedPoint = perUserMaxData.find((point) => point[2] === event.data.userId) || null;
           renderHighlight();
-          postPinChange();
-        }
+          postPinChange(true);
+        });
+        window.parent.postMessage({ type: "nomad-metrics-ready", frame: frameId }, window.location.origin);
 
         // Hover only magnifies the point under the cursor. The invisible hit areas receive the
         // events, so highlight the matching visible point; highlight states skip setOption,

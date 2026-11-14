@@ -341,6 +341,7 @@ def algorithm_specs():
                 "time_thresh": TIME_THRESH_VALUES,
                 "min_pts": MIN_PTS_VALUES,
                 "remove_overlaps": True,
+                "dur_min": 5,
             },
         },
         "dbstop": {

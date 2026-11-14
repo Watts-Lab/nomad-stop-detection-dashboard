@@ -187,7 +187,7 @@ export const FALLBACK_PARAMETER_NOTES: Record<string, MetricsParameterNote> = {
   "ST-DBSCAN": {
     source: "Generated stop-detection cache",
     sweep_parameter: "dist_thresh",
-    fixed_parameters: ["time_thresh=60", "min_pts=2", "remove_overlaps=True"],
+    fixed_parameters: ["time_thresh=60", "min_pts=2", "remove_overlaps=True", "dur_min=5"],
   },
   DBSTOP: {
     source: "Generated stop-detection cache",
